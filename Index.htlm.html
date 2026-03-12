@@ -1,0 +1,2441 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Panel de Gestión — Global Solutions</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', system-ui, sans-serif; background: #f0f2f5; min-height: 100vh; }
+  .container { max-width: 560px; margin: 0 auto; }
+
+  .topbar { background: linear-gradient(160deg, #051525 0%, #0B2545 50%, #163A6B 100%); padding: 14px 16px 10px; position: sticky; top: 0; z-index: 10; box-shadow: 0 2px 8px rgba(0,0,0,0.3); }
+  .topbar-row { display: flex; align-items: flex-start; justify-content: space-between; }
+  .topbar .label { color: rgba(255,255,255,0.9); font-size: 13px; letter-spacing: 3px; font-weight: 700; }
+  .topbar h1 { color: white; font-weight: 800; font-size: 22px; margin: 2px 0; }
+  .topbar .sub { color: rgba(255,255,255,0.6); font-size: 10px; }
+  .copy-btn { background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.3); color: white; border-radius: 8px; padding: 6px 10px; font-size: 10px; cursor: pointer; white-space: nowrap; margin-left: 8px; margin-top: 2px; transition: all 0.15s; }
+  .copy-btn:hover { background: rgba(255,255,255,0.25); }
+  .copy-btn.copied { background: #375623; border-color: #375623; }
+  .filters { display: flex; gap: 5px; margin-top: 10px; flex-wrap: wrap; }
+  .filter-btn { padding: 4px 10px; border-radius: 20px; border: none; cursor: pointer; font-size: 10px; background: rgba(255,255,255,0.15); color: rgba(255,255,255,0.8); transition: all 0.15s; }
+  .filter-btn.active { background: white; color: #1F4E79; font-weight: 700; }
+
+  .content { padding: 14px 12px; }
+  .kpi-banner { background: linear-gradient(135deg, #1F4E79, #2E75B6); border-radius: 10px; padding: 10px 14px; margin-bottom: 14px; box-shadow: 0 2px 8px rgba(31,78,121,0.3); }
+  .kpi-banner .result { color: white; font-weight: 700; font-size: 12px; letter-spacing: 0.5px; }
+  .kpi-banner .kpi { color: rgba(255,255,255,0.75); font-size: 10px; margin-top: 3px; }
+
+  .fase-card { border-radius: 12px; overflow: hidden; box-shadow: 0 2px 12px rgba(0,0,0,0.12); margin-bottom: 14px; background: white; }
+  .fase-header { padding: 12px 16px; }
+  .fase-header-inner { display: flex; align-items: center; justify-content: space-between; }
+  .fase-left { display: flex; align-items: center; gap: 8px; }
+  .fase-emoji { font-size: 20px; }
+  .fase-num { font-size: 10px; letter-spacing: 1px; color: rgba(255,255,255,0.7); }
+  .fase-name { color: white; font-weight: 800; font-size: 15px; }
+  .fase-right { text-align: right; }
+  .fase-sub { color: rgba(255,255,255,0.8); font-size: 10px; font-style: italic; }
+  .urgentes-badge { background: #C00000; color: white; font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 10px; margin-top: 3px; display: inline-block; }
+
+  .tabs { display: flex; border-bottom: 1px solid #eee; }
+  .tab-btn { flex: 1; padding: 8px 4px; border: none; cursor: pointer; font-size: 11px; color: #888; background: white; border-bottom: 2px solid transparent; transition: all 0.15s; font-weight: 500; }
+  .tab-btn.active { font-weight: 700; }
+
+  .items { padding: 6px 10px 10px; }
+
+  /* ACORDEÓN - Tareas Diarias (no tachables) */
+  .acord-item { border-radius: 7px; margin-bottom: 4px; overflow: hidden; border: 1px solid #eee; }
+  .acord-header { display: flex; align-items: center; padding: 9px 10px; cursor: pointer; background: white; transition: background 0.15s; gap: 8px; user-select: none; }
+  .acord-header:hover { background: #f7f9ff; }
+  .acord-header.open { background: #f0f5ff; }
+  .acord-arrow { font-size: 10px; color: #aaa; transition: transform 0.2s; flex-shrink: 0; }
+  .acord-header.open .acord-arrow { transform: rotate(90deg); }
+  .acord-title { font-size: 12px; font-weight: 600; color: #222; flex: 1; }
+  .acord-count { font-size: 10px; color: #aaa; background: #f0f0f0; padding: 1px 6px; border-radius: 8px; flex-shrink: 0; }
+  .proc-icon { font-size: 13px; cursor: pointer; flex-shrink: 0; opacity: 0.5; }
+  .proc-icon:hover { opacity: 1; }
+
+  .acord-body { display: none; background: #fafbff; border-top: 1px solid #eef2ff; padding: 8px 10px 8px 28px; }
+  .acord-body.open { display: block; }
+
+  /* Procedimiento / ayuda de memoria */
+  .proc-box { background: #fffbe6; border: 1px solid #ffe58f; border-radius: 6px; padding: 8px 10px; margin-bottom: 8px; font-size: 11px; color: #614700; line-height: 1.5; }
+  .proc-box strong { display: block; margin-bottom: 4px; font-size: 11px; color: #ad6800; }
+  .proc-edit-area { width: 100%; border: 1px solid #ffe58f; border-radius: 5px; padding: 6px 8px; font-size: 11px; font-family: inherit; resize: vertical; min-height: 60px; background: #fffef5; outline: none; }
+  .proc-save-btn { margin-top: 4px; background: #d48806; color: white; border: none; border-radius: 5px; padding: 4px 10px; font-size: 11px; cursor: pointer; font-weight: 600; }
+
+  .subtask { display: flex; align-items: flex-start; padding: 5px 4px; border-radius: 5px; margin-bottom: 1px; }
+  .subtask-text { font-size: 11px; color: #444; line-height: 1.4; flex: 1; }
+  .subtask-del { font-size: 14px; color: #ddd; cursor: pointer; padding: 0 4px; flex-shrink: 0; line-height: 1.6; }
+  .subtask-del:hover { color: #e55; }
+
+  .add-sub-row { display: flex; gap: 6px; margin-top: 6px; }
+  .add-sub-input { flex: 1; border: 1px solid #dde; border-radius: 5px; padding: 5px 8px; font-size: 11px; outline: none; font-family: inherit; }
+  .add-sub-input:focus { border-color: var(--fc); }
+  .add-sub-btn { background: var(--fc); color: white; border: none; border-radius: 5px; padding: 5px 10px; font-size: 13px; cursor: pointer; font-weight: 700; }
+
+  /* PENDIENTES */
+  .section-label { font-size: 10px; font-weight: 700; letter-spacing: 1px; color: #aaa; padding: 6px 4px 4px; }
+  .pend-item { display: flex; align-items: flex-start; padding: 7px 8px; border-radius: 7px; cursor: pointer; margin-bottom: 3px; background: white; border: 1px solid #eee; }
+  .pend-item:hover { background: #fafafa; }
+  .pend-item.done-pend { background: #f9f9f9; }
+  .pend-check { width: 18px; height: 18px; border-radius: 4px; border: 2px solid #ccc; background: white; margin-right: 8px; margin-top: 1px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; transition: all 0.15s; cursor: pointer; }
+  .pend-check.done { background: #607D8B; border-color: #607D8B; }
+  .pend-check.done::after { content: '✓'; color: white; font-size: 11px; font-weight: 900; line-height: 1; }
+  .pend-text { font-size: 12px; color: #222; line-height: 1.4; flex: 1; }
+  .pend-item.done-pend .pend-text { color: #aaa; text-decoration: line-through; }
+  .pend-edit { font-size: 12px; color: #bbb; cursor: pointer; padding: 0 3px; flex-shrink: 0; align-self: center; }
+  .pend-edit:hover { color: #2E75B6; }
+  .pend-tach { font-size: 13px; color: #bbb; cursor: pointer; padding: 0 3px; flex-shrink: 0; align-self: center; font-weight: 700; }
+  .pend-tach:hover { color: #888; }
+  .pend-tach.tachado { color: #4CAF50; }
+  .pend-del { font-size: 15px; color: #ddd; cursor: pointer; padding: 0 4px; flex-shrink: 0; align-self: center; }
+  .pend-del:hover { color: #e55; }
+
+  .hoy-badge { background: #C00000; color: white; font-size: 9px; font-weight: 700; padding: 1px 5px; border-radius: 3px; margin-right: 5px; letter-spacing: 0.5px; flex-shrink: 0; align-self: flex-start; margin-top: 2px; }
+  .lunes-badge { background: #2E75B6; color: white; font-size: 9px; font-weight: 700; padding: 1px 5px; border-radius: 3px; margin-right: 5px; letter-spacing: 0.5px; flex-shrink: 0; align-self: flex-start; margin-top: 2px; }
+  .ok-badge { background: #375623; color: white; font-size: 9px; font-weight: 700; padding: 1px 5px; border-radius: 3px; margin-right: 5px; letter-spacing: 0.5px; flex-shrink: 0; align-self: flex-start; margin-top: 2px; }
+  .martes-badge { background: #5B3E8C; color: white; font-size: 9px; font-weight: 700; padding: 1px 5px; border-radius: 3px; margin-right: 5px; letter-spacing: 0.5px; flex-shrink: 0; align-self: flex-start; margin-top: 2px; }
+  .miercoles-badge { background: #2E7D32; color: white; font-size: 9px; font-weight: 700; padding: 1px 5px; border-radius: 3px; margin-right: 5px; letter-spacing: 0.5px; flex-shrink: 0; align-self: flex-start; margin-top: 2px; }
+  .jueves-badge { background: #6D4C41; color: white; font-size: 9px; font-weight: 700; padding: 1px 5px; border-radius: 3px; margin-right: 5px; letter-spacing: 0.5px; flex-shrink: 0; align-self: flex-start; margin-top: 2px; }
+  .viernes-badge { background: #00695C; color: white; font-size: 9px; font-weight: 700; padding: 1px 5px; border-radius: 3px; margin-right: 5px; letter-spacing: 0.5px; flex-shrink: 0; align-self: flex-start; margin-top: 2px; }
+  .sabado-badge { background: #616161; color: white; font-size: 9px; font-weight: 700; padding: 1px 5px; border-radius: 3px; margin-right: 5px; letter-spacing: 0.5px; flex-shrink: 0; align-self: flex-start; margin-top: 2px; }
+  .domingo-badge { background: #37474F; color: white; font-size: 9px; font-weight: 700; padding: 1px 5px; border-radius: 3px; margin-right: 5px; letter-spacing: 0.5px; flex-shrink: 0; align-self: flex-start; margin-top: 2px; }
+
+  .add-pend-row { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; align-items: center; }
+  .add-pend-input { flex: 1; min-width: 150px; border: 1px solid #dde; border-radius: 7px; padding: 7px 10px; font-size: 12px; outline: none; font-family: inherit; }
+  .add-pend-input:focus { border-color: var(--fc); }
+  .badge-select { border: 1px solid #dde; border-radius: 7px; padding: 7px 6px; font-size: 11px; outline: none; font-family: inherit; background: white; cursor: pointer; }
+  .add-pend-btn { background: var(--fc); color: white; border: none; border-radius: 7px; padding: 7px 12px; font-size: 12px; cursor: pointer; font-weight: 700; white-space: nowrap; }
+
+  /* DASHBOARD */
+  .dash-wrap { margin-bottom: 14px; }
+  .dash-formula { background: #1F4E79; border-radius: 10px 10px 0 0; padding: 10px 14px 8px; box-shadow: 0 2px 8px rgba(31,78,121,0.3); }
+
+  .dash-formula .result { color: white; font-weight: 700; font-size: 13px; letter-spacing: 0.5px; }
+  .dash-formula .kpi { color: rgba(255,255,255,0.92); font-size: 12px; font-weight: 600; margin-top: 4px; }
+  .dash-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: #1a4570; border-radius: 0 0 10px 10px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+  .dash-card { background: #1F4E79; padding: 10px 12px; display: flex; flex-direction: column; gap: 3px; }
+  .dash-card-label { font-size: 10px; font-weight: 700; color: rgba(255,255,255,0.75); letter-spacing: 0.8px; text-transform: uppercase; }
+  .dash-card-value { font-size: 22px; font-weight: 800; color: white; line-height: 1; }
+  .dash-card-value span { font-size: 12px; font-weight: 500; color: rgba(255,255,255,0.6); }
+  .dash-card-sub { font-size: 11px; color: rgba(255,255,255,0.75); font-weight: 600; }
+  .dash-card-bar { height: 8px; background: rgba(255,255,255,0.2); border-radius: 4px; overflow: hidden; margin-top: 4px; }
+  .dash-card-bar-fill { height: 100%; border-radius: 4px; }
+  .dash-edit-btn { font-size: 9px; color: rgba(255,255,255,0.7); cursor: pointer; text-decoration: underline; margin-top: 1px; background: none; border: none; padding: 0; text-align: left; }
+  .dash-modal { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 100; align-items: center; justify-content: center; }
+  .dash-modal.open { display: flex; }
+  .dash-modal-box { background: white; border-radius: 14px; padding: 20px; width: 88%; max-width: 380px; box-shadow: 0 8px 30px rgba(0,0,0,0.2); }
+  .dash-modal-title { font-size: 14px; font-weight: 800; color: #1F4E79; margin-bottom: 14px; }
+  .dash-field { margin-bottom: 12px; }
+  .dash-field label { font-size: 11px; font-weight: 700; color: #555; display: block; margin-bottom: 4px; }
+  .dash-field input { width: 100%; border: 1.5px solid #ddd; border-radius: 8px; padding: 8px 10px; font-size: 14px; outline: none; }
+  .dash-field input:focus { border-color: #2E75B6; }
+  .dash-modal-btns { display: flex; gap: 8px; margin-top: 16px; }
+  .dash-btn-save { flex: 1; background: #1F4E79; color: white; border: none; border-radius: 8px; padding: 10px; font-size: 13px; font-weight: 700; cursor: pointer; }
+  .dash-btn-cancel { background: #f0f0f0; color: #555; border: none; border-radius: 8px; padding: 10px 16px; font-size: 13px; cursor: pointer; }
+
+  /* PLAN EN FASES */
+  .plan-fase { padding: 4px 0; }
+  .plan-que { font-size: 11px; font-style: italic; color: #555; background: #f8f8f8; border-radius: 7px; padding: 8px 10px; margin-bottom: 10px; line-height: 1.5; }
+  .plan-que strong { color: #333; font-style: normal; display: block; margin-bottom: 3px; font-size: 10px; letter-spacing: 0.5px; }
+  .plan-como-title { font-size: 10px; font-weight: 700; color: #888; letter-spacing: 0.5px; margin-bottom: 6px; padding-left: 2px; }
+  .plan-como-item { display: flex; align-items: flex-start; padding: 5px 4px; border-radius: 5px; cursor: pointer; margin-bottom: 2px; }
+  .plan-como-item:hover { background: #f5f5f5; }
+  .plan-como-item.done-como .plan-como-text { color: #aaa; text-decoration: line-through; }
+  .plan-como-check { width: 14px; height: 14px; border-radius: 3px; border: 2px solid #ccc; background: white; margin-right: 8px; margin-top: 1px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; transition: all 0.15s; }
+  .plan-como-check.done { border-color: var(--fc); background: var(--fc); }
+  .plan-como-check.done::after { content: '✓'; color: white; font-size: 9px; font-weight: 700; }
+  .plan-como-text { font-size: 12px; color: #222; line-height: 1.4; }
+  .plan-meta-box { margin-top: 10px; padding: 7px 10px; border-radius: 7px; font-size: 11px; font-weight: 700; color: white; line-height: 1.4; }
+  .plan-progress { display: flex; align-items: center; gap: 6px; margin: 8px 0 6px; }
+  .plan-bar { flex: 1; height: 5px; background: #eee; border-radius: 3px; overflow: hidden; }
+  .plan-bar-fill { height: 100%; border-radius: 3px; transition: width 0.3s; }
+  .plan-bar-label { font-size: 9px; color: #888; white-space: nowrap; }
+
+  /* PLAN DE ESTABILIZACIÓN */
+  .plan-etapa { border-radius: 10px; margin-bottom: 12px; overflow: hidden; border: 1px solid #eee; }
+  .plan-etapa-header { padding: 10px 12px; display: flex; align-items: center; gap: 8px; cursor: pointer; user-select: none; }
+  .plan-etapa-header:hover { opacity: 0.92; }
+  .plan-etapa-icon { font-size: 16px; }
+  .plan-etapa-info { flex: 1; }
+  .plan-etapa-label { font-size: 9px; font-weight: 700; color: rgba(255,255,255,0.7); letter-spacing: 1px; }
+  .plan-etapa-title { font-size: 13px; font-weight: 800; color: white; }
+  .plan-etapa-periodo { font-size: 10px; color: rgba(255,255,255,0.75); font-style: italic; margin-top: 1px; }
+  .plan-etapa-chevron { color: rgba(255,255,255,0.6); font-size: 12px; transition: transform 0.2s; }
+  .plan-etapa-chevron.open { transform: rotate(90deg); }
+  .plan-etapa-body { background: white; padding: 10px 12px 12px; border-top: 1px solid #eee; }
+  .plan-objetivo { font-size: 11px; color: #555; font-style: italic; margin-bottom: 8px; padding: 6px 10px; background: #f8f8f8; border-radius: 6px; line-height: 1.4; }
+  .plan-meta { font-size: 11px; font-weight: 700; color: white; padding: 6px 10px; border-radius: 6px; margin-top: 8px; line-height: 1.4; }
+  .plan-accion { display: flex; align-items: flex-start; padding: 5px 4px; border-radius: 5px; cursor: pointer; margin-bottom: 1px; }
+  .plan-accion:hover { background: #f5f5f5; }
+  .plan-accion.done-plan .plan-accion-text { color: #aaa; text-decoration: line-through; }
+  .plan-check { width: 14px; height: 14px; border-radius: 3px; border: 2px solid #ccc; background: white; margin-right: 7px; margin-top: 2px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; transition: all 0.15s; }
+  .plan-check.done { border-color: var(--etapa-color); background: var(--etapa-color); }
+  .plan-check.done::after { content: "✓"; color: white; font-size: 9px; font-weight: 700; }
+  .plan-accion-text { font-size: 11px; color: #222; line-height: 1.4; }
+  .plan-progress { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; }
+  .plan-progress-bar { flex: 1; height: 5px; background: #eee; border-radius: 3px; overflow: hidden; }
+  .plan-progress-fill { height: 100%; border-radius: 3px; transition: width 0.3s; }
+  .plan-progress-label { font-size: 9px; color: #888; white-space: nowrap; }
+
+  /* SCALING UP */
+  .su-section { margin-bottom: 12px; }
+  .su-section-title { font-size: 11px; font-weight: 700; color: #37474F; letter-spacing: 0.5px; padding: 6px 4px 4px; border-bottom: 1px solid #dde4e8; margin-bottom: 6px; }
+  .su-item { display: flex; align-items: flex-start; padding: 7px 8px; border-radius: 7px; margin-bottom: 3px; background: white; border: 1px solid #dde4e8; }
+  .su-item.done-su { background: #f9f9f9; }
+  .su-pillar { font-size: 9px; font-weight: 700; padding: 1px 6px; border-radius: 8px; margin-right: 6px; flex-shrink: 0; align-self: flex-start; margin-top: 2px; white-space: nowrap; }
+  .su-text { font-size: 12px; color: #333; line-height: 1.4; flex: 1; cursor: pointer; }
+  .su-item.done-su .su-text { color: #aaa; text-decoration: line-through; }
+  .su-del { font-size: 15px; color: #ddd; cursor: pointer; padding: 0 4px; flex-shrink: 0; align-self: center; }
+  .su-del:hover { color: #e55; }
+  .su-check { width: 16px; height: 16px; border-radius: 4px; border: 2px solid #ccc; background: white; margin-right: 8px; margin-top: 1px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; transition: all 0.15s; cursor: pointer; }
+  .su-check.done { background: #455A64; border-color: #455A64; }
+  .su-check.done::after { content: '✓'; color: white; font-size: 10px; font-weight: 700; }
+
+  .add-su-row { display: flex; gap: 6px; margin-top: 6px; flex-wrap: wrap; align-items: center; }
+  .add-su-input { flex: 1; min-width: 140px; border: 1px solid #dde4e8; border-radius: 7px; padding: 7px 10px; font-size: 12px; outline: none; font-family: inherit; }
+  .add-su-input:focus { border-color: #455A64; }
+  .pillar-select { border: 1px solid #dde4e8; border-radius: 7px; padding: 7px 6px; font-size: 11px; outline: none; font-family: inherit; background: white; cursor: pointer; }
+  .add-su-btn { background: #455A64; color: white; border: none; border-radius: 7px; padding: 7px 12px; font-size: 12px; cursor: pointer; font-weight: 700; white-space: nowrap; }
+
+  .plan-bloque-label { font-size: 9px; font-weight: 700; letter-spacing: 1px; color: #888; padding: 8px 0 3px; text-transform: uppercase; }
+  .save-indicator { text-align: center; color: #375623; font-size: 10px; padding: 2px; opacity: 0; transition: opacity 0.3s; }
+  .save-indicator.show { opacity: 1; }
+  .footer { text-align: center; color: #aaa; font-size: 10px; padding: 8px 0 24px; }
+</style>
+</head>
+<body>
+
+<!-- PANTALLA LOGIN -->
+<div id="login-screen" style="display:none;position:fixed;inset:0;background:linear-gradient(160deg,#051525,#0B2545,#163A6B);z-index:9999;overflow-y:auto">
+  <div style="max-width:400px;margin:0 auto;padding:40px 20px">
+    <div style="text-align:center;margin-bottom:32px">
+      <div style="color:rgba(255,255,255,0.7);font-size:11px;letter-spacing:3px;font-weight:700">GLOBAL SOLUTIONS</div>
+      <div style="color:white;font-size:26px;font-weight:800;margin-top:4px">Panel de Gestión</div>
+    </div>
+
+    <!-- Paso 1: Selección de rol -->
+    <div id="login-step-rol">
+      <div style="color:rgba(255,255,255,0.7);font-size:11px;letter-spacing:2px;margin-bottom:16px;text-align:center">¿QUIÉN ERES?</div>
+      <div id="roles-list" style="display:flex;flex-direction:column;gap:8px"></div>
+    </div>
+
+    <!-- Paso 2: Selección conductor (si aplica) -->
+    <div id="login-step-conductor" style="display:none">
+      <div style="color:rgba(255,255,255,0.7);font-size:11px;letter-spacing:2px;margin-bottom:16px;text-align:center">SELECCIONA TU NOMBRE</div>
+      <div id="conductores-list-login" style="display:flex;flex-direction:column;gap:8px"></div>
+      <button onclick="loginVolverRol()" style="width:100%;margin-top:16px;background:rgba(255,255,255,0.1);color:rgba(255,255,255,0.7);border:1px solid rgba(255,255,255,0.2);border-radius:10px;padding:12px;font-size:13px;cursor:pointer">← Volver</button>
+    </div>
+
+    <!-- Paso 3: PIN -->
+    <div id="login-step-pin" style="display:none">
+      <div id="login-quien" style="color:white;font-size:16px;font-weight:700;text-align:center;margin-bottom:6px"></div>
+      <div style="color:rgba(255,255,255,0.6);font-size:11px;letter-spacing:2px;margin-bottom:20px;text-align:center">INGRESA TU PIN</div>
+      <div id="pin-dots" style="display:flex;justify-content:center;gap:16px;margin-bottom:24px">
+        <div class="pin-dot"></div><div class="pin-dot"></div><div class="pin-dot"></div><div class="pin-dot"></div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;max-width:280px;margin:0 auto">
+        <button onclick="pinPress(1)" style="background:rgba(255,255,255,0.12);color:white;border:1px solid rgba(255,255,255,0.2);border-radius:12px;padding:18px;font-size:22px;font-weight:600;cursor:pointer">1</button>
+        <button onclick="pinPress(2)" style="background:rgba(255,255,255,0.12);color:white;border:1px solid rgba(255,255,255,0.2);border-radius:12px;padding:18px;font-size:22px;font-weight:600;cursor:pointer">2</button>
+        <button onclick="pinPress(3)" style="background:rgba(255,255,255,0.12);color:white;border:1px solid rgba(255,255,255,0.2);border-radius:12px;padding:18px;font-size:22px;font-weight:600;cursor:pointer">3</button>
+        <button onclick="pinPress(4)" style="background:rgba(255,255,255,0.12);color:white;border:1px solid rgba(255,255,255,0.2);border-radius:12px;padding:18px;font-size:22px;font-weight:600;cursor:pointer">4</button>
+        <button onclick="pinPress(5)" style="background:rgba(255,255,255,0.12);color:white;border:1px solid rgba(255,255,255,0.2);border-radius:12px;padding:18px;font-size:22px;font-weight:600;cursor:pointer">5</button>
+        <button onclick="pinPress(6)" style="background:rgba(255,255,255,0.12);color:white;border:1px solid rgba(255,255,255,0.2);border-radius:12px;padding:18px;font-size:22px;font-weight:600;cursor:pointer">6</button>
+        <button onclick="pinPress(7)" style="background:rgba(255,255,255,0.12);color:white;border:1px solid rgba(255,255,255,0.2);border-radius:12px;padding:18px;font-size:22px;font-weight:600;cursor:pointer">7</button>
+        <button onclick="pinPress(8)" style="background:rgba(255,255,255,0.12);color:white;border:1px solid rgba(255,255,255,0.2);border-radius:12px;padding:18px;font-size:22px;font-weight:600;cursor:pointer">8</button>
+        <button onclick="pinPress(9)" style="background:rgba(255,255,255,0.12);color:white;border:1px solid rgba(255,255,255,0.2);border-radius:12px;padding:18px;font-size:22px;font-weight:600;cursor:pointer">9</button>
+        <button onclick="pinBorrar()" style="background:rgba(255,255,255,0.08);color:rgba(255,255,255,0.7);border:1px solid rgba(255,255,255,0.15);border-radius:12px;padding:18px;font-size:18px;font-weight:600;cursor:pointer">←</button>
+        <button onclick="pinPress(0)" style="background:rgba(255,255,255,0.12);color:white;border:1px solid rgba(255,255,255,0.2);border-radius:12px;padding:18px;font-size:22px;font-weight:600;cursor:pointer">0</button>
+        <div></div>
+      </div>
+      <div id="pin-error" style="color:#EF9A9A;font-size:12px;text-align:center;margin-top:16px;min-height:18px"></div>
+      <button onclick="loginVolverRol()" style="width:100%;margin-top:16px;background:rgba(255,255,255,0.1);color:rgba(255,255,255,0.7);border:1px solid rgba(255,255,255,0.2);border-radius:10px;padding:12px;font-size:13px;cursor:pointer">← Volver</button>
+    </div>
+  </div>
+</div>
+
+<style>
+.pin-dot { width:16px;height:16px;border-radius:50%;border:2px solid rgba(255,255,255,0.5);background:transparent;transition:background 0.15s; }
+.pin-dot.filled { background:white;border-color:white; }
+.rol-btn { background:rgba(255,255,255,0.1);color:white;border:1px solid rgba(255,255,255,0.25);border-radius:12px;padding:16px 20px;font-size:15px;font-weight:600;cursor:pointer;text-align:left;transition:all 0.15s; }
+.rol-btn:hover { background:rgba(255,255,255,0.2); }
+</style>
+
+<div class="container">
+  <div class="topbar">
+    <div class="topbar-row">
+      <div>
+        <div class="label">GLOBAL SOLUTIONS</div>
+        <h1>Panel de Gestión</h1>
+        <div style="display:flex;align-items:center;gap:8px;margin-top:3px">
+          <div id="session-info" style="color:rgba(255,255,255,0.6);font-size:9px;letter-spacing:0.5px"></div>
+          <button onclick="cerrarSesion()" style="background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.25);color:rgba(255,255,255,0.7);border-radius:6px;padding:2px 8px;font-size:9px;cursor:pointer">⏏ Salir</button>
+        </div>
+      </div>
+      <button onclick="saveData();showSaveToast()" style="background:#6abf69;border:1px solid #4caf50;color:white;border-radius:8px;padding:7px 14px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;margin-top:2px">💾 Guardar</button>
+      <button id="btn-deshacer" onclick="deshacer()" title="Sin acciones para deshacer" style="background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.3);color:white;border-radius:8px;padding:7px 12px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;margin-top:2px;opacity:0.35;transition:opacity 0.2s">↩ Deshacer</button>
+      <span id="supa-status" style="font-size:10px;font-weight:700;padding:5px 10px;border-radius:8px;background:rgba(255,255,255,0.08);color:rgba(255,255,255,0.35);margin-top:2px;white-space:nowrap">⬤ DB...</span>
+    </div>
+    <div class="filters">
+      <button class="filter-btn active" onclick="filtrar('todas',this)">Todas</button>
+      <button class="filter-btn" onclick="filtrar('comercial',this)">Comercial</button>
+      <button class="filter-btn" onclick="filtrar('operacional',this)">Operacional</button>
+      <button class="filter-btn" onclick="filtrar('financiero',this)">Financiero</button>
+      <button class="filter-btn" onclick="filtrar('control',this)">Control</button>
+      <button class="filter-btn" onclick="filtrar('scalingup',this)">Scaling Up</button>
+    </div>
+  </div>
+
+  <div class="content">
+    <div id="dashboard-container"></div>
+    <div style="text-align:center;margin:-4px 0 10px">
+      <button onclick="abrirEnChrome()" style="background:rgba(31,78,121,0.08);border:1px solid #2E75B6;color:#1F4E79;border-radius:8px;padding:6px 16px;font-size:11px;font-weight:700;cursor:pointer;letter-spacing:0.5px">↗ Abrir en ventana independiente</button>
+    </div>
+    <div id="save-indicator" class="save-indicator">✓ Guardado</div>
+    <div id="fases"></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center;padding:16px 0 8px;">
+      <button class="copy-btn" id="copyBtn" onclick="copiarResumen()" style="background:#1F4E79;border-color:#2E75B6;font-size:11px;padding:8px 14px">📋 Copiar resumen</button>
+      <button class="copy-btn" onclick="saveData();showSaveToast()" style="background:#6abf69;border-color:#4caf50;font-size:11px;padding:8px 14px">💾 Guardar</button>
+      <button class="copy-btn" onclick="exportarDatos()" style="background:#37474F;border-color:#546E7A;font-size:11px;padding:8px 14px">⬇ Exportar</button>
+      <label class="copy-btn" style="background:#37474F;border-color:#546E7A;font-size:11px;padding:8px 14px;cursor:pointer">⬆ Importar<input type="file" accept=".json" onchange="importarDatos(event)" style="display:none"></label>
+    </div>
+    <div class="footer">Marzo 2026 · Global Solutions / Santa Berenice</div>
+  </div>
+
+  <!-- Modal dashboard individual -->
+  <div class="dash-modal" id="dash-modal" onclick="if(event.target===this)closeDashModal()">
+    <div class="dash-modal-box">
+      <div class="dash-modal-title" id="dash-modal-title">Actualizar</div>
+      <div class="dash-field">
+        <label id="dash-modal-label"></label>
+        <input type="number" id="dash-modal-input" style="font-size:18px;padding:10px 12px">
+      </div>
+      <div class="dash-modal-btns">
+        <button class="dash-btn-cancel" onclick="closeDashModal()">Cancelar</button>
+        <button class="dash-btn-save" onclick="saveDashSingle()">Guardar</button>
+      </div>
+    </div>
+  </div>
+  </div>
+</div>
+
+<script>
+const PILLAR_COLORS = {
+  'Personas': { bg: '#E8F4FD', text: '#1A5276' },
+  'Estrategia': { bg: '#EBF5EB', text: '#1E8449' },
+  'Ejecución': { bg: '#FEF9E7', text: '#B7770D' },
+  'Finanzas': { bg: '#FDEDEC', text: '#922B21' },
+  'Sistema': { bg: '#F4ECF7', text: '#455A64' },
+};
+
+const DEFAULT_DATA = {
+  dashboard: {
+    ventas_mes: 0,
+    caja: 0,
+    flota_total: 9,
+    flota_disponible: 5,
+    flota_ocupada: 3,
+    gasto_meta: 7030000,
+    gasto_real: 0,
+    presupuesto_mes: 0,
+    meta_pe: 13950000,
+    servicios_semana: 0,
+    servicios_semana_presup: 0,
+    facturas_cobrar: 0,
+    historial: [],
+  },
+  conductores: ['Manuel Madrid','Felipe Vidal','Manuel Madariaga','Sebastián Zúñiga','Pablo Riquelme'],
+  midia_foco: [],
+  midia_open: {},
+  pipeline: [
+    { cliente: "Invernada", contacto: "Carolina Palacios", etapa: "cotizado", ultimaGestion: "Mar 2026", proximaAccion: "Confirmar inicio contrato abril", notas: "Servicio 2 meses — inicio abril" },
+    { cliente: "Carri", contacto: "", etapa: "activo", ultimaGestion: "Mar 2026", proximaAccion: "Reunión ajuste tarifas", notas: "Acuerdo logrado ✅" },
+    { cliente: "Dole Chile", contacto: "Vía Thomas", etapa: "prospecto", ultimaGestion: "Mar 2026", proximaAccion: "Enviar presentación", notas: "Contacto por Thomas Commentz" },
+    { cliente: "Sollem", contacto: "", etapa: "activo", ultimaGestion: "Mar 2026", proximaAccion: "Monitorear pedidos semana a semana", notas: "1-2 servicios diarios en marzo, días sin pedidos. Dijeron que pararían en marzo — no lo hicieron. No tienen programa planificado. Temporada fuerte julio. No planificable pero ingreso real. Pablo maneja la relación." },
+    { cliente: "Geologística", contacto: "", etapa: "prospecto", ultimaGestion: "", proximaAccion: "Agendar reunión", notas: "" },
+    { cliente: "Wever", contacto: "", etapa: "prospecto", ultimaGestion: "", proximaAccion: "Agendar reunión", notas: "" },
+    { cliente: "Latam Capital", contacto: "", etapa: "prospecto", ultimaGestion: "", proximaAccion: "Recibir contactos y atacar", notas: "2 contactos pendientes de recibir" },
+    { cliente: "Logística Chile", contacto: "", etapa: "cotizado", ultimaGestion: "Mar 2026", proximaAccion: "Enviar cotización ruta Traiguén–Casablanca", notas: "Ruta Traiguén a Casablanca — pendiente cotización" },
+    { cliente: "Cocalán → Paine", contacto: "Pablo", etapa: "activo", ultimaGestion: "Mar 2026", proximaAccion: "Confirmar continuidad del servicio", notas: "Cliente kiwis — ingresó por Pablo. Ruta Cocalán a Paine." },
+    { cliente: "Patrón del Pallet", contacto: "Pablo", etapa: "activo", ultimaGestion: "Mar 2026", proximaAccion: "Evaluar si conviene seguir o priorizar clientes más rentables", notas: "Margen bajo pero positivo. Casi la peor opción de la cartera. Mantener mientras no haya cliente mejor que lo reemplace." },
+    { cliente: "Rucaray", contacto: "Pablo", etapa: "activo", ultimaGestion: "Mar 2026", proximaAccion: "Monitorear pedidos — sin gestión activa por ahora", notas: "Cartera Pablo. Pide servicios esporádicos. Muy informal, sin compromisos. Factoring activo — pendiente pago factura." },
+    { cliente: "Multifruta", contacto: "Pablo", etapa: "activo", ultimaGestion: "Mar 2026", proximaAccion: "Monitorear — sin gestión activa por ahora", notas: "Cartera Pablo. Pide servicios informales sin compromiso de volumen." },
+  ],
+  fases: [
+    {
+      id: "comercial", numero: "01", nombre: "COMERCIAL", subtitulo: "Conseguir carga",
+      color: "#607D8B", colorClaro: "#ECEFF1", emoji: "—",
+      rutinarias: [
+        { titulo: "Prospectar clientes", proc: "Identificar empresas agroindustriales en zonas de cobertura. Buscar nombre del encargado de logística. Contactar por WhatsApp o llamada presentando Santa Berenice. Registrar en pipeline con estado: contactado / interesado / cotizado / cerrado.", subtareas: ["Identificar empresas agroindustriales objetivo por región","Investigar contacto clave y canal de llegada","Registrar en pipeline comercial","Seguimiento a prospectos vía WhatsApp"] },
+        { titulo: "Contactar brokers y operadores", proc: "Llamar o escribir al broker consultando si tiene cargas disponibles en las rutas que operamos. Confirmar fechas, origen y destino. Registrar respuesta y hacer seguimiento si queda pendiente.", subtareas: ["Consultar cargas disponibles en rutas operadas","Confirmar rutas y fechas de despacho","Registrar respuesta y estado del contacto"] },
+        { titulo: "Cotizar servicios por ruta", proc: "Con origen y destino definidos, calcular km de la ruta. Aplicar tarifa base según equipo requerido. Verificar que el margen cubra punto de equilibrio. Preparar cotización y enviar al cliente o broker.", subtareas: ["Calcular distancia y costo variable de la ruta","Verificar que tarifa cubre punto de equilibrio","Preparar cotización formal y enviar al cliente"] },
+        { titulo: "Cerrar y confirmar servicio", proc: "Confirmar aceptación de tarifa. Registrar datos completos del servicio: cliente, origen, destino, fecha, tipo de carga, tarifa acordada. Pasar a operaciones para asignación de equipo.", subtareas: ["Confirmar aceptación de tarifa con el cliente","Registrar orden de servicio con datos del despacho","Informar a operaciones para asignación de equipo"] },
+        { titulo: "Seguimiento pipeline comercial", proc: "Revisar lista de prospectos activos. Actualizar etapa de cada uno. Identificar quién lleva más tiempo sin avanzar y decidir si llamar o descartar. Foco en los más cercanos a cerrar.", subtareas: ["Revisar estado de cada prospecto activo","Actualizar etapa del pipeline","Priorizar acciones del día según estado"] },
+        { titulo: "Registrar actividad comercial", proc: "Al final del día registrar: servicios realizados, cliente, canal de origen, si es recurrente. Esta información alimenta los KPIs y el flujo de caja proyectado.", subtareas: ["Cargar servicios realizados del día","Registrar cliente nuevo y canal de venta","Actualizar recurrencia y frecuencia por cliente"] },
+      ],
+      pendientes: [
+        { texto: "Enviar tarifas a Carri — acordado, esperando comentarios", badge: "lunes", done: false },
+        { texto: "Lunes: reunión con Carri para ajustes si se requieren", badge: "lunes", done: false },
+        { texto: "Contactar seguimiento Invernada — confirmar inicio contrato abril", badge: "hoy", done: false },
+        { texto: "Llamar a Carolina Palacios — Invernada", badge: "hoy", done: false },
+        { texto: "Enviar presentación a Thomas — Dole Chile", badge: "hoy", done: false },
+        { texto: "Recibir 2 contactos Latam Capital y atacar", badge: "hoy", done: false },
+        { texto: "Llamar a Logística Chile — ver alternativas de servicios", badge: null, done: false },
+        { texto: "Seguimiento cierre acuerdo Chocalán → Paine", badge: null, done: false },
+        { texto: "Agendar reunión Wever", badge: null, done: false },
+        { texto: "Agendar reunión Geologística", badge: null, done: false },
+        { texto: "Contactar Progreso para acuerdo de referidos con factoring", badge: null, done: false },
+        { texto: "Prospectar Leonardo Paredes — Parex", badge: null, done: false },
+        { texto: "Identificar operador logístico Antofagasta", badge: null, done: false },
+        { texto: "Publicar Panel de Gestión online", badge: null, done: false },
+        { texto: "Revisar tarifas Carri con Pablo ✅ — Acuerdo logrado con Carri ✅", badge: "ok", done: true },
+      ],
+    },
+    {
+      id: "operacional", numero: "02", nombre: "OPERACIONAL", subtitulo: "Transportar carga",
+      color: "#757575", colorClaro: "#F5F5F5", emoji: "—",
+      rutinarias: [
+        { titulo: "Registro de servicio diario", proc: "Completar al ejecutar o coordinar cada servicio del día. Registrar los datos del equipo, conductor, cliente, ruta y precio. Esta información alimenta el dashboard de ventas y caja.", subtareas: ["Verificar datos del servicio con conductor","Confirmar precio neto con cliente o broker","Registrar en sistema al cierre del servicio"], registroServicio: true },
+        { titulo: "Coordinar y ejecutar ruta", proc: "Confirmar hora de carga en origen con el cliente o broker. Monitorear que el camión salga a tiempo. Si hay demora en la carga, avisar al broker ANTES de que el camión llegue al punto. Registrar km e incidencias al término.", subtareas: ["Confirmar hora de carga con cliente","Monitorear salida y avance del servicio","Avisar al broker si hay demoras en carga","Registrar km e incidencias al término"] },
+        { titulo: "Gestión de flota", proc: "Revisar estado de los 5 camiones operativos. Registrar km por litro para controlar eficiencia. Programar mantenciones preventivas. Cargar costos directos de cada servicio en el sistema.", subtareas: ["Revisar estado operativo de los 5 camiones","Gestionar mantenciones programadas","Registrar km por litro y eficiencia","Cargar costos directos de cada servicio"] },
+      ],
+      pendientes: [
+        { texto: "Trasladar tracto Mussam a base — deuda pendiente", badge: "hoy", done: false },
+        { texto: "Retirar paqueteras del parking — deuda pendiente", badge: "hoy", done: false },
+        { texto: "Trasladar tracto ENEA a base", badge: null, done: false },
+        { texto: "Revisar con Pablo todos los servicios ejecutados en marzo — confirmar precio cobrado por cada uno, verificar que el margen cubre el punto de equilibrio por servicio. Sin este registro no es posible cerrar el mes con datos reales.", badge: "hoy", done: false },
+        { texto: "Evaluar estado técnico de cada camión con Pablo y Sebastián — identificar cuáles están en condiciones reales de operar, cuáles necesitan mantención antes de abril (inicio Invernada) y costo estimado de puesta en marcha por equipo. Prioridad antes de comprometer servicios nuevos.", badge: null, done: false },
+        { texto: "Gestionar deuda Mussam para liberar tracto", badge: null, done: false },
+        { texto: "Evaluar costo puesta en marcha de cada equipo recuperado", badge: null, done: false },
+        { texto: "Contratar nuevo chofer — solo después de estabilizar cartera comercial. Mientras tanto, el camión disponible opera como backup. Decisión se evalúa una vez que los clientes activos generen volumen regular sostenido.", badge: null, done: false },
+        { texto: "Elaborar contratos conductores", badge: null, done: false },
+        { texto: "Definir rol de Sebastián — hoy cumple doble función (chofer + ayudante operaciones) lo que es viable con volumen bajo, pero es frágil. Cuando aumente la operación no puede ser los dos al mismo tiempo. Decidir con Pablo si Sebastián es chofer o es operaciones antes de comprometer nuevos servicios.", badge: null, done: false },
+        { texto: "Revisar documentos laborales requeridos", badge: null, done: false },
+        { texto: "Crear módulo Hoja de Trabajo — registro completo de servicios con columnas: PPT, Cliente, Fecha GD, Fecha descarga, GDs, Origen, Destino, Sacos/KM, Flete Neto, Adicional, IVA, Flete Total. Con totales automáticos y exportación a Excel", badge: null, done: false },
+      ],
+    },
+    {
+      id: "financiero", numero: "03", nombre: "FINANCIERO", subtitulo: "Cobrar servicio",
+      color: "#546E7A", colorClaro: "#EEEEEE", emoji: "—",
+      rutinarias: [
+        { titulo: "Proceso Liquidación", proc: "Revisar lista de servicios pendientes de liquidar. Seleccionar cada servicio por su ID, ingresar precio neto, petróleo y adicionales. Al guardar queda liquidado y pasa automáticamente a cuentas por cobrar.", subtareas: ["Revisar servicios pendientes del día","Ingresar precio neto por servicio","Registrar petróleo y adicionales","Confirmar liquidación"], liquidacionServicios: true },
+        { titulo: "Facturación y cobro", proc: "Por cada servicio completado: emitir factura al cliente. Evaluar si aplica factoring para anticipo. Registrar en el sistema de cobranza con fecha de vencimiento. Confirmar pago y liquidar comisión del conductor.", subtareas: ["Emitir factura por servicio completado","Evaluar y gestionar factoring si aplica","Confirmar pago y registrar cobro efectivo","Liquidar comisión conductor"] },
+        { titulo: "Control de caja y presupuesto", proc: "Cada día descargar cartola bancaria y categorizar movimientos. Actualizar el flujo de caja. Contrastar ingresos y gastos vs presupuesto mensual. Revisar si la proyección de la semana cubre el punto de equilibrio.", subtareas: ["Descargar y categorizar cartola bancaria","Actualizar flujo de caja real","Contrastar vs presupuesto mensual","Revisar proyección de ingresos próxima semana"] },
+        { titulo: "Cuentas por cobrar", proc: "Revisar lista de facturas emitidas: cuáles están pagadas, cuáles pendientes, cuáles vencidas. Gestionar cobro directo de las vencidas. Actualizar registro de factoring activo.", subtareas: ["Cargar estado de cobranza del día","Gestionar cobros vencidos","Actualizar registro de factoring activo"] },
+        { titulo: "Cuentas por cobrar", proc: "Revisar lista de facturas emitidas: cuáles están pagadas, cuáles pendientes, cuáles vencidas. Gestionar cobro directo de las vencidas. Actualizar registro de factoring activo.", subtareas: ["Cargar estado de cobranza del día","Gestionar cobros vencidos","Actualizar registro de factoring activo","Actualizar dashboard con total x cobrar"] },
+        { titulo: "Bancarización Global Solutions", proc: "Proceso en curso: abrir cuenta bancaria a nombre de Global Solutions. Reunir carpeta tributaria, inicio de actividades, documentos de la sociedad. Objetivo: operar financieramente con identidad Global Solutions.", subtareas: ["Gestionar apertura cuenta bancaria","Sacar carpetas tributarias Global Solutions","Reunir documentos para bancarización","Iniciar operación financiera con Global Solutions"] },
+      ],
+      pendientes: [
+        { texto: "Gestionar cuenta bancaria Global Solutions", badge: "hoy", done: false },
+        { texto: "Sacar carpetas tributarias y documentos para bancarización", badge: "hoy", done: false },
+        { texto: "Confirmar cobro Madrid $2M — viernes", badge: "hoy", done: false },
+        { texto: "Realizar factura cobro adicional + factoring por mora a Sollem", badge: "hoy", done: false },
+        { texto: "Rucaray — Factoring ✅  Pendiente pago de factura", badge: null, done: false },
+        { texto: "Armar flujo de caja con ingresos + proyección", badge: null, done: false },
+        { texto: "Resolver deuda parking paqueteras", badge: null, done: false },
+        { texto: "Resolver deuda Mussam", badge: null, done: false },
+        { texto: "Retomar conversación Latam Capital", badge: null, done: false },
+        { texto: "Sollem — Facturado ✅  Factoring ✅", badge: "ok", done: true },
+      ],
+    },
+    {
+      id: "control", numero: "04", nombre: "CONTROL DE GESTIÓN", subtitulo: "Medir y decidir",
+      color: "#37474F", colorClaro: "#ECEFF1", emoji: "—",
+      personalPendientes: [
+        { texto: "Revisar plan personal anual", badge: null, done: false },
+        { texto: "Seguimiento compromisos personales", badge: null, done: false },
+      ],
+      rutinarias: [
+        { titulo: "Revisión de indicadores", proc: "Revisar dashboard al inicio del día. Verificar que los datos estén actualizados. Detectar alertas (gasto sobre presupuesto, flota baja, servicios por debajo de meta). Tomar nota de acciones correctivas.", subtareas: ["Revisar dashboard y alertas activas","Verificar actualización de indicadores","Registrar acciones correctivas si aplica"] },
+        { titulo: "Carga de registros de servicio", proc: "Importar registros desde Excel o cargar manualmente. Verificar que los servicios del día estén registrados. Confirmar que las ventas del dashboard reflejan los registros cargados.", subtareas: ["Cargar servicios del día o importar desde Excel","Verificar coherencia con ventas del dashboard","Revisar totales del mes"] },
+      ],
+      pendientes: [
+        { texto: "Publicar panel online con URL fija — acceso desde celular y PC sin descarga", badge: null, done: false },
+        { texto: "Construir módulo Hoja de Trabajo — registro completo con importación desde Excel, totales automáticos y exportación", badge: null, done: false },
+        { texto: "Construir ficha Cuentas por Cobrar — cliente, N° factura, monto, fecha emisión, vencimiento, estado", badge: null, done: false },
+        { texto: "Conectar registros de servicio al indicador de ventas del dashboard en tiempo real", badge: null, done: false },
+        { texto: "Diseñar informe de desempeño mensual por ámbito — base para informe de gestión", badge: null, done: false },
+        { texto: "Realizar proceso de identificación de Rocks con Carlos y Pablo", badge: null, done: false },
+        { texto: "Crear pestaña Personal con acceso por clave dentro de Control de Gestión — espacio privado para pendientes personales de Carlos", badge: null, done: false },
+      ],
+    },
+  ],
+  scalingup: {
+    ideas: [
+      { texto: "Construir manual de operaciones vivo — procedimiento de cada tarea rutinaria", pillar: "Ejecución", done: false },
+      { texto: "Definir plan de sucesión y delegación futura para cada rol", pillar: "Personas", done: false },
+      { texto: "Evaluar integración con Google Sheets para panel online multidispositivo", pillar: "Sistema", done: false },
+      { texto: "Publicar Panel de Gestión online accesible desde celular y PC", pillar: "Sistema", done: false },
+    ],
+    rocks: [
+      { texto: "One Page Plan Global Solutions — negocio en una página", pillar: "Estrategia", done: false },
+      { texto: "Establecer ritmo de reuniones semanal Carlos / Pablo", pillar: "Personas", done: false },
+      { texto: "Implementar Rockefeller Habits Checklist adaptado a GS", pillar: "Ejecución", done: false },
+      { texto: "Estabilizar negocio cubriendo punto de equilibrio — julio 2026", pillar: "Finanzas", done: false },
+      { texto: "Completar bancarización y estructura legal Global Solutions", pillar: "Finanzas", done: false },
+      { texto: "Recuperar al menos 2 camiones adicionales de flota parada", pillar: "Ejecución", done: false },
+    ],
+    plan: [
+      {
+        etapa: "ETAPA 1", titulo: "Estabilización financiera", periodo: "Marzo 2026",
+        color: "#C00000", icon: "🔴",
+        objetivo: "Cubrir obligaciones del mes y generar caja operativa mínima",
+        acciones: [
+          { texto: "Cobrar Rucaray $2M y Madrid $2M", done: false },
+          { texto: "Destrabar facturación Sollem $9M — gestionar aprobación liquidación", done: false },
+          { texto: "Facturar mora Sollem + factoring adicional", done: false },
+          { texto: "Abrir cuenta bancaria Global Solutions", done: false },
+          { texto: "Sacar carpetas tributarias y documentos bancarización", done: false },
+          { texto: "Cerrar acuerdo Carri — enviar tarifas y programa de trabajo", done: false },
+        ],
+        meta: "Ingresar mínimo $13.000.000 antes de cerrar el mes",
+      },
+      {
+        etapa: "ETAPA 2", titulo: "Diversificación de cartera", periodo: "Abril — Mayo 2026",
+        color: "#C55A11", icon: "🟠",
+        objetivo: "No depender de un solo operador. Al menos 3 fuentes de ingreso activas",
+        acciones: [
+          { texto: "Cerrar contrato con Invernada (cliente directo, 2 meses)", done: false },
+          { texto: "Concretar primer servicio con Dole Chile vía Thomas", done: false },
+          { texto: "Activar Geologística y Wever — reuniones pendientes", done: false },
+          { texto: "Activar 2 contactos de Latam Capital", done: false },
+          { texto: "Establecer acuerdo estable con Logística Chile", done: false },
+          { texto: "Definir y firmar contratos con conductores", done: false },
+        ],
+        meta: "3 clientes/operadores activos generando servicios regulares",
+      },
+      {
+        etapa: "ETAPA 3", titulo: "Recuperación operativa", periodo: "Mayo — Junio 2026",
+        color: "#7F6000", icon: "🟡",
+        objetivo: "Aumentar capacidad operativa recuperando flota parada",
+        acciones: [
+          { texto: "Pagar deudas TAG equipos — convenio municipalidades rebaja 80%, saldo en cuotas (20%)", done: false },
+          { texto: "Resolver deudas Mussam y parking — retirar equipos", done: false },
+          { texto: "Recuperar al menos 2 camiones de mantención", done: false },
+          { texto: "Definir roles formales Carlos / Pablo", done: false },
+          { texto: "Construir flujo de caja proyectado a 3 meses", done: false },
+          { texto: "Implementar hoja de servicios diaria y registro km", done: false },
+          { texto: "Primer KPI mensual: servicios, ingresos, margen", done: false },
+        ],
+        meta: "7+ camiones operativos y KPIs medidos mensualmente",
+      },
+      {
+        etapa: "ETAPA 4", titulo: "Punto de equilibrio sostenido", periodo: "Julio 2026",
+        color: "#375623", icon: "🟢",
+        objetivo: "Operar sobre punto de equilibrio de forma consistente y preparar escalada",
+        acciones: [
+          { texto: "Superar $13.950.000 de facturación mensual sostenida", done: false },
+          { texto: "Retomar cliente Sollem (reinicio temporada julio)", done: false },
+          { texto: "Formalizar Global Solutions como marca operativa", done: false },
+          { texto: "Ritmo semanal de reuniones Carlos/Pablo establecido", done: false },
+          { texto: "Panel de Gestión publicado online y en uso diario", done: false },
+          { texto: "One Page Plan del negocio documentado y compartido", done: false },
+        ],
+        meta: "Negocio estabilizado → listo para escalar como Global Solutions",
+      },
+    ],
+    planEscalamiento: [
+      {
+        fase: "FASE 1", titulo: "Confirmación del modelo operativo", herramienta: "Understanding the Business Model",
+        color: "#455A64", icon: "🗺️", open: true,
+        objetivo: "Revisar el mapa de procesos existente para confirmar cómo fluye la ejecución del negocio y cómo entra el dinero.",
+        entregable: "Mapa de proceso operativo confirmado",
+        acciones: [
+          { texto: "Revisar mapa de procesos existente de Global Solutions", done: false },
+          { texto: "Confirmar cómo fluye la ejecución del negocio", done: false },
+          { texto: "Confirmar cómo entra el dinero (flujo de ingresos)", done: false },
+          { texto: "Documentar mapa de proceso macro confirmado", done: false },
+        ],
+      },
+      {
+        fase: "FASE 2", titulo: "Evaluación del sistema del negocio", herramienta: "Scaling Up Framework — 4 pilares",
+        color: "#546E7A", icon: "⚙️", open: false,
+        objetivo: "Analizar el negocio usando los 4 pilares de Scaling Up para detectar dónde está desbalanceado el sistema.",
+        entregable: "Diagnóstico estructurado del sistema del negocio",
+        acciones: [
+          { texto: "Análisis pilar Personas — roles, equipo, cultura", done: false },
+          { texto: "Análisis pilar Estrategia — propósito y ventaja competitiva", done: false },
+          { texto: "Análisis pilar Ejecución — procesos y disciplina operativa", done: false },
+          { texto: "Análisis pilar Caja — control financiero y flujo", done: false },
+          { texto: "Redactar diagnóstico estructurado con plan de acción", done: false },
+        ],
+      },
+      {
+        fase: "FASE 3", titulo: "Diagnóstico de madurez del negocio", herramienta: "Growth Stages Framework",
+        color: "#607D8B", icon: "📊", open: false,
+        objetivo: "Evaluar el nivel de desarrollo organizacional del negocio y si está organizado para escalar o depende demasiado del fundador.",
+        entregable: "Declaración del nivel de madurez + plan de trabajo requerido",
+        acciones: [
+          { texto: "Aplicar Growth Stages Framework a Global Solutions", done: false },
+          { texto: "Identificar nivel de madurez organizacional actual", done: false },
+          { texto: "Determinar si el negocio puede escalar sin dependencia personal", done: false },
+          { texto: "Redactar declaración de madurez y plan de trabajo requerido", done: false },
+        ],
+      },
+      {
+        fase: "FASE 4", titulo: "Identificación de brechas", herramienta: "Gap Analysis",
+        color: "#37474F", icon: "🔍", open: false,
+        objetivo: "Identificar las brechas que limitan el crecimiento. Comparar situación actual vs situación necesaria para escalar.",
+        entregable: "Lista priorizada de brechas + plan de acción",
+        acciones: [
+          { texto: "Mapear situación actual en cada área crítica del negocio", done: false },
+          { texto: "Definir situación necesaria para escalar en cada área", done: false },
+          { texto: "Identificar brechas prioritarias (comercial, operacional, financiero)", done: false },
+          { texto: "Priorizar brechas por impacto y urgencia", done: false },
+          { texto: "Redactar lista priorizada con plan de acción por brecha", done: false },
+        ],
+      },
+      {
+        fase: "FASE 5", titulo: "Estabilización del sistema de gestión", herramienta: "Accountability Chart + KPIs + Meeting Rhythm",
+        color: "#263238", icon: "🏗️", open: false,
+        objetivo: "Definir el sistema básico de gestión: quién es responsable de qué, qué se mide y con qué ritmo de reuniones.",
+        entregable: "Accountability Chart + KPIs definidos + Ritmo de gestión + Plan de acción",
+        acciones: [
+          { texto: "Diseñar Accountability Chart — mapa de responsabilidades Global Solutions", done: false },
+          { texto: "Definir KPIs clave por área (comercial, operacional, financiero)", done: false },
+          { texto: "Establecer Meeting Rhythm — estructura de reuniones operativas", done: false },
+          { texto: "Documentar plan de acción para implementar el sistema", done: false },
+        ],
+      },
+      {
+        fase: "FASE 6", titulo: "Hoja de ruta de escalamiento", herramienta: "One Page Strategic Plan + Quarterly Rocks",
+        color: "#1B2631", icon: "🚀", open: false,
+        objetivo: "Definir el plan estratégico para escalar Global Solutions con claridad, foco trimestral y hoja de ruta documentada.",
+        entregable: "One Page Strategic Plan + Rocks trimestrales + Hoja de ruta estratégica",
+        acciones: [
+          { texto: "Elaborar One Page Strategic Plan de Global Solutions", done: false },
+          { texto: "Definir Quarterly Rocks — 3 a 5 prioridades del trimestre", done: false },
+          { texto: "Construir hoja de ruta estratégica de escalamiento", done: false },
+          { texto: "Presentar y validar plan con Carlos y Pablo", done: false },
+        ],
+      },
+    ],
+  }
+};
+let appData;
+let uiState = {};
+let vistaActual = "todas";
+let historialAcciones = [];
+const MAX_HISTORIAL = 20;
+
+function registrarAccion(descripcion, fnDeshacer) {
+  historialAcciones.push({ descripcion, fnDeshacer });
+  if (historialAcciones.length > MAX_HISTORIAL) historialAcciones.shift();
+  actualizarBotonDeshacer();
+}
+function deshacer() {
+  if (historialAcciones.length === 0) return;
+  const accion = historialAcciones.pop();
+  accion.fnDeshacer();
+  actualizarBotonDeshacer();
+  saveData(); render();
+}
+function actualizarBotonDeshacer() {
+  const btn = document.getElementById('btn-deshacer');
+  if (!btn) return;
+  btn.style.opacity = historialAcciones.length > 0 ? '1' : '0.35';
+  btn.title = historialAcciones.length > 0 ? 'Deshacer: ' + historialAcciones[historialAcciones.length-1].descripcion : 'Sin acciones para deshacer';
+}
+document.addEventListener('keydown', (e) => {
+  if ((e.ctrlKey || e.metaKey) && e.key === 'z') { e.preventDefault(); deshacer(); }
+});
+
+function loadData() {
+  try { const s = localStorage.getItem('gs_panel_v5'); appData = s ? JSON.parse(s) : JSON.parse(JSON.stringify(DEFAULT_DATA)); } 
+  catch(e) { appData = JSON.parse(JSON.stringify(DEFAULT_DATA)); }
+  try { const s = localStorage.getItem('gs_panel_ui_v5'); uiState = s ? JSON.parse(s) : {}; }
+  catch(e) { uiState = {}; }
+  // Validar que el orden de fases sea siempre el correcto
+  const ordenCorrecto = ['comercial','operacional','financiero','control'];
+  if (appData.fases) {
+    appData.fases.sort((a,b) => {
+      const ia = ordenCorrecto.indexOf(a.id);
+      const ib = ordenCorrecto.indexOf(b.id);
+      return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
+    });
+  }
+  // Migración: agregar dashboard si no existe
+  if (!appData.dashboard) appData.dashboard = JSON.parse(JSON.stringify(DEFAULT_DATA.dashboard));
+  if (appData.dashboard.gasto_meta === undefined) appData.dashboard.gasto_meta = 7030000;
+  if (appData.dashboard.gasto_real === undefined) appData.dashboard.gasto_real = 0;
+  if (appData.dashboard.meta_pe === undefined) appData.dashboard.meta_pe = 13950000;
+  if (appData.dashboard.servicios_semana === undefined) appData.dashboard.servicios_semana = 0;
+  if (appData.dashboard.servicios_semana_presup === undefined) appData.dashboard.servicios_semana_presup = 0;
+  if (appData.dashboard.facturas_cobrar === undefined) appData.dashboard.facturas_cobrar = 0;
+  if (appData.dashboard.presupuesto_mes === undefined) appData.dashboard.presupuesto_mes = 0;
+  // Migración: agregar ámbito control si no existe
+  if (!appData.fases.find(f => f.id === 'control')) {
+    const defaultControl = DEFAULT_DATA.fases.find(f => f.id === 'control');
+    if (defaultControl) appData.fases.push(JSON.parse(JSON.stringify(defaultControl)));
+  }
+  // Migración: midia
+  if (!appData.midia_foco) appData.midia_foco = [];
+  if (!appData.midia_open) appData.midia_open = {};
+  if (!appData.pipeline) appData.pipeline = JSON.parse(JSON.stringify(DEFAULT_DATA.pipeline));
+  // Migración: agregar plan a fases que no lo tengan
+  appData.fases.forEach(fase => {
+    if (!fase.plan) {
+      const defaultFase = DEFAULT_DATA.fases.find(f => f.id === fase.id);
+      if (defaultFase && defaultFase.plan) fase.plan = defaultFase.plan;
+    }
+  });
+  // Migración: agregar plan a scalingup si no existe
+  if (!appData.scalingup.plan) {
+    appData.scalingup.plan = DEFAULT_DATA.scalingup.plan;
+  }
+  if (!appData.scalingup.planEscalamiento) {
+    appData.scalingup.planEscalamiento = DEFAULT_DATA.scalingup.planEscalamiento;
+  }
+  // Migración: plan personal en control
+  const ctrlFase = appData.fases.find(f => f.id === 'control');
+  if (ctrlFase && !ctrlFase.personalPendientes) {
+    ctrlFase.personalPendientes = [];
+  }
+}
+
+function saveUI() {
+  localStorage.setItem('gs_panel_ui_v5', JSON.stringify(uiState));
+}
+
+function saveData() {
+  localStorage.setItem('gs_panel_v5', JSON.stringify(appData));
+  localStorage.setItem('gs_panel_ui_v5', JSON.stringify(uiState));
+  const ind = document.getElementById('save-indicator');
+  ind.classList.add('show');
+  setTimeout(() => ind.classList.remove('show'), 1500);
+}
+
+function filtrar(v, btn) {
+  vistaActual = v;
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  render();
+}
+
+function setTab(faseId, tab) { uiState[`tab_${faseId}`] = tab; saveData(); render(); }
+function toggleAcord(faseId, ti) { const k=`acord_${faseId}_${ti}`; uiState[k]=!uiState[k]; saveData(); render(); }
+function toggleProc(faseId, ti) { const k=`proc_${faseId}_${ti}`; uiState[k]=!uiState[k]; saveData(); render(); }
+function saveProc(faseId, ti) {
+  const val = document.getElementById(`proc_edit_${faseId}_${ti}`).value;
+  appData.fases.find(f=>f.id===faseId).rutinarias[ti].proc = val;
+  uiState[`proc_${faseId}_${ti}`] = false;
+  saveData(); render();
+}
+function toggleTareaDone(faseId, ti) {
+  const fase = appData.fases.find(f=>f.id===faseId);
+  fase.rutinarias[ti].done = !fase.rutinarias[ti].done;
+  saveData(); render();
+}
+function editTareaTitulo(faseId, ti) {
+  uiState[`edit_tarea_${faseId}_${ti}`] = true;
+  // Asegurar que acordeón esté abierto para ver el input
+  saveUI(); render();
+  setTimeout(()=>{ const el=document.getElementById(`tarea_edit_${faseId}_${ti}`); if(el){el.focus();el.select();}},50);
+}
+function saveTareaTitulo(faseId, ti) {
+  const el = document.getElementById(`tarea_edit_${faseId}_${ti}`);
+  if (!el) return;
+  const val = el.value.trim();
+  if (val) { const fase = appData.fases.find(f=>f.id===faseId); fase.rutinarias[ti].titulo = val; saveData(); }
+  delete uiState[`edit_tarea_${faseId}_${ti}`];
+  saveUI(); render();
+}
+function delTarea(faseId, ti) {
+  const fase = appData.fases.find(f=>f.id===faseId);
+  fase.rutinarias.splice(ti, 1);
+  saveData(); render();
+}
+function addTareaRutinaria(faseId) {
+  const input = document.getElementById(`nueva_tarea_${faseId}`);
+  const val = input.value.trim(); if (!val) return;
+  const fase = appData.fases.find(f=>f.id===faseId);
+  fase.rutinarias.push({ titulo: val, proc: '', subtareas: [] });
+  input.value = ''; saveData(); render();
+}
+function toggleClienteNuevo(val) {
+  const box = document.getElementById('srv_cliente_nuevo_box');
+  if (box) box.style.display = val === '__nuevo__' ? 'block' : 'none';
+}
+
+function mostrarAgregarConductor() {
+  const nombre = prompt('Nombre del conductor nuevo:');
+  if (!nombre || !nombre.trim()) return;
+  if (!appData.conductores) appData.conductores = ['Manuel Madrid','Felipe Vidal','Manuel Madariaga','Sebastián Zúñiga','Pablo Riquelme'];
+  if (!appData.conductores.includes(nombre.trim())) {
+    appData.conductores.push(nombre.trim());
+    saveData(); render();
+    mostrarToastServicio(true);
+  }
+}
+function mostrarAgregarPatente() {
+  const pat = prompt('Patente nueva (ej: AB1234):');
+  if (!pat || !pat.trim()) return;
+  if (!appData.patentes) appData.patentes = ['GKFD84','WR9192','XR8555','GCFF12','BPBL35','XA1414','XA1114'];
+  if (!appData.patentes.includes(pat.trim().toUpperCase())) {
+    appData.patentes.push(pat.trim().toUpperCase());
+    saveData(); render();
+  }
+}
+
+function addGuia() {
+  if (!uiState.srv_guias) uiState.srv_guias = [{ num:'', destino:'', fecha_descarga:'' }];
+  uiState.srv_guias.push({ num:'', destino:'', fecha_descarga:'' });
+  render();
+}
+function delGuia(gi) {
+  if (!uiState.srv_guias || uiState.srv_guias.length <= 1) return;
+  uiState.srv_guias.splice(gi, 1);
+  render();
+}
+function updGuia(gi, campo, valor) {
+  if (!uiState.srv_guias) uiState.srv_guias = [{ num:'', destino:'', fecha_descarga:'' }];
+  uiState.srv_guias[gi][campo] = valor;
+}
+
+async function addServicio() {
+  const fecha = document.getElementById('srv_fecha')?.value.trim();
+  const patente = document.getElementById('srv_patente')?.value.trim();
+  const conductor = document.getElementById('srv_conductor')?.value.trim();
+  const tipoEquipo = document.getElementById('srv_tipo_equipo')?.value.trim() || '';
+  const clienteSelect = document.getElementById('srv_cliente')?.value.trim();
+  const cliente = clienteSelect === '__nuevo__'
+    ? (document.getElementById('srv_cliente_nuevo')?.value.trim() || '')
+    : clienteSelect;
+  const origen = document.getElementById('srv_origen')?.value.trim();
+  const km = 0;
+  const viaticos = 0;
+  const peajes = parseInt(document.getElementById('srv_peajes')?.value) || 0;
+  if (!patente && !cliente) return;
+  if (!appData.servicios) appData.servicios = [];
+  const hoy = new Date();
+  const fechaFinal = fecha || `${String(hoy.getDate()).padStart(2,'0')}-${String(hoy.getMonth()+1).padStart(2,'0')}-${hoy.getFullYear()}`;
+  const anio = fechaFinal.split('-')[2] || hoy.getFullYear().toString();
+  const mes = fechaFinal.split('-')[1] || String(hoy.getMonth()+1).padStart(2,'0');
+  const id = 'S' + String(appData.servicios.length + 1).padStart(2,'0');
+  const guias = uiState.srv_guias || [{ num:'', destino:'', fecha_descarga:'' }];
+  const servicio = { id, fecha: fechaFinal, anio, mes, patente, conductor, tipoEquipo, cliente, precio: 0, petroleo: 0, adicional: 0, liquidado: false, origen, km, viaticos, peajes, guias };
+  appData.servicios.push(servicio);
+  appData.dashboard.ventas_mes = (appData.dashboard.ventas_mes || 0) + precio;
+  // Agregar conductor nuevo a la lista si no existe
+  if (conductor && !(appData.conductores||[]).includes(conductor)) {
+    if (!appData.conductores) appData.conductores = [];
+    appData.conductores.push(conductor);
+  }
+  uiState.srv_guias = [{ num:'', destino:'', fecha_descarga:'' }];
+
+  // Guardar en Supabase si está conectado
+  let guardadoEnDB = false;
+  if (supaConectado && supa) {
+    try {
+      const { error } = await supa.from('servicios').insert({
+        codigo: id,
+        fecha: fechaFinal,
+        patente,
+        cliente,
+        flete_neto: precio,
+        origen,
+        destino: guias.map(g=>g.destino).filter(Boolean).join(' / '),
+      });
+      if (!error) guardadoEnDB = true;
+    } catch(e) { guardadoEnDB = false; }
+  }
+
+  saveData(); render();
+  mostrarToastServicio(guardadoEnDB);
+}
+function delServicio(si) {
+  if (!appData.servicios) return;
+  const precio = appData.servicios[si]?.precio || 0;
+  appData.servicios.splice(si, 1);
+  appData.dashboard.ventas_mes = Math.max(0, (appData.dashboard.ventas_mes || 0) - precio);
+  saveData(); render();
+}
+function addSub(faseId, ti) {
+  const input = document.getElementById(`sub_input_${faseId}_${ti}`);
+  const val = input.value.trim(); if (!val) return;
+  appData.fases.find(f=>f.id===faseId).rutinarias[ti].subtareas.push(val);
+  input.value = ''; saveData(); render();
+}
+function delSub(faseId, ti, si) {
+  const fase = appData.fases.find(f=>f.id===faseId);
+  const copia = fase.rutinarias[ti].subtareas[si];
+  registrarAccion(`Eliminar subtarea "${copia.substring(0,25)}"`, () => {
+    appData.fases.find(f=>f.id===faseId).rutinarias[ti].subtareas.splice(si, 0, copia);
+  });
+  fase.rutinarias[ti].subtareas.splice(si,1);
+  saveData(); render();
+}
+function editPendInline(el, faseId, pi) {
+  if (el.isContentEditable) return;
+  el.contentEditable = true;
+  el.style.outline = '1px solid #aaa';
+  el.style.borderRadius = '3px';
+  el.style.padding = '1px 4px';
+  el.focus();
+  // Seleccionar todo el texto
+  const range = document.createRange();
+  range.selectNodeContents(el);
+  const sel = window.getSelection();
+  sel.removeAllRanges(); sel.addRange(range);
+  const guardar = () => {
+    el.contentEditable = false;
+    el.style.outline = '';
+    el.style.padding = '';
+    const nuevoTexto = el.innerText.trim();
+    if (nuevoTexto) {
+      appData.fases.find(f=>f.id===faseId).pendientes[pi].texto = nuevoTexto;
+      saveData();
+    } else { render(); }
+  };
+  el.onblur = guardar;
+  el.onkeydown = (e) => { if (e.key === 'Enter') { e.preventDefault(); el.blur(); } if (e.key === 'Escape') { render(); } };
+}
+function togglePend(faseId, pi) {
+  appData.fases.find(f=>f.id===faseId).pendientes[pi].done ^= true;
+  saveData(); render();
+}
+function abrirEditBadge(faseId, pi) {
+  uiState[`editbadge_${faseId}_${pi}`] = true;
+  render();
+  setTimeout(() => {
+    const sel = document.querySelector(`[data-editbadge="${faseId}_${pi}"] select, select[data-editbadge]`);
+  }, 50);
+}
+function cerrarEditBadge(faseId, pi) {
+  delete uiState[`editbadge_${faseId}_${pi}`];
+  render();
+}
+function cambiarBadge(faseId, pi, valor) {
+  const badge = valor === 'none' ? null : valor;
+  appData.fases.find(f=>f.id===faseId).pendientes[pi].badge = badge;
+  delete uiState[`editbadge_${faseId}_${pi}`];
+  saveData(); render();
+}
+function delPend(faseId, pi) {
+  const fase = appData.fases.find(f=>f.id===faseId);
+  const copia = JSON.parse(JSON.stringify(fase.pendientes[pi]));
+  registrarAccion(`Eliminar "${copia.texto.substring(0,30)}"`, () => {
+    appData.fases.find(f=>f.id===faseId).pendientes.splice(pi, 0, copia);
+  });
+  fase.pendientes.splice(pi,1);
+  saveData(); render();
+}
+function addPend(faseId) {
+  const input = document.getElementById(`pend_input_${faseId}`);
+  const sel = document.getElementById(`pend_badge_${faseId}`);
+  const val = input.value.trim(); if (!val) return;
+  const badge = sel.value === 'none' ? null : sel.value;
+  appData.fases.find(f=>f.id===faseId).pendientes.unshift({texto:val, badge, done:false});
+  input.value = ''; sel.value = 'hoy'; saveData(); render();
+}
+function togglePlanComo(faseId, ci) {
+  const fase = appData.fases.find(f=>f.id===faseId);
+  if (fase && fase.plan) { fase.plan.como[ci].done ^= true; saveData(); render(); }
+}
+
+function setPlanSubTab(sub) {
+  uiState['plan_subtab'] = sub;
+  saveData(); render();
+}
+function togglePlanKey(planKey, ei, ai) {
+  if (!appData.scalingup[planKey]) return;
+  appData.scalingup[planKey][ei].acciones[ai].done ^= true;
+  saveData(); render();
+}
+function togglePlanEtapaKey(planKey, ei) {
+  const key = `${planKey}_open_${ei}`;
+  uiState[key] = uiState[key] === false ? true : false;
+  saveData(); render();
+}
+function togglePlan(ei, ai) {
+  appData.scalingup.plan[ei].acciones[ai].done ^= true;
+  saveData(); render();
+}
+function togglePlanEtapa(ei) {
+  const key = 'plan_open_' + ei;
+  uiState[key] = uiState[key] === false ? true : false;
+  saveData(); render();
+}
+
+function toggleSU(section, pi) {
+  appData.scalingup[section][pi].done ^= true;
+  saveData(); render();
+}
+function delSU(section, pi) {
+  appData.scalingup[section].splice(pi,1);
+  saveData(); render();
+}
+function addSU(section) {
+  const input = document.getElementById(`su_input_${section}`);
+  const sel = document.getElementById(`su_pillar_${section}`);
+  const val = input.value.trim(); if (!val) return;
+  appData.scalingup[section].unshift({texto:val, pillar:sel.value, done:false});
+  input.value = ''; saveData(); render();
+}
+
+function badgeHTML(badge) {
+  if (badge==='hoy') return '<span class="hoy-badge">HOY</span>';
+  if (badge==='lunes') return '<span class="lunes-badge">LUNES</span>';
+  if (badge==='martes') return '<span class="martes-badge">MARTES</span>';
+  if (badge==='miercoles') return '<span class="miercoles-badge">MIÉRCOLES</span>';
+  if (badge==='jueves') return '<span class="jueves-badge">JUEVES</span>';
+  if (badge==='viernes') return '<span class="viernes-badge">VIERNES</span>';
+  if (badge==='sabado') return '<span class="sabado-badge">SÁBADO</span>';
+  if (badge==='domingo') return '<span class="domingo-badge">DOMINGO</span>';
+  if (badge==='ok') return '<span class="ok-badge">✓ LISTO</span>';
+  return '';
+}
+
+function pillarBadge(pillar) {
+  const c = PILLAR_COLORS[pillar] || {bg:'#eee',text:'#333'};
+  return `<span class="su-pillar" style="background:${c.bg};color:${c.text}">${pillar}</span>`;
+}
+
+function renderFase(fase) {
+  const tab = uiState[`tab_${fase.id}`] || 'rutinarias';
+  const pendActivos = fase.pendientes.filter(p=>!p.done).length;
+  const urgentes = fase.pendientes.filter(p=>p.badge==='hoy'&&!p.done).length;
+
+  // Migración: asegurar que "Registro de servicio diario" existe en operacional
+  if (fase.id === 'operacional') {
+    const tieneRegistro = fase.rutinarias.some(r => r.registroServicio);
+    if (!tieneRegistro) {
+      fase.rutinarias.unshift({ titulo: 'Registro de servicio diario', proc: 'Completar al ejecutar o coordinar cada servicio del día.', subtareas: [], registroServicio: true, done: false });
+      saveData();
+    }
+  }
+
+  // Migración: asegurar que "Proceso Liquidación" existe en financiero
+  if (fase.id === 'financiero') {
+    const tieneLiquidacion = fase.rutinarias.some(r => r.liquidacionServicios);
+    if (!tieneLiquidacion) {
+      fase.rutinarias.unshift({ titulo: 'Proceso Liquidación', proc: 'Revisar servicios pendientes, ingresar precio, petróleo y adicionales por cada ID.', subtareas: [], liquidacionServicios: true, done: false });
+      saveData();
+    }
+  }
+
+  const rutHTML = fase.rutinarias.map((tarea, ti) => {
+    const isOpen = !!uiState[`acord_${fase.id}_${ti}`];
+    const isProcOpen = !!uiState[`proc_${fase.id}_${ti}`];
+    const isDone = !!tarea.done;
+
+    const subsHTML = tarea.subtareas.map((st, si) =>
+      `<div class="subtask" style="${isDone?'opacity:0.5':''}">
+        <span class="subtask-text">— ${st}</span>
+        <span class="subtask-del" onclick="delSub('${fase.id}',${ti},${si})">×</span>
+      </div>`
+    ).join('');
+
+    const procHTML = `<div class="proc-box" style="margin-top:8px">
+      <strong style="cursor:pointer;display:flex;align-items:center;justify-content:space-between" onclick="toggleProc('${fase.id}',${ti})">
+        <span>Procedimiento / Ayuda de memoria</span>
+        <span style="font-size:10px;color:#ad6800">${isProcOpen?'▲ cerrar':'▼ ver'}</span>
+      </strong>
+      ${isProcOpen ? `<textarea class="proc-edit-area" id="proc_edit_${fase.id}_${ti}">${tarea.proc||''}</textarea>
+        <button class="proc-save-btn" onclick="saveProc('${fase.id}',${ti})">Guardar</button>` :
+        (tarea.proc ? `<div style="font-size:11px;color:#614700;margin-top:4px;line-height:1.5">${tarea.proc}</div>` : '<div style="font-size:11px;color:#aaa;margin-top:4px">Sin procedimiento — clic en ver para agregar.</div>')}
+    </div>`;
+
+    const liquidacionHTML = tarea.liquidacionServicios ? (() => {
+      const servicios = (appData.servicios || []).slice().sort((a,b) => {
+        // Ordenar por fecha descendente
+        const fa = a.fecha.split('-').reverse().join('');
+        const fb = b.fecha.split('-').reverse().join('');
+        return fb.localeCompare(fa);
+      });
+      const pendientes = servicios.filter(s => !s.liquidado);
+      const liquidados = servicios.filter(s => s.liquidado);
+      const liquidandoId = uiState.liquidando_id || null;
+
+      const renderTarjeta = (s, si_orig) => {
+        const estaAbriendo = liquidandoId === s.id;
+        const destinos = (s.guias||[]).map(g=>g.destino).filter(Boolean).join(' / ') || '—';
+        const color = s.liquidado ? '#E8F5E9' : '#FFFDE7';
+        const colorBorde = s.liquidado ? '#A5D6A7' : '#FFE082';
+        const badge = s.liquidado
+          ? `<span style="background:#2E7D32;color:white;padding:2px 8px;border-radius:10px;font-size:9px;font-weight:700">LIQUIDADO</span>`
+          : `<span style="background:#F9A825;color:white;padding:2px 8px;border-radius:10px;font-size:9px;font-weight:700">PENDIENTE</span>`;
+        const detalle = estaAbriendo ? `
+          <div style="margin-top:8px;padding:10px;background:white;border-radius:8px;border:1px solid #dde">
+            <div style="font-size:9px;font-weight:700;color:#607D8B;margin-bottom:10px">PROCESO LIQUIDACIÓN — ${s.id}</div>
+
+            <div style="font-size:9px;font-weight:700;color:#1565C0;margin-bottom:6px;background:#E3F2FD;padding:4px 8px;border-radius:5px">🚛 SALIDA — Combustible</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:10px">
+              <div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">LITROS CARGADOS</div>
+                <input id="liq_litros_${s.id}" type="number" placeholder="ej: 120" value="${s.litros||''}" style="width:100%;border:1px solid #dde;border-radius:5px;padding:6px 8px;font-size:12px;outline:none;font-family:inherit"></div>
+              <div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">MONTO COMBUSTIBLE ($)</div>
+                <input id="liq_monto_comb_${s.id}" type="number" placeholder="ej: 95000" value="${s.montoComb||''}" style="width:100%;border:1px solid #dde;border-radius:5px;padding:6px 8px;font-size:12px;outline:none;font-family:inherit"></div>
+            </div>
+
+            <div style="font-size:9px;font-weight:700;color:#2E7D32;margin-bottom:6px;background:#E8F5E9;padding:4px 8px;border-radius:5px">✅ CIERRE — Resultado del servicio</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:10px">
+              <div style="grid-column:1/-1"><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">PRECIO NETO ($)</div>
+                <input id="liq_precio_${s.id}" type="number" placeholder="ej: 450000" value="${s.precio||''}" style="width:100%;border:1px solid #dde;border-radius:5px;padding:7px 8px;font-size:13px;outline:none;font-family:inherit"></div>
+              <div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">KILÓMETROS</div>
+                <input id="liq_km_${s.id}" type="number" placeholder="ej: 320" value="${s.km||''}" style="width:100%;border:1px solid #dde;border-radius:5px;padding:6px 8px;font-size:12px;outline:none;font-family:inherit"></div>
+              <div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">VIÁTICOS ($)</div>
+                <input id="liq_viaticos_${s.id}" type="number" placeholder="ej: 15000" value="${s.viaticos||''}" style="width:100%;border:1px solid #dde;border-radius:5px;padding:6px 8px;font-size:12px;outline:none;font-family:inherit"></div>
+              <div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">PETRÓLEO ($)</div>
+                <input id="liq_petroleo_${s.id}" type="number" placeholder="ej: 85000" value="${s.petroleo||''}" style="width:100%;border:1px solid #dde;border-radius:5px;padding:6px 8px;font-size:12px;outline:none;font-family:inherit"></div>
+              <div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">ADICIONAL ($)</div>
+                <input id="liq_adicional_${s.id}" type="number" placeholder="ej: 30000" value="${s.adicional||''}" style="width:100%;border:1px solid #dde;border-radius:5px;padding:6px 8px;font-size:12px;outline:none;font-family:inherit"></div>
+              <div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">PEAJES ($)</div>
+                <input id="liq_peajes_${s.id}" type="number" placeholder="ej: 8000" value="${s.peajes||''}" style="width:100%;border:1px solid #dde;border-radius:5px;padding:6px 8px;font-size:12px;outline:none;font-family:inherit"></div>
+            </div>
+
+            <div style="font-size:9px;font-weight:700;color:#888;margin-bottom:6px">ESTADO DE COBRO</div>
+            <div style="display:flex;gap:6px;margin-bottom:10px">
+              <button id="cobro_pendiente_${s.id}" onclick="setCobro('${s.id}','pendiente')" style="flex:1;padding:8px;border-radius:7px;border:2px solid ${(!s.cobro||s.cobro==='pendiente')?'#F9A825':'#dde'};background:${(!s.cobro||s.cobro==='pendiente')?'#FFF9C4':'white'};color:${(!s.cobro||s.cobro==='pendiente')?'#F9A825':'#888'};font-size:11px;font-weight:700;cursor:pointer">⏳ Pendiente</button>
+              <button id="cobro_pagado_${s.id}" onclick="setCobro('${s.id}','pagado')" style="flex:1;padding:8px;border-radius:7px;border:2px solid ${s.cobro==='pagado'?'#2E7D32':'#dde'};background:${s.cobro==='pagado'?'#E8F5E9':'white'};color:${s.cobro==='pagado'?'#2E7D32':'#888'};font-size:11px;font-weight:700;cursor:pointer">✅ Pagado</button>
+              <button id="cobro_facturado_${s.id}" onclick="setCobro('${s.id}','facturado')" style="flex:1;padding:8px;border-radius:7px;border:2px solid ${s.cobro==='facturado'?'#1565C0':'#dde'};background:${s.cobro==='facturado'?'#E3F2FD':'white'};color:${s.cobro==='facturado'?'#1565C0':'#888'};font-size:11px;font-weight:700;cursor:pointer">🧾 Facturado</button>
+            </div>
+
+            <button onclick="liquidarServicio('${s.id}')" style="width:100%;margin-top:4px;background:#2E7D32;color:white;border:none;border-radius:7px;padding:10px;font-size:12px;font-weight:700;cursor:pointer">💾 Guardar</button>
+            <button onclick="uiState.liquidando_id=null;render()" style="width:100%;margin-top:4px;background:transparent;color:#999;border:1px solid #ddd;border-radius:7px;padding:7px;font-size:11px;cursor:pointer">Cerrar</button>
+          </div>` : '';
+        return `<div onclick="uiState.liquidando_id=(uiState.liquidando_id==='${s.id}'?null:'${s.id}');render()" style="padding:10px 12px;margin-bottom:6px;background:${color};border:1px solid ${colorBorde};border-radius:8px;cursor:pointer">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start">
+            <div>
+              <span style="font-size:13px;font-weight:700;color:#455A64;letter-spacing:1px">${s.id}</span>
+              <span style="font-size:11px;color:#777;margin-left:6px">${s.fecha}</span>
+            </div>
+            ${badge}
+          </div>
+          <div style="font-size:11px;color:#333;margin-top:3px">${s.patente} · ${s.conductor||'—'} · ${s.cliente||'—'}</div>
+          <div style="font-size:11px;color:#777">${s.origen||'—'} → ${destinos}${s.tipoEquipo ? ` · ${s.tipoEquipo}` : ''}</div>
+          ${s.liquidado ? `
+            <div style="font-size:11px;color:#2E7D32;font-weight:700;margin-top:3px">${fmtPeso(s.precio)}</div>
+            <div style="display:flex;gap:6px;margin-top:4px;flex-wrap:wrap">
+              ${s.km ? `<span style="font-size:9px;background:#E3F2FD;color:#1565C0;padding:2px 6px;border-radius:8px">${s.km} km</span>` : ''}
+              ${s.rendimiento ? `<span style="font-size:9px;background:#F3E5F5;color:#6A1B9A;padding:2px 6px;border-radius:8px">${s.rendimiento} km/L</span>` : ''}
+              ${s.margen ? `<span style="font-size:9px;background:#E8F5E9;color:#2E7D32;padding:2px 6px;border-radius:8px">${s.margen}% margen</span>` : ''}
+              ${s.cobro === 'pagado' ? `<span style="font-size:9px;background:#E8F5E9;color:#2E7D32;padding:2px 6px;border-radius:8px">✅ Pagado</span>` : ''}
+              ${s.cobro === 'facturado' ? `<span style="font-size:9px;background:#E3F2FD;color:#1565C0;padding:2px 6px;border-radius:8px">🧾 Facturado</span>` : ''}
+              ${(!s.cobro || s.cobro === 'pendiente') ? `<span style="font-size:9px;background:#FFFDE7;color:#F9A825;padding:2px 6px;border-radius:8px">⏳ Pendiente cobro</span>` : ''}
+            </div>` 
+          : `<div style="font-size:10px;color:#F9A825;margin-top:3px">Toca para liquidar</div>`}
+          ${detalle}
+        </div>`;
+      };
+
+      const idxMap = {};
+      (appData.servicios||[]).forEach((s,i) => idxMap[s.id] = i);
+
+      return `<div style="margin-bottom:10px;padding:10px 12px;background:#f4f6f8;border-radius:10px;border:1px solid #dde4e8">
+        <div style="font-size:10px;font-weight:700;color:#455A64;letter-spacing:1px;margin-bottom:10px">
+          SERVICIOS — <span style="color:#F9A825">${pendientes.length} pendientes</span> · <span style="color:#2E7D32">${liquidados.length} liquidados</span>
+        </div>
+        ${servicios.length ? servicios.map(s => renderTarjeta(s, idxMap[s.id])).join('') : '<div style="font-size:11px;color:#bbb;text-align:center;padding:10px">Sin servicios registrados aún</div>'}
+      </div>`;
+    })() : '';
+
+    const serviciosHTML = tarea.registroServicio ? (() => {
+      const servicios = (appData.servicios || []);
+      const hoyStr = (() => { const h=new Date(); return `${String(h.getDate()).padStart(2,'0')}-${String(h.getMonth()+1).padStart(2,'0')}-${h.getFullYear()}`; })();
+      const ultimos3 = servicios.slice(-3).reverse();
+      const lista = ultimos3.length ? ultimos3.map((s)=>{
+        const idxReal = servicios.indexOf(s);
+        const destStr = (s.guias||[]).map(g=>g.destino).filter(Boolean).join(' / ') || s.destino || '—';
+        return `
+        <div style="font-size:11px;padding:6px 0;border-bottom:1px solid #eee;color:#333;line-height:1.6">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start">
+            <div><strong style="color:#455A64">${s.id||'—'}</strong> · ${s.fecha} · <strong>${s.patente}</strong><br>
+            <span style="color:#777">${s.conductor||'—'} · ${s.cliente||'—'}</span><br>
+            <span style="color:#999">${s.origen||'—'} → ${destStr}</span></div>
+            <div style="text-align:right;flex-shrink:0;margin-left:8px">
+              <span onclick="delServicio(${idxReal})" style="color:#bbb;cursor:pointer;font-size:11px">× eliminar</span>
+            </div>
+          </div>
+        </div>`}).join('') : '<div style="font-size:11px;color:#bbb;padding:6px 0;text-align:center">Sin servicios registrados aún</div>';
+      // ID automático
+      const nextId = 'S' + String(servicios.length + 1).padStart(2,'0');
+      const guias = uiState.srv_guias || [{ num:'', destino:'', fecha_descarga:'' }];
+      const clientesActivos = (appData.pipeline||[]).filter(c=>c.etapa==='activo').map(c=>c.cliente);
+      const conductoresDefault = ['Manuel Madrid','Felipe Vidal','Manuel Madariaga','Sebastián Zúñiga','Pablo Riquelme'];
+      if (!appData.conductores || appData.conductores.length < 2) {
+        appData.conductores = conductoresDefault;
+        saveData();
+      }
+      const conductoresLista = appData.conductores;
+      const conductoresOpts = conductoresLista.map(c=>`<option value="${c}">${c}</option>`).join('');
+      const patentesLista = appData.patentes || ['GKFD84','WR9192','XR8555','GCFF12','BPBL35','XA1414','XA1114'];
+      const patenteOpts = patentesLista.map(p=>`<option value="${p}">${p}</option>`).join('');
+      const guiasHTML = guias.map((g,gi) => `
+        <div style="background:#eef0f4;border-radius:6px;padding:8px;margin-bottom:5px">
+          <div style="font-size:9px;font-weight:700;color:#607D8B;margin-bottom:5px">GUÍA ${gi+1} ${guias.length>1?`<span onclick="delGuia(${gi})" style="color:#bbb;cursor:pointer;float:right;font-size:13px">×</span>`:''}</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:5px">
+            <div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">N° GUÍA</div>
+              <input value="${g.num}" onchange="updGuia(${gi},'num',this.value)" placeholder="ej: 123456" style="width:100%;border:1px solid #dde;border-radius:5px;padding:6px 8px;font-size:12px;outline:none;font-family:inherit"></div>
+            <div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">DESTINO</div>
+              <input value="${g.destino}" onchange="updGuia(${gi},'destino',this.value)" placeholder="ej: Santiago" style="width:100%;border:1px solid #dde;border-radius:5px;padding:6px 8px;font-size:12px;outline:none;font-family:inherit"></div>
+            <div style="grid-column:1/-1"><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">FECHA DESCARGA</div>
+              <input value="${g.fecha_descarga}" onchange="updGuia(${gi},'fecha_descarga',this.value)" type="date" style="width:100%;border:1px solid #dde;border-radius:5px;padding:6px 8px;font-size:12px;outline:none;font-family:inherit"></div>
+          </div>
+        </div>`).join('');
+
+      return `<div style="margin-bottom:10px;padding:10px 12px;background:#f4f6f8;border-radius:10px;border:1px solid #dde4e8">
+
+        <div style="font-size:10px;font-weight:700;color:#455A64;letter-spacing:1px;margin-bottom:8px;padding-bottom:5px;border-bottom:2px solid #CFD8DC">BLOQUE 1 — CONDUCTOR</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px">
+          <div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">ID SERVICIO</div>
+            <div style="background:#455A64;color:white;border-radius:6px;padding:7px 9px;font-size:14px;font-weight:700;letter-spacing:2px">${nextId}</div></div>
+          <div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">FECHA SALIDA</div>
+            <input id="srv_fecha" value="${hoyStr}" style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit"></div>
+          <div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">PATENTE</div>
+            <select id="srv_patente" style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit;background:white;-webkit-appearance:auto">
+              <option value="">Seleccionar patente...</option>
+              ${patenteOpts}
+            </select>
+            <div style="margin-top:3px"><span onclick="mostrarAgregarPatente()" style="font-size:10px;color:#607D8B;cursor:pointer;text-decoration:underline">+ Agregar patente nueva</span></div>
+            </div>
+          <div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">CONDUCTOR</div>
+            <select id="srv_conductor" style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit;background:white;-webkit-appearance:auto">
+              <option value="">Seleccionar conductor...</option>
+              ${conductoresOpts}
+            </select>
+            <div style="margin-top:3px"><span onclick="mostrarAgregarConductor()" style="font-size:10px;color:#607D8B;cursor:pointer;text-decoration:underline">+ Agregar conductor nuevo</span></div>
+            </div>
+          <div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">TIPO DE EQUIPO</div>
+            <select id="srv_tipo_equipo" style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit;background:white;-webkit-appearance:auto">
+              <option value="">Seleccionar...</option>
+              <option value="Camión solo">Camión solo</option>
+              <option value="Camión con carro">Camión con carro</option>
+              <option value="Rampla">Rampla</option>
+              <option value="Camión 3/4">Camión 3/4</option>
+              <option value="Camioneta">Camioneta</option>
+            </select></div>
+          <div style="grid-column:1/-1"><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">CLIENTE</div>
+            <select id="srv_cliente" onchange="toggleClienteNuevo(this.value)" style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit;background:white;-webkit-appearance:auto">
+              <option value="">Seleccionar cliente...</option>
+              ${clientesActivos.map(c=>`<option value="${c}">${c}</option>`).join('')}
+              <option value="__nuevo__">+ Cliente no está en la lista...</option>
+            </select>
+            <div id="srv_cliente_nuevo_box" style="display:none;margin-top:5px">
+              <input id="srv_cliente_nuevo" placeholder="Escribir nombre del cliente" style="width:100%;border:1px solid #FFE082;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit;background:#FFFDE7">
+              <div style="font-size:9px;color:#F9A825;margin-top:3px">Este cliente quedará pendiente de agregar al pipeline por Carlos o Pablo.</div>
+            </div>
+            </div>
+          <div style="grid-column:1/-1"><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">ORIGEN</div>
+            <input id="srv_origen" placeholder="ej: San Felipe" style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit"></div>
+        </div>
+
+        <div style="font-size:9px;font-weight:700;color:#607D8B;margin-bottom:5px;letter-spacing:0.5px">GUÍAS DE DESPACHO</div>
+        <div id="guias-container">${guiasHTML}</div>
+        <button onclick="addGuia()" style="width:100%;background:white;color:#455A64;border:1px dashed #90A4AE;border-radius:6px;padding:7px;font-size:11px;cursor:pointer;font-weight:700;margin-bottom:10px">+ Agregar guía</button>
+
+        <div style="font-size:10px;font-weight:700;color:#888;letter-spacing:1px;margin-bottom:8px;padding-bottom:5px;border-bottom:2px solid #CFD8DC">CONDUCTOR — PEAJES</div>
+        <div style="margin-bottom:8px">
+          <div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">PEAJES ($)</div>
+          <input id="srv_peajes" type="number" placeholder="ej: 8000" style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit">
+        </div>
+        <button onclick="addServicio()" style="width:100%;background:#455A64;color:white;border:none;border-radius:8px;padding:11px;font-size:13px;cursor:pointer;font-weight:700">+ Registrar servicio</button>
+        ${servicios.length ? `<div style="margin-top:12px"><div style="font-size:10px;font-weight:700;color:#607D8B;letter-spacing:1px;margin-bottom:4px">SERVICIOS DEL MES (${servicios.length})</div>${lista}</div>` : `<div style="margin-top:6px">${lista}</div>`}
+      </div>`;
+    })() : '';
+
+    return `<div class="acord-item" style="${isDone?'opacity:0.6':''}">
+      <div class="acord-header ${isOpen?'open':''}" style="${isDone?'background:#f5f5f5':''}">
+        <span class="acord-arrow" onclick="toggleAcord('${fase.id}',${ti})" style="padding:4px 6px 4px 0;cursor:pointer">▶</span>
+        ${uiState[`edit_tarea_${fase.id}_${ti}`]
+          ? `<input id="tarea_edit_${fase.id}_${ti}" value="${tarea.titulo.replace(/"/g,'&quot;')}" style="flex:1;border:1px solid ${fase.color};border-radius:5px;padding:3px 6px;font-size:12px;font-weight:700;outline:none" onblur="saveTareaTitulo('${fase.id}',${ti})" onkeydown="if(event.key==='Enter')saveTareaTitulo('${fase.id}',${ti})">`
+          : `<span class="acord-title" style="${isDone?'text-decoration:line-through;color:#aaa':''}" onclick="toggleAcord('${fase.id}',${ti})">${tarea.titulo}</span>`
+        }
+        <span onclick="toggleTareaDone('${fase.id}',${ti})" title="${isDone?'Reactivar':'Tachar tarea'}" style="cursor:pointer;font-size:14px;color:${isDone?fase.color:'#ccc'};padding:0 4px">${isDone?'✓':'○'}</span>
+        <span onclick="editTareaTitulo('${fase.id}',${ti})" title="Editar nombre" style="cursor:pointer;font-size:12px;color:#bbb;padding:0 4px">✎</span>
+        <span onclick="delTarea('${fase.id}',${ti})" title="Eliminar tarea" style="cursor:pointer;font-size:16px;color:#ddd;padding:0 4px">×</span>
+        <span class="acord-count" onclick="toggleAcord('${fase.id}',${ti})">${tarea.subtareas.length}</span>
+      </div>
+      <div class="acord-body ${isOpen?'open':''}">
+        ${liquidacionHTML}
+        ${serviciosHTML}
+        ${subsHTML}
+        <div class="add-sub-row" style="--fc:${fase.color}">
+          <input class="add-sub-input" id="sub_input_${fase.id}_${ti}" placeholder="+ Agregar paso..." onkeydown="if(event.key==='Enter')addSub('${fase.id}',${ti})">
+          <button class="add-sub-btn" style="background:${fase.color}" onclick="addSub('${fase.id}',${ti})">+</button>
+        </div>
+        ${procHTML}
+      </div>
+    </div>`;
+  }).join('');
+
+  const addTareaHTML = `<div style="padding:6px 4px 4px;display:flex;gap:6px;margin-top:4px">
+    <input id="nueva_tarea_${fase.id}" class="add-sub-input" placeholder="Nueva tarea diaria..." onkeydown="if(event.key==='Enter')addTareaRutinaria('${fase.id}')" style="flex:1;border:1px solid #dde;border-radius:7px;padding:7px 10px;font-size:12px;outline:none">
+    <button onclick="addTareaRutinaria('${fase.id}')" style="background:${fase.color};color:white;border:none;border-radius:7px;padding:7px 12px;font-size:12px;cursor:pointer;font-weight:700">+ Agregar</button>
+  </div>`;
+
+  const pendsOrdenados = [...fase.pendientes.map((p,i)=>({...p,_i:i}))].sort((a,b)=>{
+    if (a.done && !b.done) return 1;
+    if (!a.done && b.done) return -1;
+    return 0;
+  });
+  const pendsHTML = pendsOrdenados.map((pend) => {
+    const pi = pend._i;
+    const badgeOpts = ['hoy','lunes','martes','miercoles','jueves','viernes','sabado','domingo','ok','none'];
+    const badgeSelect = uiState[`editbadge_${fase.id}_${pi}`]
+      ? `<select onchange="cambiarBadge('${fase.id}',${pi},this.value)" onblur="cerrarEditBadge('${fase.id}',${pi})" style="font-size:10px;border:1px solid #ccc;border-radius:5px;padding:2px 4px;background:white;cursor:pointer" autofocus>
+          <option value="hoy" ${pend.badge==='hoy'?'selected':''}>🔴 HOY</option>
+          <option value="lunes" ${pend.badge==='lunes'?'selected':''}>LUNES</option>
+          <option value="martes" ${pend.badge==='martes'?'selected':''}>MARTES</option>
+          <option value="miercoles" ${pend.badge==='miercoles'?'selected':''}>MIÉRC.</option>
+          <option value="jueves" ${pend.badge==='jueves'?'selected':''}>JUEVES</option>
+          <option value="viernes" ${pend.badge==='viernes'?'selected':''}>VIERNES</option>
+          <option value="sabado" ${pend.badge==='sabado'?'selected':''}>SÁB.</option>
+          <option value="domingo" ${pend.badge==='domingo'?'selected':''}>DOM.</option>
+          <option value="ok" ${pend.badge==='ok'?'selected':''}>✓ LISTO</option>
+          <option value="none" ${!pend.badge||pend.badge==='none'?'selected':''}>Sin etiqueta</option>
+        </select>`
+      : `<span onclick="abrirEditBadge('${fase.id}',${pi})" title="Cambiar día" style="cursor:pointer">${badgeHTML(pend.badge)}</span>`;
+    return `<div class="pend-item ${pend.done?'done-pend':''}" style="--fc:${fase.color}">
+      <div class="pend-check ${pend.done?'done':''}" style="${pend.done?`background:${fase.color};border-color:${fase.color}`:''}" onclick="togglePend('${fase.id}',${pi})" title="Tachar/Activar"></div>
+      <div style="display:flex;align-items:flex-start;flex:1;min-width:0">
+        ${!pend.done ? badgeSelect : ''}
+        <span class="pend-text" onclick="editPendInline(this,'${fase.id}',${pi})" style="${pend.done?'text-decoration:line-through;color:#bbb':''}">${pend.texto}</span>
+      </div>
+      <span class="pend-del" onclick="delPend('${fase.id}',${pi})" title="Eliminar" style="font-size:16px;color:#ddd;cursor:pointer;padding:0 4px;flex-shrink:0;align-self:center;line-height:1">×</span>
+    </div>`;
+  }).join('');
+
+  const addPendHTML = `<div class="add-pend-row" style="--fc:${fase.color}">
+    <input class="add-pend-input" id="pend_input_${fase.id}" placeholder="Nueva tarea pendiente..." onkeydown="if(event.key==='Enter')addPend('${fase.id}')">
+    <select class="badge-select" id="pend_badge_${fase.id}">
+      <option value="hoy">🔴 HOY</option>
+      <option value="lunes">LUNES</option>
+      <option value="martes">MARTES</option>
+      <option value="miercoles">MIÉRCOLES</option>
+      <option value="jueves">JUEVES</option>
+      <option value="viernes">VIERNES</option>
+      <option value="sabado">SÁBADO</option>
+      <option value="domingo">DOMINGO</option>
+      <option value="none">Sin etiqueta</option>
+    </select>
+    <button class="add-pend-btn" style="background:${fase.color}" onclick="addPend('${fase.id}')">+ Agregar</button>
+  </div>`;
+
+  function planFaseHTML() {
+    const plan = fase.plan;
+    if (!plan) return '<div style="padding:12px;color:#aaa;font-size:12px">Sin plan definido</div>';
+    const total = plan.como.length;
+    const done = plan.como.filter(c=>c.done).length;
+    const pct = total > 0 ? Math.round(done/total*100) : 0;
+    const comoHTML = plan.como.map((c,ci) =>
+      `<div class="plan-como-item ${c.done?'done-como':''}" onclick="togglePlanComo('${fase.id}',${ci})" style="--fc:${fase.color}">
+        <div class="plan-como-check ${c.done?'done':''}" style="${c.done?'background:'+fase.color+';border-color:'+fase.color:''}"></div>
+        <span class="plan-como-text">${c.texto}</span>
+      </div>`
+    ).join('');
+    return `<div class="plan-fase" style="--fc:${fase.color}">
+      <div class="plan-que"><strong>QUÉ QUEREMOS LOGRAR</strong>${plan.que}</div>
+      <div class="plan-como-title">CÓMO LO VAMOS A HACER</div>
+      <div class="plan-progress">
+        <div class="plan-bar"><div class="plan-bar-fill" style="width:${pct}%;background:${fase.color}"></div></div>
+        <span class="plan-bar-label">${done}/${total} completado (${pct}%)</span>
+      </div>
+      ${comoHTML}
+      <div class="plan-meta-box" style="background:${fase.color}">✅ Meta: ${plan.meta}</div>
+    </div>`;
+  }
+
+  const miDiaContent = fase.id === 'control' ? renderMiDia() : '';
+  const personalContent = fase.id === 'control' ? renderPersonal() : '';
+  const pipelineContent = fase.id === 'comercial' ? renderPipeline() : '';
+  const tabContent = tab==='rutinarias' ? rutHTML + addTareaHTML :
+    tab==='plan' ? planFaseHTML() :
+    tab==='midia' ? miDiaContent :
+    tab==='personal' ? personalContent :
+    tab==='pipeline' ? pipelineContent :
+    `<div class="section-label">PENDIENTES PRIORITARIOS</div>${pendsHTML}${addPendHTML}`;
+
+  const extraTabControl = fase.id === 'control' ? `<button class="tab-btn ${tab==='midia'?'active':''}" onclick="setTab('${fase.id}','midia')" style="${tab==='midia'?`color:${fase.color};border-bottom-color:${fase.color};background:${fase.colorClaro};font-weight:900`:'font-weight:700'}">⚡ DÍA</button><button class="tab-btn ${tab==='personal'?'active':''}" onclick="abrirPersonal('${fase.id}')" style="${tab==='personal'?`color:${fase.color};border-bottom-color:${fase.color};background:${fase.colorClaro};font-weight:900`:'font-weight:700'}">🔒 Personal</button>` : '';
+  const extraTabComercial = fase.id === 'comercial' ? `<button class="tab-btn ${tab==='pipeline'?'active':''}" onclick="setTab('${fase.id}','pipeline')" style="${tab==='pipeline'?`color:${fase.color};border-bottom-color:${fase.color};background:${fase.colorClaro};font-weight:900`:'font-weight:700'}">🎯 Pipeline</button>` : '';
+  const extraTab = extraTabControl + extraTabComercial;
+
+  return `<div class="fase-card" data-fase="${fase.id}">
+    <div class="fase-header" style="background:${fase.color}">
+      <div class="fase-header-inner">
+        <div class="fase-left">
+          <div><div class="fase-name">${fase.nombre}</div></div>
+        </div>
+        <div class="fase-right">
+          <div class="fase-sub">${fase.subtitulo}</div>
+          ${urgentes>0?`<div class="urgentes-badge">${urgentes} urgente${urgentes>1?'s':''}</div>`:''}
+        </div>
+      </div>
+    </div>
+    <div class="tabs">
+      ${extraTab}
+      <button class="tab-btn ${tab==='rutinarias'?'active':''}" onclick="setTab('${fase.id}','rutinarias')" style="${tab==='rutinarias'?`color:${fase.color};border-bottom-color:${fase.color};background:${fase.colorClaro}`:''}">Tareas Diarias</button>
+      <button class="tab-btn ${tab==='pendientes'?'active':''}" onclick="setTab('${fase.id}','pendientes')" style="${tab==='pendientes'?`color:${fase.color};border-bottom-color:${fase.color};background:${fase.colorClaro}`:''}">Pendientes (${pendActivos})</button>
+      <button class="tab-btn ${tab==='plan'?'active':''}" onclick="setTab('${fase.id}','plan')" style="${tab==='plan'?`color:${fase.color};border-bottom-color:${fase.color};background:${fase.colorClaro}`:''}">Plan</button>
+    </div>
+    <div class="items">${tabContent}</div>
+  </div>`;
+}
+
+// ── SUPABASE ──────────────────────────────────────────────
+const SUPA_URL = 'https://qjbelwogpacknivdaows.supabase.co';
+const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFqYmVsd29ncGFja25pdmRhb3dzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNDg3MTUsImV4cCI6MjA4ODcyNDcxNX0.PaN5ol4v5TPDBLWeB4MSTu3SM-ezUjTRFk3jRm3Kv-M';
+let supa = null;
+try { supa = supabase.createClient(SUPA_URL, SUPA_KEY); } catch(e) { console.warn('Supabase SDK no disponible'); }
+
+// Estado de conexión
+let supaConectado = false;
+
+async function initSupabase() {
+  const el = document.getElementById('supa-status');
+  if (!supa) { if (el) { el.textContent = '⬤ DB Offline'; el.style.color = '#e57373'; } return; }
+  try {
+    const { data, error } = await supa.from('pipeline').select('id').limit(1);
+    if (!error) {
+      supaConectado = true;
+      if (el) { el.textContent = '⬤ DB Online'; el.style.color = '#6abf69'; }
+      console.log('Supabase conectado ✅');
+      await syncPipelineDesdeSupabase();
+    } else {
+      if (el) { el.textContent = '⬤ DB Error'; el.style.color = '#e57373'; }
+    }
+  } catch(e) {
+    if (el) { el.textContent = '⬤ DB Offline'; el.style.color = '#e57373'; }
+    console.warn('Supabase no disponible, usando localStorage', e);
+  }
+}
+
+async function syncPipelineDesdeSupabase() {
+  const { data, error } = await supa.from('pipeline').select('*').order('created_at');
+  if (!error && data) {
+    if (data.length === 0 && appData.pipeline && appData.pipeline.length > 0) {
+      // Primera vez — migrar pipeline local a Supabase
+      for (const item of appData.pipeline) {
+        const row = {
+          cliente: item.cliente,
+          contacto: item.contacto || '',
+          etapa: item.etapa || 'prospecto',
+          ultima_gestion: item.ultimaGestion || '',
+          proxima_accion: item.proximaAccion || '',
+          notas: item.notas || '',
+        };
+        const { data: ins } = await supa.from('pipeline').insert(row).select().single();
+        if (ins) item.id = ins.id;
+      }
+      saveData();
+    } else {
+      appData.pipeline = data.map(r => ({
+        id: r.id,
+        cliente: r.cliente,
+        contacto: r.contacto || '',
+        etapa: r.etapa || 'prospecto',
+        ultimaGestion: r.ultima_gestion || '',
+        proximaAccion: r.proxima_accion || '',
+        notas: r.notas || '',
+      }));
+      saveData(); render();
+    }
+  }
+}
+
+async function guardarPipelineSupabase(item) {
+  if (!supaConectado || !supa) return;
+  const row = {
+    cliente: item.cliente,
+    contacto: item.contacto || '',
+    etapa: item.etapa || 'prospecto',
+    ultima_gestion: item.ultimaGestion || '',
+    proxima_accion: item.proximaAccion || '',
+    notas: item.notas || '',
+  };
+  if (item.id && item.id.includes('-')) {
+    await supa.from('pipeline').update(row).eq('id', item.id);
+  } else {
+    const { data } = await supa.from('pipeline').insert(row).select().single();
+    if (data) item.id = data.id;
+  }
+}
+
+async function eliminarPipelineSupabase(id) {
+  if (!supaConectado || !supa || !id || !id.includes('-')) return;
+  await supa.from('pipeline').delete().eq('id', id);
+}
+// ─────────────────────────────────────────────────────────
+const ETAPA_COLORES = { prospecto:'#607D8B', cotizado:'#C55A11', activo:'#2E7D32', inactivo:'#9E9E9E' };
+const ETAPAS_PIPELINE = ['prospecto','cotizado','activo','inactivo'];
+const ETAPA_LABELS  = { prospecto:'PROSPECTO', cotizado:'COTIZADO', activo:'ACTIVO', inactivo:'INACTIVO' };
+
+function renderPipeline() {
+  const pipeline = appData.pipeline || [];
+  if (!appData.pipeline) appData.pipeline = [];
+
+  const filas = pipeline.map((c, ci) => {
+    const col = ETAPA_COLORES[c.etapa] || '#607D8B';
+    const editando = uiState[`pip_edit_${ci}`];
+    if (editando) {
+      return `<div style="background:#f8f9fa;border:1px solid #dde;border-radius:8px;padding:12px;margin-bottom:8px">
+        <div style="font-size:9px;font-weight:800;color:#888;letter-spacing:1px;margin-bottom:8px">EDITANDO CLIENTE</div>
+        <div style="display:grid;gap:6px">
+          <input id="pip_cliente_${ci}" value="${c.cliente}" placeholder="Cliente" style="border:1px solid #dde;border-radius:6px;padding:6px 9px;font-size:12px;outline:none;font-family:inherit">
+          <input id="pip_contacto_${ci}" value="${c.contacto||''}" placeholder="Contacto" style="border:1px solid #dde;border-radius:6px;padding:6px 9px;font-size:12px;outline:none;font-family:inherit">
+          <select id="pip_etapa_${ci}" style="border:1px solid #dde;border-radius:6px;padding:6px 9px;font-size:12px;outline:none;background:white">
+            ${ETAPAS_PIPELINE.map(e=>`<option value="${e}" ${c.etapa===e?'selected':''}>${ETAPA_LABELS[e]}</option>`).join('')}
+          </select>
+          <input id="pip_accion_${ci}" value="${c.proximaAccion||''}" placeholder="Próxima acción" style="border:1px solid #dde;border-radius:6px;padding:6px 9px;font-size:12px;outline:none;font-family:inherit">
+          <input id="pip_notas_${ci}" value="${c.notas||''}" placeholder="Notas" style="border:1px solid #dde;border-radius:6px;padding:6px 9px;font-size:12px;outline:none;font-family:inherit">
+        </div>
+        <div style="display:flex;gap:6px;margin-top:8px">
+          <button onclick="guardarPipeline(${ci})" style="flex:1;background:#607D8B;color:white;border:none;border-radius:6px;padding:7px;font-size:12px;font-weight:700;cursor:pointer">✓ Guardar</button>
+          <button onclick="cancelarEditPipeline(${ci})" style="background:#eee;color:#555;border:none;border-radius:6px;padding:7px 12px;font-size:12px;cursor:pointer">Cancelar</button>
+        </div>
+      </div>`;
+    }
+    return `<div style="border:1px solid #eee;border-radius:8px;padding:10px 12px;margin-bottom:6px;background:white">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px">
+        <div style="flex:1">
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;flex-wrap:wrap">
+            <span style="font-size:13px;font-weight:800;color:#222">${c.cliente}</span>
+            <span style="font-size:9px;font-weight:800;background:${col};color:white;padding:2px 7px;border-radius:10px;letter-spacing:0.5px">${ETAPA_LABELS[c.etapa]||c.etapa}</span>
+          </div>
+          ${c.contacto ? `<div style="font-size:11px;color:#777;margin-bottom:3px">👤 ${c.contacto}</div>` : ''}
+          ${c.proximaAccion ? `<div style="font-size:11px;color:#444;margin-bottom:2px">→ ${c.proximaAccion}</div>` : ''}
+          ${c.notas ? `<div style="font-size:10px;color:#aaa;font-style:italic">${c.notas}</div>` : ''}
+        </div>
+        <div style="display:flex;flex-direction:column;gap:4px;flex-shrink:0">
+          <button onclick="editarPipeline(${ci})" style="background:none;border:1px solid #dde;border-radius:5px;padding:3px 8px;font-size:10px;color:#607D8B;cursor:pointer;font-weight:700">✎</button>
+          <button onclick="delPipeline(${ci})" style="background:none;border:1px solid #eee;border-radius:5px;padding:3px 8px;font-size:12px;color:#ddd;cursor:pointer" title="Eliminar">×</button>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+
+  const resumen = ETAPAS_PIPELINE.map(e => {
+    const n = pipeline.filter(c=>c.etapa===e).length;
+    if (!n) return '';
+    return `<span style="font-size:10px;font-weight:700;background:${ETAPA_COLORES[e]};color:white;padding:2px 8px;border-radius:10px;margin-right:4px">${ETAPA_LABELS[e]} ${n}</span>`;
+  }).join('');
+
+  const addForm = uiState['pip_add']
+    ? `<div style="background:#f8f9fa;border:1px solid #dde;border-radius:8px;padding:12px;margin-top:8px">
+        <div style="font-size:9px;font-weight:800;color:#888;letter-spacing:1px;margin-bottom:8px">NUEVO CLIENTE</div>
+        <div style="display:grid;gap:6px">
+          <input id="pip_new_cliente" placeholder="Cliente *" style="border:1px solid #dde;border-radius:6px;padding:6px 9px;font-size:12px;outline:none;font-family:inherit">
+          <input id="pip_new_contacto" placeholder="Contacto" style="border:1px solid #dde;border-radius:6px;padding:6px 9px;font-size:12px;outline:none;font-family:inherit">
+          <select id="pip_new_etapa" style="border:1px solid #dde;border-radius:6px;padding:6px 9px;font-size:12px;outline:none;background:white">
+            ${ETAPAS_PIPELINE.map(e=>`<option value="${e}">${ETAPA_LABELS[e]}</option>`).join('')}
+          </select>
+          <input id="pip_new_accion" placeholder="Próxima acción" style="border:1px solid #dde;border-radius:6px;padding:6px 9px;font-size:12px;outline:none;font-family:inherit">
+          <input id="pip_new_notas" placeholder="Notas" style="border:1px solid #dde;border-radius:6px;padding:6px 9px;font-size:12px;outline:none;font-family:inherit">
+        </div>
+        <div style="display:flex;gap:6px;margin-top:8px">
+          <button onclick="agregarPipeline()" style="flex:1;background:#607D8B;color:white;border:none;border-radius:6px;padding:7px;font-size:12px;font-weight:700;cursor:pointer">+ Agregar cliente</button>
+          <button onclick="cancelarAddPipeline()" style="background:#eee;color:#555;border:none;border-radius:6px;padding:7px 12px;font-size:12px;cursor:pointer">Cancelar</button>
+        </div>
+      </div>`
+    : `<button onclick="uiState['pip_add']=true;render()" style="width:100%;margin-top:8px;background:white;border:1.5px dashed #ccc;border-radius:8px;padding:9px;font-size:12px;color:#888;cursor:pointer;font-weight:600">+ Agregar cliente</button>`;
+
+  return `<div style="padding:10px 4px">
+    <div style="margin-bottom:10px;flex-wrap:wrap;display:flex;gap:4px;align-items:center">
+      <span style="font-size:10px;font-weight:800;color:#888;letter-spacing:1px;margin-right:4px">PIPELINE:</span>
+      ${resumen || '<span style="font-size:11px;color:#bbb">Sin clientes aún</span>'}
+    </div>
+    ${filas}
+    ${addForm}
+  </div>`;
+}
+
+function editarPipeline(ci) {
+  // cerrar otros
+  Object.keys(uiState).filter(k=>k.startsWith('pip_edit_')).forEach(k=>delete uiState[k]);
+  uiState[`pip_edit_${ci}`] = true;
+  render();
+}
+function cancelarEditPipeline(ci) { delete uiState[`pip_edit_${ci}`]; render(); }
+function cancelarAddPipeline() { delete uiState['pip_add']; render(); }
+async function guardarPipeline(ci) {
+  if (!appData.pipeline) appData.pipeline = [];
+  const item = appData.pipeline[ci];
+  appData.pipeline[ci] = {
+    id: item.id || '',
+    cliente: document.getElementById(`pip_cliente_${ci}`)?.value.trim() || item.cliente,
+    contacto: document.getElementById(`pip_contacto_${ci}`)?.value.trim() || '',
+    etapa: document.getElementById(`pip_etapa_${ci}`)?.value || 'prospecto',
+    proximaAccion: document.getElementById(`pip_accion_${ci}`)?.value.trim() || '',
+    notas: document.getElementById(`pip_notas_${ci}`)?.value.trim() || '',
+    ultimaGestion: item.ultimaGestion || '',
+  };
+  delete uiState[`pip_edit_${ci}`];
+  await guardarPipelineSupabase(appData.pipeline[ci]);
+  saveData(); render();
+}
+async function agregarPipeline() {
+  const cliente = document.getElementById('pip_new_cliente')?.value.trim();
+  if (!cliente) return;
+  if (!appData.pipeline) appData.pipeline = [];
+  const hoy = new Date();
+  const mes = hoy.toLocaleDateString('es-CL',{month:'short',year:'numeric'});
+  const nuevo = {
+    id: '',
+    cliente,
+    contacto: document.getElementById('pip_new_contacto')?.value.trim() || '',
+    etapa: document.getElementById('pip_new_etapa')?.value || 'prospecto',
+    proximaAccion: document.getElementById('pip_new_accion')?.value.trim() || '',
+    notas: document.getElementById('pip_new_notas')?.value.trim() || '',
+    ultimaGestion: mes,
+  };
+  appData.pipeline.push(nuevo);
+  await guardarPipelineSupabase(nuevo);
+  delete uiState['pip_add'];
+  saveData(); render();
+}
+async function delPipeline(ci) {
+  if (!appData.pipeline) return;
+  const copia = JSON.parse(JSON.stringify(appData.pipeline[ci]));
+  await eliminarPipelineSupabase(copia.id);
+  appData.pipeline.splice(ci, 1);
+  saveData(); render();
+}
+
+function renderMiDia() {
+  const foco = appData.midia_foco || [];
+  const hoy = new Date();
+  const COLORES = { comercial:'#607D8B', operacional:'#757575', financiero:'#546E7A', control:'#37474F' };
+
+  // Sección FOCO DEL DÍA
+  const focoHTML = foco.length === 0
+    ? `<div style="text-align:center;padding:18px 12px;color:#aaa;font-size:12px">Aún no tienes ítems en tu foco.<br>Selecciona desde los ámbitos abajo ↓</div>`
+    : foco.map((item, fi) => {
+        const col = COLORES[item.faseId] || '#607D8B';
+        return `<div style="display:flex;align-items:flex-start;gap:10px;padding:9px 12px;border-radius:8px;background:#f8f9fa;margin-bottom:6px;border-left:3px solid ${col}">
+          <div style="flex:1">
+            <div style="font-size:9px;font-weight:800;color:${col};letter-spacing:1px;text-transform:uppercase;margin-bottom:2px">${item.faseNombre}</div>
+            <div style="font-size:13px;color:#222;font-weight:${item.done?'400':'600'};text-decoration:${item.done?'line-through':'none'};color:${item.done?'#aaa':'#222'}">${item.texto}</div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:5px;align-items:center;flex-shrink:0">
+            <button onclick="toggleFocoDone(${fi})" style="background:${item.done?col:'white'};border:2px solid ${col};border-radius:50%;width:22px;height:22px;cursor:pointer;font-size:11px;display:flex;align-items:center;justify-content:center;color:${item.done?'white':col}">${item.done?'✓':'○'}</button>
+            <button onclick="quitarFoco(${fi})" style="background:none;border:none;color:#ccc;cursor:pointer;font-size:14px;line-height:1" title="Quitar del foco">×</button>
+          </div>
+        </div>`;
+      }).join('');
+
+  // Sección PENDIENTES POR ÁMBITO
+  const ambitos = appData.fases.filter(f => f.id !== 'control');
+  const focoIds = new Set(foco.map(f => f.faseId + '::' + f.texto));
+
+  const ambitosHTML = ambitos.map(fase => {
+    const col = COLORES[fase.id] || '#607D8B';
+    const pendActivos = fase.pendientes.filter(p => !p.done);
+    if (pendActivos.length === 0) return '';
+    const isOpen = !!appData.midia_open?.[fase.id];
+    const itemsHTML = pendActivos.map((p, pi) => {
+      const key = fase.id + '::' + p.texto;
+      const enFoco = focoIds.has(key);
+      return `<div style="display:flex;align-items:flex-start;gap:8px;padding:7px 10px;border-bottom:1px solid #f0f0f0">
+        <div style="flex:1;font-size:12px;color:#333;line-height:1.4">${p.badge && p.badge!=='none'?`<span style="font-size:9px;font-weight:800;background:${col};color:white;padding:1px 6px;border-radius:3px;margin-right:5px">${p.badge.toUpperCase()}</span>`:''}${p.texto}</div>
+        <button onclick="agregarFoco('${fase.id}','${fase.nombre}',${fase.pendientes.indexOf(p)})" style="flex-shrink:0;background:${enFoco?col:'white'};border:1.5px solid ${col};border-radius:5px;padding:3px 8px;font-size:10px;font-weight:700;color:${enFoco?'white':col};cursor:pointer">${enFoco?'✓':'+ foco'}</button>
+      </div>`;
+    }).join('');
+
+    return `<div style="margin-bottom:6px;border-radius:8px;overflow:hidden;border:1px solid #e8eaec">
+      <div onclick="toggleMidiaAmb('${fase.id}')" style="display:flex;justify-content:space-between;align-items:center;padding:9px 12px;background:${col};cursor:pointer">
+        <div style="font-size:10px;font-weight:800;color:white;letter-spacing:1px">${fase.nombre}</div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <span style="font-size:10px;color:rgba(255,255,255,0.8)">${pendActivos.length} pendientes</span>
+          <span style="color:white;font-size:12px">${isOpen?'▲':'▼'}</span>
+        </div>
+      </div>
+      ${isOpen ? `<div>${itemsHTML}</div>` : ''}
+    </div>`;
+  }).join('');
+
+  return `<div style="padding:12px">
+    <div style="font-size:10px;font-weight:800;letter-spacing:1.5px;color:#37474F;margin-bottom:8px">⚡ DÍA — ${hoy.toLocaleDateString('es-CL',{weekday:'long',day:'numeric',month:'long'})}</div>
+    <div style="margin-bottom:16px">${focoHTML}</div>
+    <div style="font-size:10px;font-weight:800;letter-spacing:1.5px;color:#888;margin-bottom:8px;border-top:1px solid #eee;padding-top:12px">PENDIENTES POR ÁMBITO</div>
+    ${ambitosHTML}
+  </div>`;
+}
+
+function agregarFoco(faseId, faseNombre, pendIdx) {
+  if (!appData.midia_foco) appData.midia_foco = [];
+  const fase = appData.fases.find(f => f.id === faseId);
+  if (!fase) return;
+  const pend = fase.pendientes[pendIdx];
+  if (!pend) return;
+  const key = faseId + '::' + pend.texto;
+  const yaEsta = appData.midia_foco.findIndex(f => f.faseId + '::' + f.texto === key);
+  if (yaEsta >= 0) {
+    appData.midia_foco.splice(yaEsta, 1);
+  } else {
+    appData.midia_foco.push({ faseId, faseNombre, texto: pend.texto, done: false });
+  }
+  saveData(); render();
+}
+
+function quitarFoco(fi) {
+  if (!appData.midia_foco) return;
+  appData.midia_foco.splice(fi, 1);
+  saveData(); render();
+}
+
+function toggleFocoDone(fi) {
+  if (!appData.midia_foco) return;
+  appData.midia_foco[fi].done = !appData.midia_foco[fi].done;
+  saveData(); render();
+}
+
+function toggleMidiaAmb(faseId) {
+  if (!appData.midia_open) appData.midia_open = {};
+  appData.midia_open[faseId] = !appData.midia_open[faseId];
+  saveData(); render();
+}
+
+function renderScalingUp() {
+  const su = appData.scalingup;
+  const subTab = uiState['plan_subtab'] || 'estabilizacion';
+  const SU_COLOR = '#455A64';
+  const SU_LIGHT = '#ECEFF1';
+
+  // ── ESTABILIZACIÓN: 3 bloques por ámbito (Comercial / Operacional / Financiero) ──
+  function estabilizacionContent() {
+    const ambitos = [
+      {
+        id: 'estab_comercial', nombre: 'COMERCIAL', color: '#607D8B',
+        etapas: appData.scalingup.estabComercial || [
+          { etapa:'ETAPA 1', titulo:'Estabilización financiera', periodo:'Marzo 2026', color:'#C00000',
+            que:'Activar y cerrar fuentes de ingreso inmediatas', meta:'3 clientes/operadores activos generando servicios' },
+          { etapa:'ETAPA 2', titulo:'Diversificación de cartera', periodo:'Abril–Mayo 2026', color:'#C55A11',
+            que:'No depender de un solo operador. Al menos 3 fuentes activas', meta:'3 clientes/operadores activos generando servicios regulares' },
+          { etapa:'ETAPA 3', titulo:'Recuperación operativa', periodo:'Mayo–Junio 2026', color:'#7F6000',
+            que:'Ampliar base de clientes directos', meta:'4+ fuentes de ingreso activas' },
+          { etapa:'ETAPA 4', titulo:'Punto de equilibrio sostenido', periodo:'Julio 2026', color:'#375623',
+            que:'Mantener cartera activa y retomar clientes de temporada', meta:'PE sostenido con clientes recurrentes' },
+        ]
+      },
+      {
+        id: 'estab_operacional', nombre: 'OPERACIONAL', color: '#757575',
+        etapas: appData.scalingup.estabOperacional || [
+          { etapa:'ETAPA 1', titulo:'Estabilización financiera', periodo:'Marzo 2026', color:'#C00000',
+            que:'Mantener flota operativa y servicios en ejecución', meta:'5 camiones operativos sin detenerse' },
+          { etapa:'ETAPA 2', titulo:'Diversificación de cartera', periodo:'Abril–Mayo 2026', color:'#C55A11',
+            que:'Consolidar contratos y estructura de conductores', meta:'Contratos conductores firmados · Roles definidos' },
+          { etapa:'ETAPA 3', titulo:'Recuperación operativa', periodo:'Mayo–Junio 2026', color:'#7F6000',
+            que:'Recuperar flota parada y escalar capacidad', meta:'7+ camiones operativos y KPIs medidos mensualmente' },
+          { etapa:'ETAPA 4', titulo:'Punto de equilibrio sostenido', periodo:'Julio 2026', color:'#375623',
+            que:'Operar con sistema de gestión diaria establecido', meta:'Panel en uso diario · Hoja de servicios activa' },
+        ]
+      },
+      {
+        id: 'estab_financiero', nombre: 'FINANCIERO', color: '#546E7A',
+        etapas: appData.scalingup.estabFinanciero || [
+          { etapa:'ETAPA 1', titulo:'Estabilización financiera', periodo:'Marzo 2026', color:'#C00000',
+            que:'Generar caja operativa mínima y bancarizar la empresa', meta:'Ingresar mínimo $13.000.000 antes de cerrar el mes' },
+          { etapa:'ETAPA 2', titulo:'Diversificación de cartera', periodo:'Abril–Mayo 2026', color:'#C55A11',
+            que:'Controlar flujo de caja y regularizar obligaciones', meta:'Flujo de caja proyectado a 3 meses activo' },
+          { etapa:'ETAPA 3', titulo:'Recuperación operativa', periodo:'Mayo–Junio 2026', color:'#7F6000',
+            que:'Resolver deudas críticas y recuperar activos', meta:'Mussam y parking resueltos · Camiones recuperados' },
+          { etapa:'ETAPA 4', titulo:'Punto de equilibrio sostenido', periodo:'Julio 2026', color:'#375623',
+            que:'Superar PE de forma consistente con estructura financiera clara', meta:'$13.950.000+ facturación mensual sostenida' },
+        ]
+      },
+    ];
+
+    return ambitos.map(amb => {
+      const isOpen = uiState[`estab_amb_${amb.id}`] !== false;
+      const etapasHTML = amb.etapas.map((e,ei) => {
+        const eOpen = uiState[`estab_etapa_${amb.id}_${ei}`] !== false;
+        return `<div class="plan-etapa" style="margin-bottom:8px">
+          <div class="plan-etapa-header" style="background:${e.color}" onclick="toggleEstabEtapa('${amb.id}',${ei})">
+            <div class="plan-etapa-info">
+              <div class="plan-etapa-label">${e.etapa} · ${e.periodo}</div>
+              <div class="plan-etapa-title">${e.titulo}</div>
+            </div>
+            <span class="plan-etapa-chevron ${eOpen?'open':''}">▶</span>
+          </div>
+          ${eOpen ? `<div class="plan-etapa-body">
+            <div class="plan-bloque-label">QUÉ</div>
+            <div class="plan-objetivo">${e.que}</div>
+            <div class="plan-bloque-label" style="margin-top:6px">INDICADOR DE TÉRMINO</div>
+            <div class="plan-meta" style="background:${e.color}">${e.meta}</div>
+          </div>` : ''}
+        </div>`;
+      }).join('');
+
+      return `<div style="border-radius:10px;overflow:hidden;border:1px solid #dde;margin-bottom:12px">
+        <div style="background:${amb.color};padding:10px 14px;display:flex;align-items:center;justify-content:space-between;cursor:pointer" onclick="toggleEstabAmb('${amb.id}')">
+          <span style="color:white;font-weight:800;font-size:13px;letter-spacing:0.5px">${amb.nombre}</span>
+          <span style="color:rgba(255,255,255,0.7);font-size:12px">${isOpen?'▲':'▼'}</span>
+        </div>
+        ${isOpen ? `<div style="padding:10px 12px 4px">${etapasHTML}</div>` : ''}
+      </div>`;
+    }).join('');
+  }
+
+  // ── ESCALAMIENTO: 6 Fases Scaling Up (Carta Gantt) ──
+  function escalamientoContent() {
+    const plan = appData.scalingup.planEscalamiento || DEFAULT_DATA.scalingup.planEscalamiento;
+    const etapasHTML = plan.map((e, ei) => {
+      const isOpen = uiState[`escal_fase_${ei}`] !== false;
+      const total = e.acciones.length;
+      const done = e.acciones.filter(a=>a.done).length;
+      const pct = total > 0 ? Math.round(done/total*100) : 0;
+      const accionesHTML = e.acciones.map((a,ai) =>
+        `<div class="plan-accion ${a.done?'done-plan':''}" onclick="toggleEscalAccion(${ei},${ai})" style="--etapa-color:${e.color}">
+          <div class="plan-check ${a.done?'done':''}" style="${a.done?'background:'+e.color+';border-color:'+e.color:''}"></div>
+          <span class="plan-accion-text" style="${a.done?'text-decoration:line-through;color:#aaa':''}">${a.texto}</span>
+          <span onclick="event.stopPropagation();delEscalAccion(${ei},${ai})" style="color:#ddd;cursor:pointer;font-size:14px;padding:0 4px;flex-shrink:0;line-height:1" title="Eliminar">×</span>
+        </div>`
+      ).join('');
+      const pctColor = pct===100 ? '#4CAF50' : pct > 50 ? '#FF9800' : e.color;
+      return `<div style="border-radius:10px;overflow:hidden;border:1px solid #dde;margin-bottom:10px;box-shadow:0 1px 4px rgba(0,0,0,0.08)">
+        <div style="background:${e.color};padding:12px 14px;cursor:pointer;user-select:none" onclick="toggleEscalFase(${ei})">
+          <div style="display:flex;align-items:flex-start;justify-content:space-between">
+            <div style="flex:1">
+              <div style="color:rgba(255,255,255,0.6);font-size:9px;font-weight:800;letter-spacing:1.5px;margin-bottom:3px">${e.fase}</div>
+              <div style="color:white;font-weight:800;font-size:14px;line-height:1.2">${e.icon} ${e.titulo}</div>
+            </div>
+            <div style="text-align:right;flex-shrink:0;margin-left:10px;display:flex;flex-direction:column;align-items:flex-end;gap:3px">
+              <div style="font-size:18px;font-weight:900;color:${pct===100?'#A5D6A7':'white'}">${pct}%</div>
+              <div style="font-size:9px;color:rgba(255,255,255,0.55)">${done}/${total} acciones</div>
+              <div style="font-size:12px;color:rgba(255,255,255,0.5)">${isOpen?'▲':'▼'}</div>
+            </div>
+          </div>
+          <div style="height:3px;background:rgba(255,255,255,0.2);border-radius:2px;margin-top:8px;overflow:hidden">
+            <div style="height:100%;width:${pct}%;background:rgba(255,255,255,0.7);border-radius:2px;transition:width 0.4s"></div>
+          </div>
+        </div>
+        ${isOpen ? `<div style="padding:12px 14px 10px;background:white">
+          <div style="font-size:9px;font-weight:800;color:#888;letter-spacing:1px;margin-bottom:4px">🎯 OBJETIVO</div>
+          <div style="font-size:11px;color:#444;line-height:1.5;margin-bottom:10px;padding:8px 10px;background:#f8f9fa;border-radius:7px;border-left:3px solid ${e.color}">${e.objetivo}</div>
+          <div style="font-size:9px;font-weight:800;color:#888;letter-spacing:1px;margin-bottom:4px">🔧 HERRAMIENTA</div>
+          <div style="font-size:11px;color:#555;margin-bottom:10px;padding:5px 10px;background:#f0f4f8;border-radius:6px;font-style:italic">${e.herramienta}</div>
+          <div style="font-size:9px;font-weight:800;color:#888;letter-spacing:1px;margin-bottom:6px">✅ ACCIONES</div>
+          ${accionesHTML}
+          <div style="font-size:9px;font-weight:800;color:#888;letter-spacing:1px;margin-top:10px;margin-bottom:4px">📄 ENTREGABLE</div>
+          <div style="font-size:11px;color:white;font-weight:700;padding:7px 10px;background:${e.color};border-radius:7px;margin-bottom:8px">${e.entregable}</div>
+          <div style="display:flex;gap:6px;margin-top:6px">
+            <input id="escal_input_${ei}" style="flex:1;border:1px solid #dde;border-radius:6px;padding:7px 10px;font-size:11px;outline:none;font-family:inherit" placeholder="Nueva acción..." onkeydown="if(event.key==='Enter')addEscalAccion(${ei})">
+            <button onclick="addEscalAccion(${ei})" style="background:${e.color};color:white;border:none;border-radius:6px;padding:7px 12px;font-size:13px;cursor:pointer;font-weight:700">+</button>
+          </div>
+        </div>` : ''}
+      </div>`;
+    }).join('');
+    return `<div style="padding-top:4px">${etapasHTML}</div>`;
+  }
+
+  const content = subTab==='estabilizacion' ? estabilizacionContent() : escalamientoContent();
+
+  return `<div class="fase-card" data-fase="scalingup">
+    <div class="fase-header" style="background:${SU_COLOR}">
+      <div class="fase-header-inner">
+        <div class="fase-left"><div><div class="fase-name">SCALING UP</div></div></div>
+        <div class="fase-right"><div class="fase-sub">Crecimiento y Sostenibilidad</div></div>
+      </div>
+    </div>
+    <div class="tabs">
+      <button class="tab-btn ${subTab==='estabilizacion'?'active':''}" onclick="setSUTab('estabilizacion')" style="${subTab==='estabilizacion'?`color:${SU_COLOR};border-bottom-color:${SU_COLOR};background:${SU_LIGHT}`:''}">Estabilización</button>
+      <button class="tab-btn ${subTab==='escalamiento'?'active':''}" onclick="setSUTab('escalamiento')" style="${subTab==='escalamiento'?`color:${SU_COLOR};border-bottom-color:${SU_COLOR};background:${SU_LIGHT}`:''}">Plan de Escalamiento</button>
+    </div>
+    <div class="items">${content}</div>
+  </div>`;
+}
+function toggleEscalFase(ei) { uiState[`escal_fase_${ei}`]=!(uiState[`escal_fase_${ei}`]!==false); saveUI(); render(); }
+function toggleEscalAccion(ei,ai) {
+  if(!appData.scalingup.planEscalamiento) appData.scalingup.planEscalamiento = DEFAULT_DATA.scalingup.planEscalamiento;
+  appData.scalingup.planEscalamiento[ei].acciones[ai].done = !appData.scalingup.planEscalamiento[ei].acciones[ai].done;
+  saveData(); render();
+}
+function addEscalAccion(ei) {
+  const val = document.getElementById(`escal_input_${ei}`)?.value.trim(); if(!val) return;
+  if(!appData.scalingup.planEscalamiento) appData.scalingup.planEscalamiento = DEFAULT_DATA.scalingup.planEscalamiento;
+  appData.scalingup.planEscalamiento[ei].acciones.push({texto:val,done:false});
+  saveData(); render();
+}
+function delEscalAccion(ei,ai) {
+  if(!appData.scalingup.planEscalamiento) return;
+  const copia = JSON.parse(JSON.stringify(appData.scalingup.planEscalamiento[ei].acciones[ai]));
+  registrarAccion(`Eliminar acción "${copia.texto.substring(0,25)}"`, () => {
+    appData.scalingup.planEscalamiento[ei].acciones.splice(ai, 0, copia);
+  });
+  appData.scalingup.planEscalamiento[ei].acciones.splice(ai,1);
+  saveData(); render();
+}
+function setSUTab(tab) { uiState['plan_subtab']=tab; saveUI(); render(); }
+function toggleEstabAmb(id) { uiState[`estab_amb_${id}`]=!(uiState[`estab_amb_${id}`]!==false); saveUI(); render(); }
+function toggleEstabEtapa(ambId,ei) { uiState[`estab_etapa_${ambId}_${ei}`]=!(uiState[`estab_etapa_${ambId}_${ei}`]!==false); saveUI(); render(); }
+function toggleEscalPilar(key) { uiState[`escal_pilar_${key}`]=!(uiState[`escal_pilar_${key}`]!==false); saveUI(); render(); }
+function togglePilarAccion(key,ai) {
+  const mapKey = {personas:'pilPersonas',estrategia:'pilEstrategia',ejecucion:'pilEjecucion',flujo:'pilFlujo'};
+  const k = mapKey[key]; if(!k) return;
+  if (!appData.scalingup[k]) {
+    // inicializar desde defaults si no existe
+    const defaults = {
+      pilPersonas:[{texto:'Definir roles formales Carlos / Pablo',done:false},{texto:'Establecer ritmo semanal de reuniones Carlos / Pablo',done:false},{texto:'Firmar contratos con conductores activos',done:false},{texto:'Definir plan de delegación y sucesión de roles',done:false}],
+      pilEstrategia:[{texto:'Elaborar One Page Plan Global Solutions',done:false},{texto:'Formalizar Global Solutions como marca operativa ante clientes',done:false},{texto:'Definir zonas geográficas prioritarias de operación',done:false},{texto:'Establecer propuesta de valor diferenciada vs competencia',done:false}],
+      pilEjecucion:[{texto:'Implementar Rockefeller Habits Checklist adaptado a GS',done:false},{texto:'Construir manual de operaciones vivo por área',done:false},{texto:'Publicar Panel de Gestión online con login por rol',done:false},{texto:'Implementar KPIs mensuales formales — servicios, margen, km',done:false}],
+      pilFlujo:[{texto:'Construir flujo de caja proyectado a 3 meses',done:false},{texto:'Completar bancarización — cuenta operativa Global Solutions activa',done:false},{texto:'Establecer estructura de costos fijos y variables por camión',done:false},{texto:'Evaluar incorporación de nuevo socio o inversionista',done:false}],
+    };
+    appData.scalingup[k] = JSON.parse(JSON.stringify(defaults[k]));
+  }
+  appData.scalingup[k][ai].done = !appData.scalingup[k][ai].done;
+  saveData(); render();
+}
+function addPilarAccion(key) {
+  const mapKey = {personas:'pilPersonas',estrategia:'pilEstrategia',ejecucion:'pilEjecucion',flujo:'pilFlujo'};
+  const k = mapKey[key]; if(!k) return;
+  const val = document.getElementById(`pilar_input_${key}`)?.value.trim(); if(!val) return;
+  if(!appData.scalingup[k]) appData.scalingup[k]=[];
+  appData.scalingup[k].push({texto:val,done:false});
+  saveData(); render();
+}
+
+function abrirPersonal(faseId) {
+  // Si ya está desbloqueado en esta sesión, ir directo
+  if (sessionStorage.getItem('personal_desbloqueado') === '1313') {
+    setTab(faseId, 'personal'); return;
+  }
+  const clave = prompt('🔒 Ingresa tu clave personal:');
+  if (clave === '1313') {
+    sessionStorage.setItem('personal_desbloqueado', '1313');
+    setTab(faseId, 'personal');
+  } else if (clave !== null) {
+    alert('Clave incorrecta');
+  }
+}
+
+function renderPersonal() {
+  const fase = appData.fases.find(f => f.id === 'control');
+  if (!fase.personalPendientes) fase.personalPendientes = [];
+  const pends = fase.personalPendientes;
+  const pendsHTML = pends.length === 0
+    ? '<div style="text-align:center;padding:16px;color:#aaa;font-size:12px">Sin tareas personales aún</div>'
+    : pends.map((p, pi) => `
+      <div class="pend-item ${p.done?'done-pend':''}" style="--fc:#37474F">
+        <div class="pend-check ${p.done?'done':''}" style="${p.done?'background:#37474F;border-color:#37474F':''}"></div>
+        <span class="pend-text" onclick="editPersonalInline(this,${pi})">${p.texto}</span>
+        <span class="pend-tach ${p.done?'tachado':''}" onclick="togglePersonal(${pi})" title="Tachar">S̶</span>
+        <span class="pend-del" onclick="delPersonal(${pi})">×</span>
+      </div>`).join('');
+  return `<div style="padding:12px">
+    <div style="font-size:10px;font-weight:800;letter-spacing:1.5px;color:#37474F;margin-bottom:10px">🔒 PLAN PERSONAL — PRIVADO</div>
+    ${pendsHTML}
+    <div class="add-pend-row" style="--fc:#37474F;margin-top:10px">
+      <input class="add-pend-input" id="personal_input" placeholder="Nueva tarea personal..." onkeydown="if(event.key==='Enter')addPersonal()">
+      <button onclick="addPersonal()" style="background:#37474F;color:white;border:none;border-radius:7px;padding:7px 12px;font-size:12px;cursor:pointer;font-weight:700">+ Agregar</button>
+    </div>
+  </div>`;
+}
+
+function togglePersonal(pi) {
+  const fase = appData.fases.find(f => f.id === 'control');
+  if (!fase.personalPendientes) return;
+  fase.personalPendientes[pi].done = !fase.personalPendientes[pi].done;
+  saveData(); render();
+}
+function delPersonal(pi) {
+  const fase = appData.fases.find(f => f.id === 'control');
+  if (!fase.personalPendientes) return;
+  fase.personalPendientes.splice(pi, 1);
+  saveData(); render();
+}
+function addPersonal() {
+  const input = document.getElementById('personal_input');
+  const val = input?.value.trim(); if (!val) return;
+  const fase = appData.fases.find(f => f.id === 'control');
+  if (!fase.personalPendientes) fase.personalPendientes = [];
+  fase.personalPendientes.unshift({ texto: val, done: false });
+  input.value = ''; saveData(); render();
+}
+function editPersonalInline(el, pi) {
+  if (el.isContentEditable) return;
+  el.contentEditable = true; el.style.outline = '1px solid #aaa'; el.focus();
+  const range = document.createRange(); range.selectNodeContents(el);
+  const sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(range);
+  const guardar = () => {
+    el.contentEditable = false; el.style.outline = '';
+    const val = el.innerText.trim();
+    if (val) { const f = appData.fases.find(f=>f.id==='control'); if(f.personalPendientes) f.personalPendientes[pi].texto = val; saveData(); }
+    else render();
+  };
+  el.onblur = guardar;
+  el.onkeydown = (e) => { if(e.key==='Enter'){e.preventDefault();el.blur();} if(e.key==='Escape')render(); };
+}
+
+function abrirEnChrome() {
+  const htmlActual = document.documentElement.outerHTML;
+  const blob = new Blob([htmlActual], {type: 'text/html; charset=utf-8'});
+  const url = URL.createObjectURL(blob);
+  const ventana = window.open(url, '_blank');
+  if (!ventana) alert('El navegador bloqueó la ventana. Permite popups para este archivo y vuelve a intentar.');
+  setTimeout(() => URL.revokeObjectURL(url), 8000);
+}
+
+function setCobro(id, estado) {
+  uiState[`cobro_${id}`] = estado;
+  ['pendiente','pagado','facturado'].forEach(e => {
+    const btn = document.getElementById(`cobro_${e}_${id}`);
+    if (!btn) return;
+    const activo = e === estado;
+    btn.style.background = activo ? (e==='pendiente'?'#FFF9C4':e==='pagado'?'#E8F5E9':'#E3F2FD') : 'white';
+    btn.style.borderColor = activo ? (e==='pendiente'?'#F9A825':e==='pagado'?'#2E7D32':'#1565C0') : '#dde';
+    btn.style.color = activo ? (e==='pendiente'?'#F9A825':e==='pagado'?'#2E7D32':'#1565C0') : '#888';
+  });
+}
+
+function liquidarServicio(id) {
+  const idx = (appData.servicios||[]).findIndex(s => s.id === id);
+  if (idx === -1) return;
+  const precio     = parseInt(document.getElementById(`liq_precio_${id}`)?.value) || 0;
+  const km         = parseInt(document.getElementById(`liq_km_${id}`)?.value) || 0;
+  const viaticos   = parseInt(document.getElementById(`liq_viaticos_${id}`)?.value) || 0;
+  const petroleo   = parseInt(document.getElementById(`liq_petroleo_${id}`)?.value) || 0;
+  const litros     = parseFloat(document.getElementById(`liq_litros_${id}`)?.value) || 0;
+  const montoComb  = parseInt(document.getElementById(`liq_monto_comb_${id}`)?.value) || 0;
+  const adicional  = parseInt(document.getElementById(`liq_adicional_${id}`)?.value) || 0;
+  const peajes     = parseInt(document.getElementById(`liq_peajes_${id}`)?.value) || appData.servicios[idx].peajes || 0;
+  const cobro      = uiState[`cobro_${id}`] || 'pendiente';
+
+  // Calcular rendimiento km/litro
+  const rendimiento = (litros > 0 && km > 0) ? Math.round((km / litros) * 10) / 10 : 0;
+
+  // Costo total del servicio
+  const costoTotal = petroleo + montoComb + viaticos + peajes + adicional;
+  const margen = precio > 0 ? Math.round(((precio - costoTotal) / precio) * 100) : 0;
+
+  const esLiquidado = (precio > 0);
+  Object.assign(appData.servicios[idx], {
+    precio, km, viaticos, petroleo, litros, montoComb, adicional, peajes,
+    cobro, rendimiento, costoTotal, margen,
+    liquidado: esLiquidado
+  });
+
+  appData.dashboard.ventas_mes = (appData.servicios||[]).filter(s=>s.liquidado).reduce((a,s)=>a+(s.precio||0),0);
+  uiState.liquidando_id = null;
+  saveData(); render();
+  mostrarToastServicio(true);
+}
+
+function mostrarToastServicio(exito) {
+  const existing = document.getElementById('toast-servicio');
+  if (existing) existing.remove();
+  const toast = document.createElement('div');
+  toast.id = 'toast-servicio';
+  toast.style.cssText = `
+    position:fixed;bottom:30px;left:50%;transform:translateX(-50%);
+    padding:14px 24px;border-radius:10px;font-size:14px;font-weight:700;
+    color:white;z-index:9999;text-align:center;box-shadow:0 4px 20px rgba(0,0,0,0.3);
+    background:${exito?'#2E7D32':'#E65100'};
+  `;
+  toast.textContent = exito ? '✅ Servicio guardado correctamente' : '⚠️ Guardado localmente — sin conexión';
+  document.body.appendChild(toast);
+  setTimeout(() => { toast.style.opacity='0'; toast.style.transition='opacity 0.4s'; setTimeout(()=>toast.remove(),400); }, 3000);
+}
+
+function showSaveToast() {
+  const el = document.getElementById('save-indicator');
+  el.textContent = '✓ Guardado correctamente';
+  el.classList.add('show');
+  setTimeout(()=>el.classList.remove('show'), 2000);
+}
+function exportarDatos() {
+  const blob = new Blob([JSON.stringify(appData, null, 2)], {type: 'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  const fecha = new Date().toLocaleDateString('es-CL').replace(/\//g,'-');
+  a.href = url; a.download = `GlobalSolutions_datos_${fecha}.json`;
+  a.click(); URL.revokeObjectURL(url);
+}
+
+function importarDatos(event) {
+  const file = event.target.files[0]; if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      const datos = JSON.parse(e.target.result);
+      appData = datos;
+      saveData(); render();
+      alert('✓ Datos importados correctamente');
+    } catch(err) { alert('Error al importar: archivo inválido'); }
+  };
+  reader.readAsText(file);
+}
+
+function copiarResumen() {
+  let txt = `PANEL DE GESTIÓN — GLOBAL SOLUTIONS\n${new Date().toLocaleDateString('es-CL')}\n\n`;
+  appData.fases.forEach(fase => {
+    const activos = fase.pendientes.filter(p=>!p.done);
+    const urgentes = activos.filter(p=>p.badge==='hoy');
+    if (activos.length === 0) return;
+    txt += `═══ ${fase.nombre} ═══\n`;
+    if (urgentes.length) { txt += `HOY:\n`; urgentes.forEach(p => txt += `  • ${p.texto}\n`); }
+    const resto = activos.filter(p=>p.badge!=='hoy');
+    if (resto.length) { txt += `Pendientes:\n`; resto.forEach(p => txt += `  • ${p.badge?'['+p.badge.toUpperCase()+'] ':''}${p.texto}\n`); }
+    txt += '\n';
+  });
+  const suActivos = appData.scalingup.rocks.filter(r=>!r.done);
+  if (suActivos.length) {
+    txt += `═══ SCALING UP — ROCKS ═══\n`;
+    suActivos.forEach(r => txt += `  • [${r.pillar}] ${r.texto}\n`);
+  }
+  const btn = document.getElementById('copyBtn');
+  const doCopiado = () => { btn.textContent = '✓ Copiado'; btn.classList.add('copied'); setTimeout(() => { btn.textContent = '📋 Copiar resumen'; btn.classList.remove('copied'); }, 2000); };
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(txt).then(doCopiado).catch(() => {
+      const ta = document.createElement('textarea');
+      ta.value = txt; ta.style.position='fixed'; ta.style.opacity='0';
+      document.body.appendChild(ta); ta.select(); document.execCommand('copy');
+      document.body.removeChild(ta); doCopiado();
+    });
+  } else {
+    const ta = document.createElement('textarea');
+    ta.value = txt; ta.style.position='fixed'; ta.style.opacity='0';
+    document.body.appendChild(ta); ta.select(); document.execCommand('copy');
+    document.body.removeChild(ta); doCopiado();
+  }
+}
+
+function fmtPeso(n) {
+  if (!n || n === 0) return '$0';
+  return '$' + Math.round(n).toLocaleString('es-CL');
+}
+
+function fmtPesoCompacto(n) {
+  // Cifras completas — sin abreviar
+  return fmtPeso(n);
+}
+
+function renderDashboard() {
+  const d = appData.dashboard;
+  const hoy = new Date();
+  const metaVentas = d.meta_pe || 13950000;
+  const costosFijos = d.gasto_meta || 7030000;
+  const presupuesto = d.presupuesto_mes || 0;
+  const ventas = d.ventas_mes || 0;
+  const gasto = d.gasto_real || 0;
+  const caja = d.caja || 0;
+  const resultado = ventas - gasto;
+  const resultadoPct = metaVentas > 0 ? Math.min(100, Math.round(ventas/metaVentas*100)) : 0;
+  const peAlcanzado = ventas >= metaVentas;
+  const gastoPct = presupuesto > 0 ? Math.min(100, Math.round(gasto/presupuesto*100)) : (costosFijos > 0 ? Math.min(100, Math.round(gasto/costosFijos*100)) : 0);
+  const gastoBase = presupuesto > 0 ? presupuesto : costosFijos;
+  const gastoAlerta = gastoPct > 90;
+  const dispPct = (d.flota_total||9) > 0 ? Math.round((d.flota_disponible||0)/(d.flota_total||9)*100) : 0;
+  const ocupPct = (d.flota_disponible||0) > 0 ? Math.round((d.flota_ocupada||0)/(d.flota_disponible||1)*100) : 0;
+  const serviciosSemana = d.servicios_semana || 0;
+  const serviciosSemanaPresup = d.servicios_semana_presup || 0;
+  const serviciosMes = (appData.servicios||[]).filter(s => {
+    if (!s.fecha) return false;
+    const parts = s.fecha.split('-');
+    return parts.length===3 && parseInt(parts[1])===hoy.getMonth()+1 && parseInt(parts[2])===hoy.getFullYear();
+  }).length;
+  const facturasCobrar = d.facturas_cobrar || 0;
+  const semanaActual = Math.ceil(hoy.getDate()/7);
+
+  function bar(pct, color, h) {
+    h = h || 8;
+    return `<div style="height:${h}px;background:rgba(255,255,255,0.15);border-radius:4px;overflow:hidden;margin:6px 0 4px">
+      <div style="height:100%;width:${pct}%;background:${color};border-radius:4px;transition:width 0.4s"></div></div>`;
+  }
+  function eBtn(field, label, val) {
+    return `<button class="dash-edit-btn" style="font-size:9px;padding:0;margin-top:3px" onclick="openDashSingle('${field}','${label}',${val})">✎ editar</button>`;
+  }
+
+  // ── 1. RESULTADO ──
+  const resColor = resultado >= 0 ? '#81C784' : '#EF9A9A';
+  const resBlock = `
+    <div style="background:#1a3d6b;border-radius:10px;padding:14px 16px;margin-bottom:8px">
+      <div style="font-size:9px;font-weight:800;letter-spacing:1.5px;color:rgba(255,255,255,0.5);margin-bottom:6px">RESULTADO DEL MES</div>
+      <div style="font-size:36px;font-weight:900;color:${resColor};line-height:1;letter-spacing:-1px">${resultado>=0?'+':''}${fmtPesoCompacto(resultado)}</div>
+      <div style="font-size:11px;color:rgba(255,255,255,0.6);margin-top:3px">Ventas ${fmtPesoCompacto(ventas)} − Gasto ${fmtPesoCompacto(gasto)}</div>
+      ${bar(resultadoPct, peAlcanzado?'#81C784':'rgba(255,255,255,0.6)')}
+      <div style="font-size:11px;font-weight:700;color:${peAlcanzado?'#81C784':'rgba(255,255,255,0.8)'}">${peAlcanzado?'✓ PE ALCANZADO':'Faltan '+fmtPesoCompacto(metaVentas-ventas)+' para el PE'}</div>
+    </div>`;
+
+  // ── 2. INGRESOS vs COSTOS ──
+  const ingcosBlock = `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px">
+      <div style="background:#1a3d6b;border-radius:10px;padding:12px 14px">
+        <div style="font-size:9px;font-weight:800;letter-spacing:1.5px;color:rgba(255,255,255,0.5);margin-bottom:4px">INGRESOS</div>
+        <div style="font-size:26px;font-weight:900;color:white;line-height:1">${fmtPesoCompacto(ventas)}</div>
+        <div style="font-size:10px;color:rgba(255,255,255,0.55);margin-top:2px">meta ${fmtPesoCompacto(metaVentas)}</div>
+        ${bar(resultadoPct,'rgba(255,255,255,0.7)',6)}
+        <div style="font-size:10px;font-weight:700;color:rgba(255,255,255,0.8)">${resultadoPct}% del PE</div>
+        ${eBtn('ventas','Ventas del mes ($)',ventas)}
+      </div>
+      <div style="background:#1a3d6b;border-radius:10px;padding:12px 14px">
+        <div style="font-size:9px;font-weight:800;letter-spacing:1.5px;color:rgba(255,255,255,0.5);margin-bottom:4px">COSTOS</div>
+        <div style="font-size:26px;font-weight:900;color:${gastoAlerta?'#EF9A9A':'white'};line-height:1">${fmtPesoCompacto(gasto)}</div>
+        <div style="font-size:10px;color:rgba(255,255,255,0.55);margin-top:2px">${presupuesto>0?'presup. '+fmtPesoCompacto(presupuesto):'CF '+fmtPesoCompacto(costosFijos)}</div>
+        ${bar(gastoPct, gastoAlerta?'#EF9A9A':'rgba(255,255,255,0.7)',6)}
+        <div style="font-size:10px;font-weight:700;color:${gastoAlerta?'#EF9A9A':'rgba(255,255,255,0.8)'}">${gastoPct}% ejecutado${gastoAlerta?' ⚠':''}</div>
+        ${eBtn('gasto_real','Gasto real del mes ($)',gasto)}
+      </div>
+    </div>`;
+
+  // ── 3. OPERACIONAL + CAJA ──
+  const opsBlock = `
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:6px">
+      <div style="background:#1a3d6b;border-radius:10px;padding:10px 12px">
+        <div style="font-size:9px;font-weight:800;letter-spacing:1px;color:rgba(255,255,255,0.5);margin-bottom:4px">FLOTA</div>
+        <div style="font-size:11px;color:rgba(255,255,255,0.6)">Disp.</div>
+        <div style="font-size:22px;font-weight:900;color:white;line-height:1">${d.flota_disponible||0}<span style="font-size:11px;color:rgba(255,255,255,0.4)">/${d.flota_total||9}</span></div>
+        ${bar(dispPct,'rgba(255,255,255,0.7)',5)}
+        <div style="font-size:11px;color:rgba(255,255,255,0.6)">Ocup.</div>
+        <div style="font-size:22px;font-weight:900;color:white;line-height:1">${d.flota_ocupada||0}<span style="font-size:11px;color:rgba(255,255,255,0.4)">/${d.flota_disponible||0}</span></div>
+        ${bar(ocupPct,'rgba(255,255,255,0.7)',5)}
+        ${eBtn('flota_disponible','Camiones disponibles hoy',d.flota_disponible||0)}
+      </div>
+      <div style="background:#1a3d6b;border-radius:10px;padding:10px 12px">
+        <div style="font-size:9px;font-weight:800;letter-spacing:1px;color:rgba(255,255,255,0.5);margin-bottom:4px">SERVICIOS</div>
+        <div style="font-size:11px;color:rgba(255,255,255,0.6)">Esta sem.</div>
+        <div style="font-size:22px;font-weight:900;color:white;line-height:1">${serviciosSemana}<span style="font-size:11px;color:rgba(255,255,255,0.4)">/${serviciosSemanaPresup||'?'}</span></div>
+        <div style="font-size:10px;color:rgba(255,255,255,0.55);margin-top:4px">Sem ${semanaActual} del mes</div>
+        <div style="font-size:10px;color:rgba(255,255,255,0.55)">${serviciosMes} en el mes</div>
+        ${eBtn('servicios_semana','Servicios esta semana',serviciosSemana)}
+      </div>
+      <div style="background:#1a3d6b;border-radius:10px;padding:10px 12px">
+        <div style="font-size:9px;font-weight:800;letter-spacing:1px;color:rgba(255,255,255,0.5);margin-bottom:4px">CAJA</div>
+        <div style="font-size:20px;font-weight:900;color:white;line-height:1.1;margin-top:4px">${fmtPesoCompacto(caja)}</div>
+        <div style="font-size:10px;color:rgba(255,255,255,0.55);margin-top:6px">x cobrar</div>
+        <div style="font-size:16px;font-weight:800;color:rgba(255,255,255,0.85)">${fmtPesoCompacto(facturasCobrar)}</div>
+        ${eBtn('caja','Caja disponible ($)',caja)}
+      </div>
+    </div>`;
+
+  document.getElementById('dashboard-container').innerHTML = `
+    <div class="dash-wrap" style="padding:10px;background:#163557;border-radius:12px;margin-bottom:10px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+        <div>
+          <div style="font-size:14px;font-weight:900;color:white;letter-spacing:2px">DASHBOARD</div>
+          <div style="font-size:10px;color:rgba(255,255,255,0.5)">${hoy.toLocaleDateString('es-CL',{weekday:'short',day:'numeric',month:'long'})}</div>
+        </div>
+        <div style="text-align:right">
+          <div style="font-size:9px;color:rgba(255,255,255,0.4);font-weight:700">COSTOS FIJOS</div>
+          <div style="font-size:12px;font-weight:700;color:rgba(255,255,255,0.8)">${fmtPesoCompacto(costosFijos)} <span style="font-size:9px;cursor:pointer;text-decoration:underline;color:rgba(255,255,255,0.5)" onclick="openDashSingle('gasto_meta','Costos fijos ($)',${costosFijos})">editar</span></div>
+        </div>
+      </div>
+      ${resBlock}${ingcosBlock}${opsBlock}
+    </div>`;
+}
+
+let _dashField = null;
+function openDashSingle(field, label, valor) {
+  _dashField = field;
+  document.getElementById('dash-modal-title').textContent = label;
+  document.getElementById('dash-modal-label').textContent = label;
+  const inp = document.getElementById('dash-modal-input');
+  inp.value = valor || '';
+  inp.placeholder = valor || '';
+  document.getElementById('dash-modal').classList.add('open');
+  setTimeout(()=>{ inp.focus(); inp.select(); }, 80);
+}
+function openDashModal() { openDashSingle('ventas','Ventas del mes ($)', appData.dashboard.ventas_mes||0); }
+
+function closeDashModal() {
+  document.getElementById('dash-modal').classList.remove('open');
+  _dashField = null;
+}
+
+function saveDashSingle() {
+  if (!_dashField) return;
+  const val = parseInt(document.getElementById('dash-modal-input').value);
+  if (isNaN(val)) { closeDashModal(); return; }
+  const d = appData.dashboard;
+  if (_dashField === 'ventas') d.ventas_mes = val;
+  else if (_dashField === 'caja') d.caja = val;
+  else if (_dashField === 'meta_pe') d.meta_pe = val;
+  else if (_dashField === 'gasto_real') d.gasto_real = val;
+  else if (_dashField === 'gasto_meta') d.gasto_meta = val;
+  else if (_dashField === 'flota_disponible') d.flota_disponible = val;
+  else if (_dashField === 'flota_ocupada') d.flota_ocupada = val;
+  else d[_dashField] = val;
+  closeDashModal();
+  saveData(); render();
+}
+
+function render() {
+  const dashEl = document.getElementById('dashboard-container');
+  // Ocultar dashboard cuando se filtra por un ámbito específico
+  if (vistaActual !== 'todas') {
+    dashEl.style.display = 'none';
+  } else {
+    dashEl.style.display = '';
+    renderDashboard();
+  }
+  const container = document.getElementById('fases');
+  if (vistaActual === 'scalingup') {
+    container.innerHTML = renderScalingUp();
+    return;
+  }
+  const filtered = vistaActual==='todas' ? appData.fases : appData.fases.filter(f=>f.id===vistaActual);
+  container.innerHTML = filtered.map(renderFase).join('') + (vistaActual==='todas' ? renderScalingUp() : '');
+}
+
+// ============ SISTEMA DE LOGIN ============
+const ROLES = [
+  { id: 'cgestion',   nombre: 'Controler',     pin: '0001', acceso: 'todo' },
+  { id: 'coordinador',nombre: 'Coordinador',   pin: '0002', acceso: 'operacional,financiero' },
+  { id: 'ayudante',   nombre: 'Mantenimiento', pin: '0003', acceso: 'operacional' },
+  { id: 'admin',      nombre: 'Administrativo',pin: '0004', acceso: 'operacional,financiero,comercial' },
+  { id: 'conductor',  nombre: 'Conductor',     pin: null,   acceso: 'conductor' },
+];
+
+const CONDUCTORES_PINS = {};
+let sessionRol = null;
+let sessionConductor = null;
+let pinIngresado = '';
+let pinTarget = null;
+
+function iniciarLogin() {
+  const guardado = localStorage.getItem('gs_session');
+  if (guardado) {
+    try {
+      const s = JSON.parse(guardado);
+      sessionRol = s.rol;
+      sessionConductor = s.conductor || null;
+      aplicarAcceso();
+      return;
+    } catch(e) {}
+  }
+  mostrarLogin();
+}
+
+function mostrarLogin() {
+  document.getElementById('login-screen').style.display = 'block';
+  document.querySelector('.container').style.display = 'none';
+  mostrarPasoRol();
+}
+
+function mostrarPasoRol() {
+  document.getElementById('login-step-rol').style.display = 'block';
+  document.getElementById('login-step-conductor').style.display = 'none';
+  document.getElementById('login-step-pin').style.display = 'none';
+  const lista = document.getElementById('roles-list');
+  lista.innerHTML = ROLES.map(r => `
+    <button class="rol-btn" onclick="seleccionarRol('${r.id}')">${r.nombre}</button>
+  `).join('');
+}
+
+function seleccionarRol(rolId) {
+  const rol = ROLES.find(r => r.id === rolId);
+  if (rolId === 'conductor') {
+    mostrarPasoConductor();
+  } else {
+    pinTarget = rol;
+    sessionConductor = null;
+    mostrarPasoPin(rol.nombre);
+  }
+}
+
+function mostrarPasoConductor() {
+  document.getElementById('login-step-rol').style.display = 'none';
+  document.getElementById('login-step-conductor').style.display = 'block';
+  const conductores = appData.conductores || ['Manuel Madrid','Felipe Vidal','Manuel Madariaga','Sebastián Zúñiga','Pablo Riquelme'];
+  const lista = document.getElementById('conductores-list-login');
+  lista.innerHTML = conductores.map((c,i) => `
+    <button class="rol-btn" onclick="seleccionarConductor('${c}', ${i})">${c}</button>
+  `).join('');
+}
+
+function seleccionarConductor(nombre, idx) {
+  const pin = String(5 + idx).padStart(4, '0');
+  pinTarget = { id: 'conductor', nombre: 'Conductor', pin, acceso: 'conductor' };
+  sessionConductor = nombre;
+  mostrarPasoPin(nombre);
+}
+
+function mostrarPasoPin(nombre) {
+  document.getElementById('login-step-rol').style.display = 'none';
+  document.getElementById('login-step-conductor').style.display = 'none';
+  document.getElementById('login-step-pin').style.display = 'block';
+  document.getElementById('login-quien').textContent = nombre;
+  pinIngresado = '';
+  actualizarDots();
+  document.getElementById('pin-error').textContent = '';
+}
+
+function pinPress(val) {
+  if (pinIngresado.length < 4) {
+    pinIngresado += String(val);
+  }
+  actualizarDots();
+  if (pinIngresado.length === 4) {
+    setTimeout(validarPin, 150);
+  }
+}
+
+function pinBorrar() {
+  pinIngresado = pinIngresado.slice(0, -1);
+  actualizarDots();
+  document.getElementById('pin-error').textContent = '';
+}
+
+function actualizarDots() {
+  document.querySelectorAll('.pin-dot').forEach((d,i) => {
+    d.classList.toggle('filled', i < pinIngresado.length);
+  });
+}
+
+function validarPin() {
+  if (pinIngresado === pinTarget.pin) {
+    sessionRol = pinTarget;
+    localStorage.setItem('gs_session', JSON.stringify({ rol: pinTarget, conductor: sessionConductor }));
+    document.getElementById('login-screen').style.display = 'none';
+    document.querySelector('.container').style.display = 'block';
+    aplicarAcceso();
+  } else {
+    document.getElementById('pin-error').textContent = 'PIN incorrecto. Intenta de nuevo.';
+    pinIngresado = '';
+    actualizarDots();
+  }
+}
+
+function loginVolverRol() {
+  pinIngresado = '';
+  sessionConductor = null;
+  mostrarPasoRol();
+}
+
+function cerrarSesion() {
+  localStorage.removeItem('gs_session');
+  sessionRol = null;
+  sessionConductor = null;
+  mostrarLogin();
+}
+
+function aplicarAcceso() {
+  if (!sessionRol) { mostrarLogin(); return; }
+  document.getElementById('login-screen').style.display = 'none';
+  document.querySelector('.container').style.display = 'block';
+  // Mostrar nombre en topbar
+  const info = document.getElementById('session-info');
+  if (info) {
+    const nombre = sessionConductor || sessionRol.nombre;
+    info.textContent = nombre.toUpperCase();
+  }
+  const acceso = sessionRol.acceso;
+  if (acceso === 'conductor') {
+    // Ocultar todos los filtros excepto Operacional
+    document.querySelectorAll('.filter-btn').forEach(b => {
+      b.style.display = 'none';
+    });
+    // Activar vista operacional directamente
+    vistaActual = 'operacional';
+    render();
+    // Abrir acordeón de registro de servicio automáticamente
+    setTimeout(() => {
+      const fase = appData.fases.find(f => f.id === 'operacional');
+      if (fase) {
+        const idx = fase.rutinarias.findIndex(r => r.registroServicio);
+        if (idx !== -1) {
+          uiState[`acord_operacional_${idx}`] = true;
+          render();
+        }
+      }
+    }, 100);
+  } else {
+    render();
+  }
+}
+// ============ FIN LOGIN ============
+
+loadData(); iniciarLogin(); initSupabase();
+</script>
+</body>
+</html>
