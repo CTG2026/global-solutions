@@ -780,7 +780,7 @@ function mostrarAgregarConductor() {
 function mostrarAgregarPatente() {
   const pat = prompt('Patente nueva (ej: AB1234):');
   if (!pat || !pat.trim()) return;
-  if (!appData.patentes) appData.patentes = ['GKFD84','WR9192','XR8555','GCFF12','BPBL35','XA1414','XA1114'];
+  if (!appData.patentes) appData.patentes = ['GKFD84','WR9192','XR8555','GCFF12','BPBL35','XA1114','DSDV36'];
   if (!appData.patentes.includes(pat.trim().toUpperCase())) {
     appData.patentes.push(pat.trim().toUpperCase());
     saveData(); render();
@@ -797,6 +797,23 @@ function delGuia(gi) {
   uiState.srv_guias.splice(gi, 1);
   render();
 }
+function togglePatenteTercero() {
+  const sel = document.getElementById('srv_patente');
+  const manual = document.getElementById('srv_patente_manual');
+  if (!sel || !manual) return;
+  manual.style.display = sel.value === '__tercero__' ? 'block' : 'none';
+}
+
+function toggleConductorTercero() {
+  const sel = document.getElementById('srv_conductor');
+  const patSel = document.getElementById('srv_patente');
+  if (!sel || !patSel) return;
+  if (sel.value === 'Tercero') {
+    patSel.value = '__tercero__';
+    togglePatenteTercero();
+  }
+}
+
 function updGuia(gi, campo, valor) {
   if (!uiState.srv_guias) uiState.srv_guias = [{ num:'', destino:'', fecha_descarga:'' }];
   uiState.srv_guias[gi][campo] = valor;
@@ -806,7 +823,10 @@ async function addServicio() {
   const fechaRaw = document.getElementById('srv_fecha')?.value.trim();
   // Convertir yyyy-mm-dd a dd-mm-yyyy para consistencia interna
   const fecha = fechaRaw ? (() => { const p=fechaRaw.split('-'); return p.length===3 ? `${p[2]}-${p[1]}-${p[0]}` : fechaRaw; })() : null;
-  const patente = document.getElementById('srv_patente')?.value.trim();
+  const patenteRaw = document.getElementById('srv_patente')?.value.trim();
+  const patente = patenteRaw === '__tercero__'
+    ? (document.getElementById('srv_patente_manual')?.value.trim().toUpperCase() || 'TERCERO')
+    : patenteRaw;
   const conductor = document.getElementById('srv_conductor')?.value.trim();
   const tipoEquipo = document.getElementById('srv_tipo_equipo')?.value.trim() || '';
   const clienteSelect = document.getElementById('srv_cliente')?.value.trim();
@@ -828,6 +848,7 @@ async function addServicio() {
   const guias = uiState.srv_guias || [{ num:'', destino:'', fecha_descarga:'' }];
   const servicio = { id, fecha: fechaFinal, anio, mes, patente, conductor, tipoEquipo, cliente, precio: 0, petroleo: 0, adicional: 0, liquidado: false, origen, km, viaticos, peajes, guias };
   appData.servicios.push(servicio);
+  upsertServicioSupabase(servicio);
   appData.dashboard.ventas_mes = (appData.dashboard.ventas_mes || 0) + precio;
   // Agregar conductor nuevo a la lista si no existe
   if (conductor && !(appData.conductores||[]).includes(conductor)) {
@@ -840,15 +861,7 @@ async function addServicio() {
   let guardadoEnDB = false;
   if (supaConectado && supa) {
     try {
-      const { error } = await supa.from('servicios').insert({
-        codigo: id,
-        fecha: fechaFinal,
-        patente,
-        cliente,
-        flete_neto: precio,
-        origen,
-        destino: guias.map(g=>g.destino).filter(Boolean).join(' / '),
-      });
+      const { error } = await supa.from('servicios').insert(servicioToRow(servicio));
       if (!error) guardadoEnDB = true;
     } catch(e) { guardadoEnDB = false; }
   }
@@ -1168,16 +1181,17 @@ function renderFase(fase) {
       const guias = uiState.srv_guias || [{ num:'', destino:'', fecha_descarga:'' }];
       const clientesDefault = DEFAULT_DATA.pipeline.filter(c=>c.etapa==='activo').map(c=>c.cliente);
       const clientesLocal = (appData.pipeline||[]).filter(c=>c.etapa==='activo').map(c=>c.cliente);
-      const clientesActivos = [...new Set([...clientesDefault, ...clientesLocal])];
-      const conductoresDefault = ['Manuel Madrid','Felipe Vidal','Manuel Madariaga','Sebastián Zúñiga','Pablo Riquelme'];
+      const clientesActivos = [...new Set([...clientesDefault, ...clientesLocal])].sort();
+      const conductoresDefault = ['Manuel Madrid','Felipe Vidal','Manuel Madariaga','Sebastián Zúñiga','Pablo Riquelme','Tercero'];
       if (!appData.conductores || appData.conductores.length < 2) {
         appData.conductores = conductoresDefault;
         saveData();
       }
+      if (!appData.conductores.includes('Tercero')) { appData.conductores.push('Tercero'); saveData(); }
       const conductoresLista = appData.conductores;
       const conductoresOpts = conductoresLista.map(c=>`<option value="${c}">${c}</option>`).join('');
-      const patentesLista = appData.patentes || ['GKFD84','WR9192','XR8555','GCFF12','BPBL35','XA1414','XA1114'];
-      const patenteOpts = patentesLista.map(p=>`<option value="${p}">${p}</option>`).join('');
+      const patentesLista = appData.patentes || ['GKFD84','WR9192','XR8555','GCFF12','BPBL35','XA1114','DSDV36'];
+      const patenteOpts = patentesLista.filter(p=>p!=='TERCERO').map(p=>`<option value="${p}">${p}</option>`).join('');
       const guiasHTML = guias.map((g,gi) => `
         <div style="background:#eef0f4;border-radius:6px;padding:8px;margin-bottom:5px">
           <div style="font-size:9px;font-weight:700;color:#607D8B;margin-bottom:5px">GUÍA ${gi+1} ${guias.length>1?`<span onclick="delGuia(${gi})" style="color:#bbb;cursor:pointer;float:right;font-size:13px">×</span>`:''}</div>
@@ -1200,14 +1214,16 @@ function renderFase(fase) {
           <div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">FECHA SALIDA</div>
             <input id="srv_fecha" type="date" value="${hoyISO}" style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit;background:white"></div>
           <div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">PATENTE</div>
-            <select id="srv_patente" style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit;background:white;-webkit-appearance:auto">
+            <select id="srv_patente" onchange="togglePatenteTercero()" style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit;background:white;-webkit-appearance:auto">
               <option value="">Seleccionar patente...</option>
               ${patenteOpts}
+              <option value="__tercero__">Tercero (ingresar manualmente)</option>
             </select>
+            <input id="srv_patente_manual" placeholder="Ingresar patente..." style="display:none;margin-top:4px;width:100%;border:1px solid #FFA726;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit;text-transform:uppercase">
             <div style="margin-top:3px"><span onclick="mostrarAgregarPatente()" style="font-size:10px;color:#607D8B;cursor:pointer;text-decoration:underline">+ Agregar patente nueva</span></div>
             </div>
           <div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">CONDUCTOR</div>
-            <select id="srv_conductor" style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit;background:white;-webkit-appearance:auto">
+            <select id="srv_conductor" onchange="toggleConductorTercero()" style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit;background:white;-webkit-appearance:auto">
               <option value="">Seleccionar conductor...</option>
               ${conductoresOpts}
             </select>
@@ -1355,17 +1371,22 @@ function renderFase(fase) {
 
   const miDiaContent = fase.id === 'control' ? renderMiDia() : '';
   const personalContent = fase.id === 'control' ? renderPersonal() : '';
+  const informesContent = fase.id === 'control' ? renderInformes() : '';
   const pipelineContent = fase.id === 'comercial' ? renderPipeline() : '';
+  const disponibilidadContent = fase.id === 'operacional' ? renderDisponibilidad() : '';
   const tabContent = tab==='rutinarias' ? rutHTML + addTareaHTML :
     tab==='plan' ? planFaseHTML() :
     tab==='midia' ? miDiaContent :
+    tab==='informes' ? informesContent :
     tab==='personal' ? personalContent :
     tab==='pipeline' ? pipelineContent :
+    tab==='disponibilidad' ? disponibilidadContent :
     `<div class="section-label">PENDIENTES PRIORITARIOS</div>${pendsHTML}${addPendHTML}`;
 
-  const extraTabControl = fase.id === 'control' ? `<button class="tab-btn ${tab==='midia'?'active':''}" onclick="setTab('${fase.id}','midia')" style="${tab==='midia'?`color:${fase.color};border-bottom-color:${fase.color};background:${fase.colorClaro};font-weight:900`:'font-weight:700'}">⚡ DÍA</button><button class="tab-btn ${tab==='personal'?'active':''}" onclick="abrirPersonal('${fase.id}')" style="${tab==='personal'?`color:${fase.color};border-bottom-color:${fase.color};background:${fase.colorClaro};font-weight:900`:'font-weight:700'}">🔒 Personal</button>` : '';
+  const extraTabControl = fase.id === 'control' ? `<button class="tab-btn ${tab==='midia'?'active':''}" onclick="setTab('${fase.id}','midia')" style="${tab==='midia'?`color:${fase.color};border-bottom-color:${fase.color};background:${fase.colorClaro};font-weight:900`:'font-weight:700'}">⚡ DÍA</button><button class="tab-btn ${tab==='informes'?'active':''}" onclick="setTab('${fase.id}','informes')" style="${tab==='informes'?`color:${fase.color};border-bottom-color:${fase.color};background:${fase.colorClaro};font-weight:900`:'font-weight:700'}">📊 Informes</button><button class="tab-btn ${tab==='personal'?'active':''}" onclick="abrirPersonal('${fase.id}')" style="${tab==='personal'?`color:${fase.color};border-bottom-color:${fase.color};background:${fase.colorClaro};font-weight:900`:'font-weight:700'}">🔒 Personal</button>` : '';
   const extraTabComercial = fase.id === 'comercial' ? `<button class="tab-btn ${tab==='pipeline'?'active':''}" onclick="setTab('${fase.id}','pipeline')" style="${tab==='pipeline'?`color:${fase.color};border-bottom-color:${fase.color};background:${fase.colorClaro};font-weight:900`:'font-weight:700'}">🎯 Pipeline</button>` : '';
-  const extraTab = extraTabControl + extraTabComercial;
+  const extraTabOperacional = fase.id === 'operacional' ? `<button class="tab-btn ${tab==='disponibilidad'?'active':''}" onclick="setTab('${fase.id}','disponibilidad')" style="${tab==='disponibilidad'?`color:${fase.color};border-bottom-color:${fase.color};background:${fase.colorClaro};font-weight:900`:'font-weight:700'}">🚛 Disponibilidad y Ocupación</button>` : '';
+  const extraTab = extraTabControl + extraTabComercial + extraTabOperacional;
 
   return `<div class="fase-card" data-fase="${fase.id}">
     <div class="fase-header" style="background:${fase.color}">
@@ -1389,6 +1410,90 @@ function renderFase(fase) {
   </div>`;
 }
 
+// ── HELPERS SERVICIOS SUPABASE ─────────────────────────────
+function servicioToRow(s) {
+  return {
+    id: s.id,
+    fecha: s.fecha,
+    anio: s.anio,
+    mes: s.mes,
+    patente: s.patente || '',
+    conductor: s.conductor || '',
+    tipo_equipo: s.tipoEquipo || '',
+    cliente: s.cliente || '',
+    origen: s.origen || '',
+    peajes: s.peajes || 0,
+    guias: s.guias || [],
+    precio: s.precio || 0,
+    km: s.km || 0,
+    litros: s.litros || 0,
+    monto_comb: s.montoComb || 0,
+    petroleo: s.petroleo || 0,
+    adicional: s.adicional || 0,
+    viaticos: s.viaticos || 0,
+    cobro: s.cobro || 'pendiente',
+    liquidado: s.liquidado || false,
+    costo_total: s.costoTotal || 0,
+    margen: s.margen || 0,
+    rendimiento: s.rendimiento || 0,
+  };
+}
+
+function rowToServicio(r) {
+  return {
+    id: r.id,
+    fecha: r.fecha,
+    anio: r.anio,
+    mes: r.mes,
+    patente: r.patente,
+    conductor: r.conductor,
+    tipoEquipo: r.tipo_equipo,
+    cliente: r.cliente,
+    origen: r.origen,
+    peajes: r.peajes,
+    guias: r.guias || [],
+    precio: r.precio,
+    km: r.km,
+    litros: r.litros,
+    montoComb: r.monto_comb,
+    petroleo: r.petroleo,
+    adicional: r.adicional,
+    viaticos: r.viaticos,
+    cobro: r.cobro,
+    liquidado: r.liquidado,
+    costoTotal: r.costo_total,
+    margen: r.margen,
+    rendimiento: r.rendimiento,
+  };
+}
+
+async function syncServiciosDesdeSupabase() {
+  if (!supaConectado || !supa) return;
+  try {
+    const { data, error } = await supa.from('servicios').select('*').order('created_at');
+    if (!error && data) {
+      // Migrar servicios locales a Supabase si la tabla está vacía
+      if (data.length === 0 && appData.servicios && appData.servicios.length > 0) {
+        for (const s of appData.servicios) {
+          await supa.from('servicios').insert(servicioToRow(s));
+        }
+      } else if (data.length > 0) {
+        appData.servicios = data.map(rowToServicio);
+        saveData();
+      }
+    }
+  } catch(e) { console.warn('Error sync servicios', e); }
+}
+
+async function guardarServicioSupabase(servicio) {
+  if (!supaConectado || !supa) return false;
+  try {
+    const { error } = await supa.from('servicios').upsert(servicioToRow(servicio));
+    return !error;
+  } catch(e) { return false; }
+}
+// ──────────────────────────────────────────────────────────
+
 // ── SUPABASE ──────────────────────────────────────────────
 const SUPA_URL = 'https://qjbelwogpacknivdaows.supabase.co';
 const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFqYmVsd29ncGFja25pdmRhb3dzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNDg3MTUsImV4cCI6MjA4ODcyNDcxNX0.PaN5ol4v5TPDBLWeB4MSTu3SM-ezUjTRFk3jRm3Kv-M';
@@ -1408,6 +1513,9 @@ async function initSupabase() {
       if (el) { el.textContent = '⬤ DB Online'; el.style.color = '#6abf69'; }
       console.log('Supabase conectado ✅');
       await syncPipelineDesdeSupabase();
+      await syncServiciosDesdeSupabase();
+      await syncServiciosDesdeSupabase();
+      render();
     } else {
       if (el) { el.textContent = '⬤ DB Error'; el.style.color = '#e57373'; }
     }
@@ -1471,6 +1579,61 @@ async function guardarPipelineSupabase(item) {
 async function eliminarPipelineSupabase(id) {
   if (!supaConectado || !supa || !id || !id.includes('-')) return;
   await supa.from('pipeline').delete().eq('id', id);
+}
+// ── SYNC SERVICIOS SUPABASE ───────────────────────────────
+async function syncServiciosDesdeSupabase() {
+  if (!supa || !supaConectado) return;
+  try {
+    const { data, error } = await supa.from('servicios').select('*').order('created_at');
+    if (error) { console.warn('Error sync servicios:', error); return; }
+    if (!data || data.length === 0) {
+      // Primera vez — migrar servicios locales a Supabase
+      const locales = appData.servicios || [];
+      for (const s of locales) {
+        await upsertServicioSupabase(s);
+      }
+    } else {
+      // Merge: supabase manda, pero agregar locales que no estén
+      const idsRemoto = new Set(data.map(r => r.id));
+      const localesNuevos = (appData.servicios||[]).filter(s => !idsRemoto.has(s.id));
+      for (const s of localesNuevos) {
+        await upsertServicioSupabase(s);
+      }
+      // Actualizar appData con datos remotos + locales nuevos
+      const remotos = data.map(r => ({
+        id: r.id, fecha: r.fecha, anio: r.anio, mes: r.mes,
+        patente: r.patente, conductor: r.conductor, tipoEquipo: r.tipo_equipo,
+        cliente: r.cliente, origen: r.origen, peajes: r.peajes||0,
+        guias: r.guias||[], precio: r.precio||0, km: r.km||0,
+        litros: r.litros||0, montoComb: r.monto_comb||0,
+        petroleo: r.petroleo||0, adicional: r.adicional||0,
+        viaticos: r.viaticos||0, cobro: r.cobro||'pendiente',
+        liquidado: r.liquidado||false, costoTotal: r.costo_total||0,
+        margen: r.margen||0, rendimiento: r.rendimiento||0
+      }));
+      appData.servicios = [...remotos, ...localesNuevos];
+      saveData(); render();
+    }
+  } catch(e) { console.warn('Error sync servicios:', e); }
+}
+
+async function upsertServicioSupabase(s) {
+  if (!supa || !supaConectado) return;
+  try {
+    const row = {
+      id: s.id, fecha: s.fecha, anio: s.anio||'', mes: s.mes||'',
+      patente: s.patente||'', conductor: s.conductor||'',
+      tipo_equipo: s.tipoEquipo||'', cliente: s.cliente||'',
+      origen: s.origen||'', peajes: s.peajes||0,
+      guias: s.guias||[], precio: s.precio||0, km: s.km||0,
+      litros: s.litros||0, monto_comb: s.montoComb||0,
+      petroleo: s.petroleo||0, adicional: s.adicional||0,
+      viaticos: s.viaticos||0, cobro: s.cobro||'pendiente',
+      liquidado: s.liquidado||false, costo_total: s.costoTotal||0,
+      margen: s.margen||0, rendimiento: s.rendimiento||0
+    };
+    await supa.from('servicios').upsert(row, { onConflict: 'id' });
+  } catch(e) { console.warn('Error upsert servicio:', e); }
 }
 // ─────────────────────────────────────────────────────────
 const ETAPA_COLORES = { prospecto:'#607D8B', cotizado:'#C55A11', activo:'#2E7D32', inactivo:'#9E9E9E' };
@@ -1606,6 +1769,370 @@ async function delPipeline(ci) {
   await eliminarPipelineSupabase(copia.id);
   appData.pipeline.splice(ci, 1);
   saveData(); render();
+}
+
+function renderInformes() {
+  const periodo = uiState.informe_periodo || 'mes';
+  const ambitoSel = uiState.informe_ambito || 'comercial';
+  const servicios = appData.servicios || [];
+
+  // Filtrar por período
+  const hoy = new Date();
+  const dd = s => { const p=s.fecha.split('-'); return new Date(p[2],p[1]-1,p[0]); };
+
+  function filtrarPeriodo(svcs) {
+    if (periodo === 'hoy') {
+      const h = `${String(hoy.getDate()).padStart(2,'0')}-${String(hoy.getMonth()+1).padStart(2,'0')}-${hoy.getFullYear()}`;
+      return svcs.filter(s => s.fecha === h);
+    }
+    if (periodo === 'semana') {
+      const lunes = new Date(hoy); lunes.setDate(hoy.getDate() - hoy.getDay() + 1);
+      return svcs.filter(s => { try { return dd(s) >= lunes; } catch(e) { return false; } });
+    }
+    if (periodo === 'mes') {
+      return svcs.filter(s => s.mes === String(hoy.getMonth()+1).padStart(2,'0') && s.anio === String(hoy.getFullYear()));
+    }
+    if (periodo === 'anterior') {
+      const mesSel = uiState.informe_mes_sel || `${hoy.getFullYear()}-${String(hoy.getMonth()).padStart(2,'0')}`;
+      const [anio, mes] = mesSel.split('-');
+      return svcs.filter(s => s.anio === anio && s.mes === mes);
+    }
+    if (periodo === 'anual') {
+      return svcs.filter(s => s.anio === String(hoy.getFullYear()));
+    }
+    return svcs;
+  }
+
+  const filtrados = filtrarPeriodo(servicios);
+  const liquidados = filtrados.filter(s => s.liquidado);
+
+  // KPIs base
+  const totalServicios = filtrados.length;
+  const totalIngresos = liquidados.reduce((a,s) => a+(s.precio||0), 0);
+  const totalKm = liquidados.reduce((a,s) => a+(s.km||0), 0);
+  const totalCombMonto = liquidados.reduce((a,s) => a+(s.montoComb||0), 0);
+  const totalLitros = liquidados.reduce((a,s) => a+(s.litros||0), 0);
+  const totalCostos = liquidados.reduce((a,s) => a+(s.costoTotal||0), 0);
+  const rendProm = totalLitros > 0 ? (totalKm/totalLitros).toFixed(1) : '—';
+  const margenProm = totalIngresos > 0 ? Math.round(((totalIngresos-totalCostos)/totalIngresos)*100) : 0;
+  const cobPagado = liquidados.filter(s=>s.cobro==='pagado').reduce((a,s)=>a+(s.precio||0),0);
+  const cobPendiente = liquidados.filter(s=>!s.cobro||s.cobro==='pendiente').reduce((a,s)=>a+(s.precio||0),0);
+  const cobFacturado = liquidados.filter(s=>s.cobro==='facturado').reduce((a,s)=>a+(s.precio||0),0);
+
+  // Meses disponibles para selector
+  const mesesDisp = [...new Set(servicios.map(s => `${s.anio}-${s.mes}`))].sort().reverse();
+
+  // Selector de período
+  const periodos = [
+    { id:'hoy', label:'Hoy' },
+    { id:'semana', label:'Esta semana' },
+    { id:'mes', label:'Este mes' },
+    { id:'anterior', label:'Mes anterior' },
+    { id:'anual', label:'Año completo' },
+  ];
+
+  const periodoHTML = `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">
+    ${periodos.map(p=>`<button onclick="uiState.informe_periodo='${p.id}';render()" style="padding:6px 12px;border-radius:20px;border:none;cursor:pointer;font-size:11px;font-weight:700;background:${periodo===p.id?'#455A64':'#ECEFF1'};color:${periodo===p.id?'white':'#455A64'}">${p.label}</button>`).join('')}
+    ${periodo==='anterior' && mesesDisp.length > 0 ? `<select onchange="uiState.informe_mes_sel=this.value;render()" style="border:1px solid #dde;border-radius:8px;padding:5px 8px;font-size:11px;outline:none">
+      ${mesesDisp.map(m=>`<option value="${m}" ${uiState.informe_mes_sel===m?'selected':''}>${m}</option>`).join('')}
+    </select>` : ''}
+  </div>`;
+
+  // Selector de ámbito
+  const ambitos = [
+    { id:'comercial', label:'Comercial', color:'#1565C0' },
+    { id:'operacional', label:'Operacional', color:'#455A64' },
+    { id:'financiero', label:'Financiero', color:'#2E7D32' },
+  ];
+
+  const ambitoHTML = `<div style="display:flex;gap:6px;margin-bottom:14px">
+    ${ambitos.map(a=>`<button onclick="uiState.informe_ambito='${a.id}';render()" style="flex:1;padding:8px;border-radius:8px;border:none;cursor:pointer;font-size:11px;font-weight:700;background:${ambitoSel===a.id?a.color:'#ECEFF1'};color:${ambitoSel===a.id?'white':a.color}">${a.label}</button>`).join('')}
+  </div>`;
+
+  // KPIs resumen
+  const kpisHTML = `<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px">
+    <div style="background:#F5F5F5;border-radius:8px;padding:10px;text-align:center">
+      <div style="font-size:9px;color:#888;font-weight:700">SERVICIOS</div>
+      <div style="font-size:22px;font-weight:900;color:#455A64">${totalServicios}</div>
+    </div>
+    <div style="background:#E8F5E9;border-radius:8px;padding:10px;text-align:center">
+      <div style="font-size:9px;color:#888;font-weight:700">INGRESOS</div>
+      <div style="font-size:16px;font-weight:900;color:#2E7D32">${fmtPeso(totalIngresos)}</div>
+    </div>
+    <div style="background:#E3F2FD;border-radius:8px;padding:10px;text-align:center">
+      <div style="font-size:9px;color:#888;font-weight:700">KM TOTALES</div>
+      <div style="font-size:18px;font-weight:900;color:#1565C0">${totalKm.toLocaleString('es-CL')}</div>
+    </div>
+    <div style="background:#FFF9C4;border-radius:8px;padding:10px;text-align:center">
+      <div style="font-size:9px;color:#888;font-weight:700">MARGEN PROM</div>
+      <div style="font-size:18px;font-weight:900;color:#F9A825">${margenProm}%</div>
+    </div>
+  </div>`;
+
+  // Contenido por ámbito
+  function contenidoComercial() {
+    const porCliente = {};
+    filtrados.forEach(s => {
+      const c = s.cliente || 'Sin cliente';
+      if (!porCliente[c]) porCliente[c] = { servicios:0, ingresos:0, pendiente:0, pagado:0, facturado:0 };
+      porCliente[c].servicios++;
+      if (s.liquidado) {
+        porCliente[c].ingresos += s.precio||0;
+        if (s.cobro==='pagado') porCliente[c].pagado += s.precio||0;
+        else if (s.cobro==='facturado') porCliente[c].facturado += s.precio||0;
+        else porCliente[c].pendiente += s.precio||0;
+      }
+    });
+    const rows = Object.entries(porCliente).sort((a,b)=>b[1].ingresos-a[1].ingresos);
+    if (rows.length === 0) return `<div style="text-align:center;color:#aaa;padding:20px;font-size:12px">Sin servicios en este período</div>`;
+    return `<div style="font-size:9px;font-weight:700;color:#1565C0;margin-bottom:8px;letter-spacing:0.5px">POR CLIENTE</div>
+    ${rows.map(([c,d])=>`<div style="padding:10px 12px;background:#F8F9FA;border-radius:8px;margin-bottom:6px;border-left:3px solid #1565C0">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <span style="font-size:12px;font-weight:700;color:#333">${c}</span>
+        <span style="font-size:11px;font-weight:700;color:#2E7D32">${fmtPeso(d.ingresos)}</span>
+      </div>
+      <div style="font-size:10px;color:#777;margin-top:3px">${d.servicios} servicio${d.servicios!==1?'s':''}</div>
+      <div style="display:flex;gap:6px;margin-top:4px;flex-wrap:wrap">
+        ${d.pagado?`<span style="font-size:9px;background:#E8F5E9;color:#2E7D32;padding:2px 6px;border-radius:6px">✅ ${fmtPeso(d.pagado)}</span>`:''}
+        ${d.pendiente?`<span style="font-size:9px;background:#FFFDE7;color:#F9A825;padding:2px 6px;border-radius:6px">⏳ ${fmtPeso(d.pendiente)}</span>`:''}
+        ${d.facturado?`<span style="font-size:9px;background:#E3F2FD;color:#1565C0;padding:2px 6px;border-radius:6px">🧾 ${fmtPeso(d.facturado)}</span>`:''}
+      </div>
+    </div>`).join('')}
+    <div style="padding:10px 12px;background:#E8F5E9;border-radius:8px;margin-top:4px">
+      <div style="display:flex;justify-content:space-between">
+        <span style="font-size:11px;font-weight:700;color:#2E7D32">Por cobrar</span>
+        <span style="font-size:12px;font-weight:900;color:#F9A825">${fmtPeso(cobPendiente)}</span>
+      </div>
+    </div>`;
+  }
+
+  function contenidoOperacional() {
+    const porCamion = {}, porConductor = {};
+    filtrados.forEach(s => {
+      const p = s.patente || 'Sin patente';
+      const c = s.conductor || 'Sin conductor';
+      if (!porCamion[p]) porCamion[p] = { servicios:0, km:0, litros:0 };
+      if (!porConductor[c]) porConductor[c] = { servicios:0, km:0 };
+      porCamion[p].servicios++;
+      porCamion[p].km += s.km||0;
+      porCamion[p].litros += s.litros||0;
+      porConductor[c].servicios++;
+      porConductor[c].km += s.km||0;
+    });
+    return `<div style="font-size:9px;font-weight:700;color:#455A64;margin-bottom:8px;letter-spacing:0.5px">POR CAMIÓN</div>
+    ${Object.entries(porCamion).sort((a,b)=>b[1].servicios-a[1].servicios).map(([p,d])=>`
+      <div style="padding:10px 12px;background:#F8F9FA;border-radius:8px;margin-bottom:6px;border-left:3px solid #455A64">
+        <div style="display:flex;justify-content:space-between">
+          <span style="font-size:12px;font-weight:700;color:#333">${p}</span>
+          <span style="font-size:11px;color:#607D8B">${d.servicios} servicio${d.servicios!==1?'s':''}</span>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:3px;flex-wrap:wrap">
+          ${d.km?`<span style="font-size:9px;background:#E3F2FD;color:#1565C0;padding:2px 6px;border-radius:6px">${d.km.toLocaleString()} km</span>`:''}
+          ${d.litros?`<span style="font-size:9px;background:#F3E5F5;color:#6A1B9A;padding:2px 6px;border-radius:6px">${(d.km/d.litros).toFixed(1)} km/L</span>`:''}
+        </div>
+      </div>`).join('') || '<div style="color:#aaa;font-size:12px;text-align:center;padding:10px">Sin datos</div>'}
+    <div style="font-size:9px;font-weight:700;color:#455A64;margin:12px 0 8px;letter-spacing:0.5px">POR CONDUCTOR</div>
+    ${Object.entries(porConductor).sort((a,b)=>b[1].servicios-a[1].servicios).map(([c,d])=>`
+      <div style="padding:10px 12px;background:#F8F9FA;border-radius:8px;margin-bottom:6px;border-left:3px solid #607D8B">
+        <div style="display:flex;justify-content:space-between">
+          <span style="font-size:12px;font-weight:700;color:#333">${c}</span>
+          <span style="font-size:11px;color:#607D8B">${d.servicios} servicio${d.servicios!==1?'s':''}</span>
+        </div>
+        ${d.km?`<div style="font-size:10px;color:#777;margin-top:2px">${d.km.toLocaleString()} km</div>`:''}
+      </div>`).join('') || '<div style="color:#aaa;font-size:12px;text-align:center;padding:10px">Sin datos</div>'}`;
+  }
+
+  function contenidoFinanciero() {
+    const pe = appData.dashboard.meta_pe || 20320000;
+    const pct = totalIngresos > 0 ? Math.min(Math.round(totalIngresos/pe*100),100) : 0;
+    return `<div style="background:#E8F5E9;border-radius:8px;padding:12px;margin-bottom:10px">
+      <div style="font-size:9px;font-weight:700;color:#888;margin-bottom:4px">AVANCE AL PE</div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+        <span style="font-size:16px;font-weight:900;color:#2E7D32">${fmtPeso(totalIngresos)}</span>
+        <span style="font-size:11px;color:#888">de ${fmtPeso(pe)}</span>
+      </div>
+      <div style="height:8px;background:#C8E6C9;border-radius:4px;overflow:hidden">
+        <div style="height:100%;width:${pct}%;background:#2E7D32;border-radius:4px"></div>
+      </div>
+      <div style="font-size:10px;color:#2E7D32;font-weight:700;margin-top:4px">${pct}% del PE</div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
+      <div style="background:#FFFDE7;border-radius:8px;padding:10px">
+        <div style="font-size:9px;color:#888;font-weight:700">COSTOS OP.</div>
+        <div style="font-size:14px;font-weight:900;color:#F9A825">${fmtPeso(totalCostos)}</div>
+      </div>
+      <div style="background:#F3E5F5;border-radius:8px;padding:10px">
+        <div style="font-size:9px;color:#888;font-weight:700">COMBUSTIBLE</div>
+        <div style="font-size:14px;font-weight:900;color:#6A1B9A">${fmtPeso(totalCombMonto)}</div>
+      </div>
+      <div style="background:#E8F5E9;border-radius:8px;padding:10px">
+        <div style="font-size:9px;color:#888;font-weight:700">✅ COBRADO</div>
+        <div style="font-size:14px;font-weight:900;color:#2E7D32">${fmtPeso(cobPagado)}</div>
+      </div>
+      <div style="background:#FFFDE7;border-radius:8px;padding:10px">
+        <div style="font-size:9px;color:#888;font-weight:700">⏳ POR COBRAR</div>
+        <div style="font-size:14px;font-weight:900;color:#F9A825">${fmtPeso(cobPendiente+cobFacturado)}</div>
+      </div>
+    </div>
+    <div style="font-size:9px;font-weight:700;color:#888;margin-bottom:8px;letter-spacing:0.5px">DETALLE POR SERVICIO</div>
+    ${liquidados.length===0?`<div style="color:#aaa;font-size:12px;text-align:center;padding:10px">Sin servicios liquidados</div>`:
+    liquidados.map(s=>`<div style="padding:8px 10px;background:#F8F9FA;border-radius:7px;margin-bottom:5px;border-left:3px solid #2E7D32">
+      <div style="display:flex;justify-content:space-between">
+        <span style="font-size:11px;font-weight:700;color:#333">${s.id} · ${s.patente||'—'}</span>
+        <span style="font-size:11px;font-weight:700;color:#2E7D32">${fmtPeso(s.precio)}</span>
+      </div>
+      <div style="font-size:10px;color:#777">${s.fecha} · ${s.cliente||'—'} · ${s.margen||0}% margen</div>
+    </div>`).join('')}`;
+  }
+
+  const contenido = ambitoSel==='comercial' ? contenidoComercial() :
+                    ambitoSel==='operacional' ? contenidoOperacional() : contenidoFinanciero();
+
+  return `<div style="padding:12px">
+    ${periodoHTML}
+    ${kpisHTML}
+    ${ambitoHTML}
+    <div>${contenido}</div>
+  </div>`;
+}
+
+function renderDisponibilidad() {
+  const hoy = new Date();
+  const fechaHoy = `${String(hoy.getDate()).padStart(2,'0')}-${String(hoy.getMonth()+1).padStart(2,'0')}-${hoy.getFullYear()}`;
+  if (!appData.disponibilidad) appData.disponibilidad = {};
+  if (!appData.disponibilidad[fechaHoy]) appData.disponibilidad[fechaHoy] = {};
+  const diaData = appData.disponibilidad[fechaHoy];
+
+  const FLOTA = ['GKFD84','WR9192','XR8555','GCFF12','BPBL35','XA1114','DSDV36'];
+  const ESTADOS = ['Disponible','En servicio','Mantención','Puesta en marcha'];
+  const ESTADO_COLOR = {
+    'Disponible':     { bg:'#E8F5E9', border:'#2E7D32', text:'#2E7D32' },
+    'En servicio':    { bg:'#E3F2FD', border:'#1565C0', text:'#1565C0' },
+    'Mantención':     { bg:'#FFF3E0', border:'#E65100', text:'#E65100' },
+    'Puesta en marcha':{ bg:'#F3E5F5', border:'#6A1B9A', text:'#6A1B9A' },
+    '':               { bg:'#F5F5F5', border:'#CFD8DC', text:'#888' },
+  };
+
+  const conductores = appData.conductores || ['Manuel Madrid','Felipe Vidal','Manuel Madariaga','Sebastián Zúñiga','Pablo Riquelme','Tercero'];
+
+  // Resumen
+  const resumen = { disponible:0, enServicio:0, mantencion:0, puestaEnMarcha:0, sinRegistro:0 };
+  FLOTA.forEach(p => {
+    const e = diaData[p]?.estado || '';
+    if (e === 'Disponible') resumen.disponible++;
+    else if (e === 'En servicio') resumen.enServicio++;
+    else if (e === 'Mantención') resumen.mantencion++;
+    else if (e === 'Puesta en marcha') resumen.puestaEnMarcha++;
+    else resumen.sinRegistro++;
+  });
+
+  const ocupacion = FLOTA.length > 0 ? Math.round((resumen.enServicio / FLOTA.length) * 100) : 0;
+
+  const resumenHTML = `<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:14px">
+    <div style="background:#E3F2FD;border-radius:8px;padding:10px;text-align:center">
+      <div style="font-size:9px;color:#888;font-weight:700">OCUPACIÓN</div>
+      <div style="font-size:24px;font-weight:900;color:#1565C0">${ocupacion}%</div>
+      <div style="font-size:9px;color:#1565C0">${resumen.enServicio} de ${FLOTA.length} equipos</div>
+    </div>
+    <div style="background:#E8F5E9;border-radius:8px;padding:10px;text-align:center">
+      <div style="font-size:9px;color:#888;font-weight:700">DISPONIBLES</div>
+      <div style="font-size:24px;font-weight:900;color:#2E7D32">${resumen.disponible}</div>
+      <div style="font-size:9px;color:#2E7D32">equipos libres</div>
+    </div>
+    <div style="background:#FFF3E0;border-radius:8px;padding:10px;text-align:center">
+      <div style="font-size:9px;color:#888;font-weight:700">MANTENCIÓN</div>
+      <div style="font-size:24px;font-weight:900;color:#E65100">${resumen.mantencion}</div>
+    </div>
+    <div style="background:#F3E5F5;border-radius:8px;padding:10px;text-align:center">
+      <div style="font-size:9px;color:#888;font-weight:700">SIN REGISTRAR</div>
+      <div style="font-size:24px;font-weight:900;color:#9E9E9E">${resumen.sinRegistro}</div>
+    </div>
+  </div>`;
+
+  // Tarjetas por patente
+  const tarjetasHTML = FLOTA.map(patente => {
+    const reg = diaData[patente] || {};
+    const estado = reg.estado || '';
+    const col = ESTADO_COLOR[estado] || ESTADO_COLOR[''];
+    const isOpen = !!uiState[`disp_open_${patente}`];
+
+    const detalle = estado === 'En servicio' ? `
+      <div style="margin-top:8px">
+        <div style="font-size:9px;font-weight:700;color:#888;margin-bottom:3px">CONDUCTOR</div>
+        <select onchange="saveDisp('${patente}','conductor',this.value)" style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;background:white;-webkit-appearance:auto">
+          <option value="">Seleccionar...</option>
+          ${conductores.map(c=>`<option value="${c}" ${reg.conductor===c?'selected':''}>${c}</option>`).join('')}
+        </select>
+      </div>` :
+    estado === 'Mantención' ? `
+      <div style="margin-top:8px">
+        <div style="font-size:9px;font-weight:700;color:#888;margin-bottom:3px">TIPO DE MANTENCIÓN</div>
+        <select onchange="saveTipoMant('${patente}',this.value)" style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;background:white;-webkit-appearance:auto">
+          <option value="">Seleccionar tipo...</option>
+          ${['Frenos','Caja de cambios','Motor','Suspensión','Eléctrico','Neumáticos','Diferencial','Embrague','Dirección','Preventivo','Otro'].map(t=>`<option value="${t}" ${reg.tipoMant===t?'selected':''}>${t}</option>`).join('')}
+          <option value="__manual__">Otro (ingresar manualmente)</option>
+        </select>
+        ${reg.tipoMant === '__manual__' || reg.tipoMantManual ? `
+        <input value="${reg.tipoMantManual||''}" onchange="saveDisp('${patente}','tipoMantManual',this.value)" placeholder="Describir mantención..." style="margin-top:4px;width:100%;border:1px solid #FFA726;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit">` : ''}
+      </div>` : '';
+
+    return `<div style="border-radius:10px;border:2px solid ${col.border};background:${col.bg};margin-bottom:8px;overflow:hidden">
+      <div onclick="uiState['disp_open_${patente}']=!uiState['disp_open_${patente}'];render()" style="padding:10px 14px;cursor:pointer;display:flex;justify-content:space-between;align-items:center">
+        <div>
+          <span style="font-size:14px;font-weight:900;color:#333;letter-spacing:1px">${patente}</span>
+          ${reg.conductor ? `<span style="font-size:10px;color:#555;margin-left:8px">— ${reg.conductor}</span>` : ''}
+          ${reg.tipoMant && reg.tipoMant !== '__manual__' ? `<span style="font-size:10px;color:#E65100;margin-left:8px">— ${reg.tipoMant}</span>` : ''}
+          ${reg.tipoMantManual ? `<span style="font-size:10px;color:#E65100;margin-left:8px">— ${reg.tipoMantManual}</span>` : ''}
+        </div>
+        <span style="font-size:10px;font-weight:700;color:${col.text};background:white;padding:3px 8px;border-radius:10px">${estado || 'Sin registrar'}</span>
+      </div>
+      ${isOpen ? `<div style="padding:0 14px 14px">
+        <div style="font-size:9px;font-weight:700;color:#888;margin-bottom:4px">ESTADO</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+          ${ESTADOS.map(e=>`<button onclick="saveDisp('${patente}','estado','${e}');render()" style="padding:8px;border-radius:7px;border:2px solid ${e===estado?ESTADO_COLOR[e].border:'#dde'};background:${e===estado?ESTADO_COLOR[e].bg:'white'};font-size:11px;font-weight:700;color:${e===estado?ESTADO_COLOR[e].text:'#555'};cursor:pointer">${e}</button>`).join('')}
+        </div>
+        ${detalle}
+      </div>` : ''}
+    </div>`;
+  }).join('');
+
+  return `<div style="padding:12px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+      <div style="font-size:11px;font-weight:700;color:#455A64">📅 ${fechaHoy}</div>
+      <div style="font-size:9px;color:#888">Toca cada equipo para registrar</div>
+    </div>
+    ${resumenHTML}
+    ${tarjetasHTML}
+  </div>`;
+}
+
+function saveDisp(patente, campo, valor) {
+  const hoy = new Date();
+  const fechaHoy = `${String(hoy.getDate()).padStart(2,'0')}-${String(hoy.getMonth()+1).padStart(2,'0')}-${hoy.getFullYear()}`;
+  if (!appData.disponibilidad) appData.disponibilidad = {};
+  if (!appData.disponibilidad[fechaHoy]) appData.disponibilidad[fechaHoy] = {};
+  if (!appData.disponibilidad[fechaHoy][patente]) appData.disponibilidad[fechaHoy][patente] = {};
+  appData.disponibilidad[fechaHoy][patente][campo] = valor;
+  if (campo === 'estado') {
+    // limpiar campos del estado anterior
+    appData.disponibilidad[fechaHoy][patente].conductor = '';
+    appData.disponibilidad[fechaHoy][patente].tipoMant = '';
+    appData.disponibilidad[fechaHoy][patente].tipoMantManual = '';
+  }
+  saveData();
+  render();
+}
+
+function saveTipoMant(patente, valor) {
+  const hoy = new Date();
+  const fechaHoy = `${String(hoy.getDate()).padStart(2,'0')}-${String(hoy.getMonth()+1).padStart(2,'0')}-${hoy.getFullYear()}`;
+  if (!appData.disponibilidad) appData.disponibilidad = {};
+  if (!appData.disponibilidad[fechaHoy]) appData.disponibilidad[fechaHoy] = {};
+  if (!appData.disponibilidad[fechaHoy][patente]) appData.disponibilidad[fechaHoy][patente] = {};
+  appData.disponibilidad[fechaHoy][patente].tipoMant = valor;
+  if (valor !== '__manual__') appData.disponibilidad[fechaHoy][patente].tipoMantManual = '';
+  saveData();
+  render();
 }
 
 function renderMiDia() {
@@ -2012,14 +2539,11 @@ function liquidarServicio(id) {
   const peajes     = parseInt(document.getElementById(`liq_peajes_${id}`)?.value) || appData.servicios[idx].peajes || 0;
   const cobro      = uiState[`cobro_${id}`] || 'pendiente';
 
-  // Calcular rendimiento km/litro
   const rendimiento = (litros > 0 && km > 0) ? Math.round((km / litros) * 10) / 10 : 0;
-
-  // Costo total del servicio
   const costoTotal = petroleo + montoComb + viaticos + peajes + adicional;
   const margen = precio > 0 ? Math.round(((precio - costoTotal) / precio) * 100) : 0;
-
   const esLiquidado = (precio > 0);
+
   Object.assign(appData.servicios[idx], {
     precio, km, viaticos, petroleo, litros, montoComb, adicional, peajes,
     cobro, rendimiento, costoTotal, margen,
@@ -2028,8 +2552,10 @@ function liquidarServicio(id) {
 
   appData.dashboard.ventas_mes = (appData.servicios||[]).filter(s=>s.liquidado).reduce((a,s)=>a+(s.precio||0),0);
   uiState.liquidando_id = null;
+  upsertServicioSupabase(appData.servicios[idx]);
+
   saveData(); render();
-  mostrarToastServicio(true);
+  mostrarToastServicio(supaConectado);
 }
 
 function mostrarToastServicio(exito) {
