@@ -277,6 +277,7 @@
       <button onclick="saveData();showSaveToast()" style="background:#6abf69;border:1px solid #4caf50;color:white;border-radius:8px;padding:7px 14px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;margin-top:2px">💾 Guardar</button>
       <button id="btn-deshacer" onclick="deshacer()" title="Sin acciones para deshacer" style="background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.3);color:white;border-radius:8px;padding:7px 12px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;margin-top:2px;opacity:0.35;transition:opacity 0.2s">↩ Deshacer</button>
       <span id="supa-status" style="font-size:10px;font-weight:700;padding:5px 10px;border-radius:8px;background:rgba(255,255,255,0.08);color:rgba(255,255,255,0.35);margin-top:2px;white-space:nowrap">⬤ DB...</span>
+      <button id="btn-edicion" onclick="toggleModoEdicion()" title="Modo edición — modificar estructura del panel" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.5);border-radius:8px;padding:7px 12px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;margin-top:2px;transition:all 0.2s">✎ Editar</button>
     </div>
     <div class="filters">
       <button class="filter-btn active" onclick="filtrar('todas',this)">Todas</button>
@@ -756,15 +757,46 @@ function saveTareaTitulo(faseId, ti) {
 }
 function delTarea(faseId, ti) {
   const fase = appData.fases.find(f=>f.id===faseId);
+  if (!fase) return;
+  const tarea = fase.rutinarias[ti];
+  // Proteger tareas del sistema
+  if (tarea && (tarea.registroServicio || tarea.liquidacionServicios || tarea.disponibilidadDiaria || tarea.pipelineTask || tarea.respaldoTask)) {
+    alert('Esta tarea es del sistema y no puede eliminarse.');
+    return;
+  }
   fase.rutinarias.splice(ti, 1);
-  saveData(); render();
+  saveData();
+  pushConfigPanel();
+  render();
 }
+function moverTarea(faseId, ti, dir) {
+  const fase = appData.fases.find(f=>f.id===faseId);
+  if (!fase) return;
+  const arr = fase.rutinarias;
+  const ni = ti + dir;
+  if (ni < 0 || ni >= arr.length) return;
+  [arr[ti], arr[ni]] = [arr[ni], arr[ti]];
+  saveData();
+  if (supaConectado) pushConfigPanel();
+  render();
+}
+
 function addTareaRutinaria(faseId) {
   const input = document.getElementById(`nueva_tarea_${faseId}`);
   const val = input.value.trim(); if (!val) return;
   const fase = appData.fases.find(f=>f.id===faseId);
-  fase.rutinarias.push({ titulo: val, proc: '', subtareas: [] });
-  input.value = ''; saveData(); render();
+  fase.rutinarias.push({ titulo: val, proc: '', subtareas: [], done: false });
+  input.value = ''; saveData(); pushConfigPanel(); render();
+}
+
+function moverTarea(faseId, ti, dir) {
+  const fase = appData.fases.find(f=>f.id===faseId);
+  if (!fase) return;
+  const arr = fase.rutinarias;
+  const newIdx = ti + dir;
+  if (newIdx < 0 || newIdx >= arr.length) return;
+  [arr[ti], arr[newIdx]] = [arr[newIdx], arr[ti]];
+  saveData(); pushConfigPanel(); render();
 }
 function toggleClienteNuevo(val) {
   const box = document.getElementById('srv_cliente_nuevo_box');
@@ -1312,7 +1344,15 @@ function renderFase(fase) {
         }
         <span onclick="toggleTareaDone('${fase.id}',${ti})" title="${isDone?'Reactivar':'Tachar tarea'}" style="cursor:pointer;font-size:14px;color:${isDone?fase.color:'#ccc'};padding:0 4px">${isDone?'✓':'○'}</span>
         <span onclick="editTareaTitulo('${fase.id}',${ti})" title="Editar nombre" style="cursor:pointer;font-size:12px;color:#bbb;padding:0 4px">✎</span>
-        <span onclick="delTarea('${fase.id}',${ti})" title="Eliminar tarea" style="cursor:pointer;font-size:16px;color:#ddd;padding:0 4px">×</span>
+        ${!tarea.registroServicio&&!tarea.liquidacionServicios&&!tarea.disponibilidadDiaria&&!tarea.pipelineTask&&!tarea.respaldoTask?`
+      <span onclick="moverTarea('${fase.id}',${ti},-1)" title="Subir" style="cursor:pointer;font-size:10px;color:#ddd;padding:0 2px">▲</span>
+      <span onclick="moverTarea('${fase.id}',${ti},1)" title="Bajar" style="cursor:pointer;font-size:10px;color:#ddd;padding:0 2px">▼</span>
+      ${modoEdicion ? `
+        <span onclick="moverTarea('${fase.id}',${ti},-1)" title="Subir" style="cursor:pointer;font-size:12px;color:#90A4AE;padding:0 3px">↑</span>
+        <span onclick="moverTarea('${fase.id}',${ti},1)" title="Bajar" style="cursor:pointer;font-size:12px;color:#90A4AE;padding:0 3px">↓</span>
+        ${!tarea.registroServicio && !tarea.liquidacionServicios && !tarea.disponibilidadDiaria && !tarea.pipelineTask && !tarea.respaldoTask ? `<span onclick="delTarea('${fase.id}',${ti})" title="Eliminar tarea" style="cursor:pointer;font-size:16px;color:#E53935;padding:0 4px">×</span>` : ''}
+      ` : ''}
+    `:''}
         <span class="acord-count" onclick="toggleAcord('${fase.id}',${ti})">${tarea.subtareas.length}</span>
       </div>
       <div class="acord-body ${isOpen?'open':''}">
@@ -1331,10 +1371,10 @@ function renderFase(fase) {
     </div>`;
   }).join('');
 
-  const addTareaHTML = `<div style="padding:6px 4px 4px;display:flex;gap:6px;margin-top:4px">
-    <input id="nueva_tarea_${fase.id}" class="add-sub-input" placeholder="Nueva tarea diaria..." onkeydown="if(event.key==='Enter')addTareaRutinaria('${fase.id}')" style="flex:1;border:1px solid #dde;border-radius:7px;padding:7px 10px;font-size:12px;outline:none">
-    <button onclick="addTareaRutinaria('${fase.id}')" style="background:${fase.color};color:white;border:none;border-radius:7px;padding:7px 12px;font-size:12px;cursor:pointer;font-weight:700">+ Agregar</button>
-  </div>`;
+  const addTareaHTML = modoEdicion ? `<div style="padding:8px 4px 4px;display:flex;gap:6px;margin-top:4px;border-top:1px dashed #e0e0e0">
+    <input id="nueva_tarea_${fase.id}" class="add-sub-input" placeholder="+ Nueva tarea rutinaria..." onkeydown="if(event.key==='Enter')addTareaRutinaria('${fase.id}')" style="flex:1;border:1px solid ${fase.color};border-radius:7px;padding:7px 10px;font-size:12px;outline:none">
+    <button onclick="addTareaRutinaria('${fase.id}')" style="background:${fase.color};color:white;border:none;border-radius:7px;padding:7px 14px;font-size:12px;cursor:pointer;font-weight:700">+ Agregar</button>
+  </div>` : '';
 
   const pendsOrdenados = [...fase.pendientes.map((p,i)=>({...p,_i:i}))].sort((a,b)=>{
     if (a.done && !b.done) return 1;
@@ -1553,7 +1593,8 @@ async function initSupabase() {
       console.log('Supabase conectado ✅');
       await syncPipelineDesdeSupabase();
       await syncServiciosDesdeSupabase();
-      await syncServiciosDesdeSupabase();
+      await syncDisponibilidadDesdeSupabase();
+      await syncConfigPanel();
       render();
     } else {
       if (el) { el.textContent = '⬤ DB Error'; el.style.color = '#e57373'; }
@@ -1674,6 +1715,185 @@ async function upsertServicioSupabase(s) {
     await supa.from('servicios').upsert(row, { onConflict: 'id' });
   } catch(e) { console.warn('Error upsert servicio:', e); }
 }
+
+// ── SYNC DISPONIBILIDAD SUPABASE ─────────────────────────
+async function syncDisponibilidadDesdeSupabase() {
+  if (!supa || !supaConectado) return;
+  try {
+    const { data, error } = await supa.from('disponibilidad').select('*');
+    if (error) { console.warn('Error sync disponibilidad:', error); return; }
+    if (!appData.disponibilidad) appData.disponibilidad = {};
+    if (data && data.length > 0) {
+      // Reconstruir estructura local {fecha: {patente: {estado,conductor,...}}}
+      data.forEach(r => {
+        if (!appData.disponibilidad[r.fecha]) appData.disponibilidad[r.fecha] = {};
+        appData.disponibilidad[r.fecha][r.patente] = {
+          estado: r.estado||'',
+          conductor: r.conductor||'',
+          tipoMant: r.tipo_mant||'',
+          mantManual: r.mant_manual||''
+        };
+      });
+      saveData();
+    } else {
+      // Migrar local a Supabase
+      const local = appData.disponibilidad || {};
+      for (const fecha of Object.keys(local)) {
+        for (const patente of Object.keys(local[fecha])) {
+          const r = local[fecha][patente];
+          await upsertDisponibilidadSupa(fecha, patente, r);
+        }
+      }
+    }
+  } catch(e) { console.warn('Error sync disponibilidad:', e); }
+}
+
+async function upsertDisponibilidadSupa(fecha, patente, r) {
+  if (!supa || !supaConectado) return;
+  const id = `${fecha}_${patente}`;
+  try {
+    await supa.from('disponibilidad').upsert({
+      id, fecha, patente,
+      estado: r.estado||'',
+      conductor: r.conductor||'',
+      tipo_mant: r.tipoMant||'',
+      mant_manual: r.mantManual||''
+    }, { onConflict: 'id' });
+  } catch(e) { console.warn('Error upsert disponibilidad:', e); }
+}
+
+// ── SYNC CONFIG PANEL SUPABASE ────────────────────────────
+async function syncConfigPanel() {
+  if (!supa || !supaConectado) return;
+  try {
+    const { data, error } = await supa.from('config_panel').select('*').eq('id','estructura').single();
+    if (error || !data) {
+      // Primera vez — guardar estructura local en Supabase
+      await pushConfigPanel();
+    } else {
+      // Restaurar estructura desde Supabase
+      const cfg = data.data;
+      if (cfg && cfg.fases) {
+        // Merge: mantener datos operacionales locales, actualizar estructura
+        appData.fases = cfg.fases;
+        saveData();
+      }
+    }
+  } catch(e) { console.warn('Error sync config_panel:', e); }
+}
+
+async function pushConfigPanel() {
+  if (!supa || !supaConectado) return;
+  try {
+    const cfg = { fases: appData.fases };
+    await supa.from('config_panel').upsert({
+      id: 'estructura',
+      data: cfg,
+      updated_at: new Date().toISOString()
+    }, { onConflict: 'id' });
+  } catch(e) { console.warn('Error push config_panel:', e); }
+}
+
+// ── MODO EDICIÓN ──────────────────────────────────────────
+let modoEdicion = false;
+
+function toggleModoEdicion() {
+  modoEdicion = !modoEdicion;
+  const btn = document.getElementById('btn-edicion');
+  if (modoEdicion) {
+    if (btn) { btn.style.background='#F57F17'; btn.style.color='white'; btn.style.border='1px solid #F57F17'; btn.textContent='✎ Editando...'; }
+  } else {
+    if (btn) { btn.style.background='rgba(255,255,255,0.08)'; btn.style.color='rgba(255,255,255,0.5)'; btn.style.border='1px solid rgba(255,255,255,0.2)'; btn.textContent='✎ Editar'; }
+    // Guardar estructura en Supabase al salir del modo edición
+    pushConfigPanel();
+  }
+  render();
+}
+
+// ── SYNC DISPONIBILIDAD SUPABASE ──────────────────────────
+async function syncDisponibilidadDesdeSupabase() {
+  if (!supa || !supaConectado) return;
+  try {
+    const { data, error } = await supa.from('disponibilidad').select('*').order('created_at');
+    if (error) { console.warn('Error sync disponibilidad:', error); return; }
+    if (!data || data.length === 0) {
+      // Primera vez — migrar local a Supabase
+      const local = appData.disponibilidad || {};
+      for (const fecha of Object.keys(local)) {
+        for (const patente of Object.keys(local[fecha])) {
+          const r = local[fecha][patente];
+          await supa.from('disponibilidad').upsert({
+            id: `${fecha}_${patente}`,
+            fecha, patente,
+            estado: r.estado||'',
+            conductor: r.conductor||'',
+            tipo_mant: r.tipoMant||'',
+            mant_manual: r.mantManual||''
+          }, { onConflict: 'id' });
+        }
+      }
+    } else {
+      // Reconstruir appData.disponibilidad desde Supabase
+      const disp = {};
+      data.forEach(r => {
+        if (!disp[r.fecha]) disp[r.fecha] = {};
+        disp[r.fecha][r.patente] = {
+          estado: r.estado||'',
+          conductor: r.conductor||'',
+          tipoMant: r.tipo_mant||'',
+          mantManual: r.mant_manual||''
+        };
+      });
+      appData.disponibilidad = disp;
+      saveData();
+    }
+  } catch(e) { console.warn('Error sync disponibilidad:', e); }
+}
+
+async function upsertDisponibilidadSupabase(fecha, patente, datos) {
+  if (!supa || !supaConectado) return;
+  try {
+    await supa.from('disponibilidad').upsert({
+      id: `${fecha}_${patente}`,
+      fecha, patente,
+      estado: datos.estado||'',
+      conductor: datos.conductor||'',
+      tipo_mant: datos.tipoMant||'',
+      mant_manual: datos.mantManual||''
+    }, { onConflict: 'id' });
+  } catch(e) { console.warn('Error upsert disponibilidad:', e); }
+}
+
+// ── SYNC CONFIG PANEL SUPABASE ─────────────────────────────
+async function syncConfigPanel() {
+  if (!supa || !supaConectado) return;
+  try {
+    const { data, error } = await supa.from('config_panel').select('*').eq('id', 'main').single();
+    if (error || !data) {
+      // Primera vez — guardar config actual en Supabase
+      await pushConfigPanel();
+    } else {
+      // Restaurar fases desde Supabase
+      if (data.data && data.data.fases) {
+        // Merge: mantener datos operacionales locales, tomar estructura de Supabase
+        appData.fases = data.data.fases;
+        saveData();
+      }
+    }
+  } catch(e) { console.warn('Error sync config panel:', e); }
+}
+
+async function pushConfigPanel() {
+  if (!supa || !supaConectado) return;
+  try {
+    await supa.from('config_panel').upsert({
+      id: 'main',
+      data: { fases: appData.fases },
+      updated_at: new Date().toISOString()
+    }, { onConflict: 'id' });
+  } catch(e) { console.warn('Error push config panel:', e); }
+}
+
 // ─────────────────────────────────────────────────────────
 const ETAPA_COLORES = { prospecto:'#607D8B', cotizado:'#C55A11', activo:'#2E7D32', inactivo:'#9E9E9E' };
 const ETAPAS_PIPELINE = ['prospecto','cotizado','activo','inactivo'];
@@ -2291,9 +2511,11 @@ function guardarDisponibilidad() {
 
   if (!appData.disponibilidad) appData.disponibilidad = {};
   if (!appData.disponibilidad[fechaKey]) appData.disponibilidad[fechaKey] = {};
-  appData.disponibilidad[fechaKey][patente] = { estado, conductor, tipoMant, mantManual };
+  const registroDisp = { estado, conductor, tipoMant, mantManual };
+  appData.disponibilidad[fechaKey][patente] = registroDisp;
   uiState.disp_form = {};
   saveData();
+  upsertDisponibilidadSupabase(fechaKey, patente, registroDisp);
   render();
 }
 
