@@ -283,6 +283,7 @@
       <button class="filter-btn" onclick="filtrar('comercial',this)">Comercial</button>
       <button class="filter-btn" onclick="filtrar('operacional',this)">Operacional</button>
       <button class="filter-btn" onclick="filtrar('financiero',this)">Financiero</button>
+      <button class="filter-btn" onclick="filtrar('rrhh',this)">RRHH</button>
       <button class="filter-btn" onclick="filtrar('control',this)">Control</button>
       <button class="filter-btn" onclick="filtrar('scalingup',this)">Scaling Up</button>
     </div>
@@ -368,12 +369,9 @@ const DEFAULT_DATA = {
       id: "comercial", numero: "01", nombre: "COMERCIAL", subtitulo: "Conseguir carga",
       color: "#607D8B", colorClaro: "#ECEFF1", emoji: "—",
       rutinarias: [
-        { titulo: "Prospectar clientes", proc: "Identificar empresas agroindustriales en zonas de cobertura. Buscar nombre del encargado de logística. Contactar por WhatsApp o llamada presentando Santa Berenice. Registrar en pipeline con estado: contactado / interesado / cotizado / cerrado.", subtareas: ["Identificar empresas agroindustriales objetivo por región","Investigar contacto clave y canal de llegada","Registrar en pipeline comercial","Seguimiento a prospectos vía WhatsApp"] },
-        { titulo: "Contactar brokers y operadores", proc: "Llamar o escribir al broker consultando si tiene cargas disponibles en las rutas que operamos. Confirmar fechas, origen y destino. Registrar respuesta y hacer seguimiento si queda pendiente.", subtareas: ["Consultar cargas disponibles en rutas operadas","Confirmar rutas y fechas de despacho","Registrar respuesta y estado del contacto"] },
-        { titulo: "Cotizar servicios por ruta", proc: "Con origen y destino definidos, calcular km de la ruta. Aplicar tarifa base según equipo requerido. Verificar que el margen cubra punto de equilibrio. Preparar cotización y enviar al cliente o broker.", subtareas: ["Calcular distancia y costo variable de la ruta","Verificar que tarifa cubre punto de equilibrio","Preparar cotización formal y enviar al cliente"] },
-        { titulo: "Cerrar y confirmar servicio", proc: "Confirmar aceptación de tarifa. Registrar datos completos del servicio: cliente, origen, destino, fecha, tipo de carga, tarifa acordada. Pasar a operaciones para asignación de equipo.", subtareas: ["Confirmar aceptación de tarifa con el cliente","Registrar orden de servicio con datos del despacho","Informar a operaciones para asignación de equipo"] },
-        { titulo: "Seguimiento pipeline comercial", proc: "Revisar lista de prospectos activos. Actualizar etapa de cada uno. Identificar quién lleva más tiempo sin avanzar y decidir si llamar o descartar. Foco en los más cercanos a cerrar.", subtareas: ["Revisar estado de cada prospecto activo","Actualizar etapa del pipeline","Priorizar acciones del día según estado"] },
-        { titulo: "Registrar actividad comercial", proc: "Al final del día registrar: servicios realizados, cliente, canal de origen, si es recurrente. Esta información alimenta los KPIs y el flujo de caja proyectado.", subtareas: ["Cargar servicios realizados del día","Registrar cliente nuevo y canal de venta","Actualizar recurrencia y frecuencia por cliente"] },
+        { titulo: "Pipeline Comercial", proc: "Revisar y actualizar el estado de cada cliente y prospecto activo. Registrar avances, próximas acciones y cambios de etapa.", subtareas: [], pipelineTask: true, done: false },
+        { titulo: "Prospectar y mantener clientes", proc: "Identificar empresas agroindustriales objetivo. Contactar por WhatsApp o llamada. Mantener relación con clientes activos. Registrar en pipeline.", subtareas: [], done: false },
+        { titulo: "Cotizar servicios", proc: "Con origen y destino definidos calcular km. Aplicar tarifa base según equipo. Verificar que el margen cubra el punto de equilibrio. Enviar cotización al cliente.", subtareas: [], done: false },
       ],
       pendientes: [
         { texto: "Enviar tarifas a Carri — acordado, esperando comentarios", badge: "lunes", done: false },
@@ -441,7 +439,13 @@ const DEFAULT_DATA = {
       ],
     },
     {
-      id: "control", numero: "04", nombre: "CONTROL DE GESTIÓN", subtitulo: "Medir y decidir",
+      id: "rrhh", numero: "04", nombre: "RRHH", subtitulo: "Gestionar personas",
+      color: "#5D4037", colorClaro: "#EFEBE9", emoji: "—",
+      rutinarias: [],
+      pendientes: [],
+    },
+    {
+      id: "control", numero: "05", nombre: "CONTROL DE GESTIÓN", subtitulo: "Medir y decidir",
       color: "#37474F", colorClaro: "#ECEFF1", emoji: "—",
       personalPendientes: [
         { texto: "Revisar plan personal anual", badge: null, done: false },
@@ -1023,10 +1027,42 @@ function renderFase(fase) {
   const urgentes = fase.pendientes.filter(p=>p.badge==='hoy'&&!p.done).length;
 
   // Migración: asegurar que "Registro de servicio diario" existe en operacional
+  if (fase.id === 'control') {
+    const tieneRespaldo = fase.rutinarias.some(r => r.respaldoTask);
+    if (!tieneRespaldo) {
+      fase.rutinarias.push({
+        titulo: 'Respaldo base de datos',
+        proc: 'Ejecutar al término de cada día para respaldar toda la información del sistema en tu PC.',
+        subtareas: [
+          'Paso 1 — Ir a Control de Gestión → Tareas Rutinarias',
+          'Paso 2 — Abrir tarea Respaldo base de datos',
+          'Paso 3 — Hacer clic en el botón Descargar respaldo',
+          'Paso 4 — El archivo se descarga con la fecha del día',
+          'Paso 5 — Guardar en carpeta Respaldos Global Solutions en tu PC'
+        ],
+        respaldoTask: true, done: false
+      });
+      saveData();
+    }
+  }
+
+  if (fase.id === 'comercial') {
+    const tienePipeline = fase.rutinarias.some(r => r.pipelineTask);
+    if (!tienePipeline) {
+      fase.rutinarias.push({ titulo: 'Pipeline Comercial', proc: 'Revisar y actualizar el estado de cada cliente y prospecto activo.', subtareas: [], pipelineTask: true, done: false });
+      saveData();
+    }
+  }
+
   if (fase.id === 'operacional') {
     const tieneRegistro = fase.rutinarias.some(r => r.registroServicio);
     if (!tieneRegistro) {
       fase.rutinarias.unshift({ titulo: 'Registro de servicio diario', proc: 'Completar al ejecutar o coordinar cada servicio del día.', subtareas: [], registroServicio: true, done: false });
+      saveData();
+    }
+    const tieneDisponibilidad = fase.rutinarias.some(r => r.disponibilidadDiaria);
+    if (!tieneDisponibilidad) {
+      fase.rutinarias.push({ titulo: 'Disponibilidad y Ocupación diaria', proc: 'Registrar el estado de cada equipo al inicio del día: Disponible, En servicio, Mantención o Puesta en marcha.', subtareas: [], disponibilidadDiaria: true, done: false });
       saveData();
     }
   }
@@ -1282,6 +1318,9 @@ function renderFase(fase) {
       <div class="acord-body ${isOpen?'open':''}">
         ${liquidacionHTML}
         ${serviciosHTML}
+        ${tarea.disponibilidadDiaria ? `<div style="margin:-4px">${renderDisponibilidad()}</div>` : ''}
+        ${tarea.pipelineTask ? `<div style="margin-bottom:8px">${renderPipeline()}</div>` : ''}
+        ${tarea.respaldoTask ? `<div style="padding:8px 0"><button onclick="descargarRespaldo()" style="width:100%;padding:12px;background:#37474F;color:white;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer">💾 Descargar respaldo</button></div>` : ''}
         ${subsHTML}
         <div class="add-sub-row" style="--fc:${fase.color}">
           <input class="add-sub-input" id="sub_input_${fase.id}_${ti}" placeholder="+ Agregar paso..." onkeydown="if(event.key==='Enter')addSub('${fase.id}',${ti})">
@@ -1384,8 +1423,8 @@ function renderFase(fase) {
     `<div class="section-label">PENDIENTES PRIORITARIOS</div>${pendsHTML}${addPendHTML}`;
 
   const extraTabControl = fase.id === 'control' ? `<button class="tab-btn ${tab==='midia'?'active':''}" onclick="setTab('${fase.id}','midia')" style="${tab==='midia'?`color:${fase.color};border-bottom-color:${fase.color};background:${fase.colorClaro};font-weight:900`:'font-weight:700'}">⚡ DÍA</button><button class="tab-btn ${tab==='informes'?'active':''}" onclick="setTab('${fase.id}','informes')" style="${tab==='informes'?`color:${fase.color};border-bottom-color:${fase.color};background:${fase.colorClaro};font-weight:900`:'font-weight:700'}">📊 Informes</button><button class="tab-btn ${tab==='personal'?'active':''}" onclick="abrirPersonal('${fase.id}')" style="${tab==='personal'?`color:${fase.color};border-bottom-color:${fase.color};background:${fase.colorClaro};font-weight:900`:'font-weight:700'}">🔒 Personal</button>` : '';
-  const extraTabComercial = fase.id === 'comercial' ? `<button class="tab-btn ${tab==='pipeline'?'active':''}" onclick="setTab('${fase.id}','pipeline')" style="${tab==='pipeline'?`color:${fase.color};border-bottom-color:${fase.color};background:${fase.colorClaro};font-weight:900`:'font-weight:700'}">🎯 Pipeline</button>` : '';
-  const extraTabOperacional = fase.id === 'operacional' ? `<button class="tab-btn ${tab==='disponibilidad'?'active':''}" onclick="setTab('${fase.id}','disponibilidad')" style="${tab==='disponibilidad'?`color:${fase.color};border-bottom-color:${fase.color};background:${fase.colorClaro};font-weight:900`:'font-weight:700'}">🚛 Disponibilidad y Ocupación</button>` : '';
+  const extraTabComercial = '';
+  const extraTabOperacional = '';
   const extraTab = extraTabControl + extraTabComercial + extraTabOperacional;
 
   return `<div class="fase-card" data-fase="${fase.id}">
@@ -1402,9 +1441,9 @@ function renderFase(fase) {
     </div>
     <div class="tabs">
       ${extraTab}
-      <button class="tab-btn ${tab==='rutinarias'?'active':''}" onclick="setTab('${fase.id}','rutinarias')" style="${tab==='rutinarias'?`color:${fase.color};border-bottom-color:${fase.color};background:${fase.colorClaro}`:''}">Tareas Diarias</button>
+      <button class="tab-btn ${tab==='rutinarias'?'active':''}" onclick="setTab('${fase.id}','rutinarias')" style="${tab==='rutinarias'?`color:${fase.color};border-bottom-color:${fase.color};background:${fase.colorClaro}`:''}">Tareas Rutinarias</button>
       <button class="tab-btn ${tab==='pendientes'?'active':''}" onclick="setTab('${fase.id}','pendientes')" style="${tab==='pendientes'?`color:${fase.color};border-bottom-color:${fase.color};background:${fase.colorClaro}`:''}">Pendientes (${pendActivos})</button>
-      <button class="tab-btn ${tab==='plan'?'active':''}" onclick="setTab('${fase.id}','plan')" style="${tab==='plan'?`color:${fase.color};border-bottom-color:${fase.color};background:${fase.colorClaro}`:''}">Plan</button>
+
     </div>
     <div class="items">${tabContent}</div>
   </div>`;
@@ -1843,10 +1882,12 @@ function renderInformes() {
     { id:'comercial', label:'Comercial', color:'#1565C0' },
     { id:'operacional', label:'Operacional', color:'#455A64' },
     { id:'financiero', label:'Financiero', color:'#2E7D32' },
+    { id:'rrhh', label:'RRHH', color:'#5D4037' },
+    { id:'scalingup', label:'Scaling Up', color:'#37474F' },
   ];
 
-  const ambitoHTML = `<div style="display:flex;gap:6px;margin-bottom:14px">
-    ${ambitos.map(a=>`<button onclick="uiState.informe_ambito='${a.id}';render()" style="flex:1;padding:8px;border-radius:8px;border:none;cursor:pointer;font-size:11px;font-weight:700;background:${ambitoSel===a.id?a.color:'#ECEFF1'};color:${ambitoSel===a.id?'white':a.color}">${a.label}</button>`).join('')}
+  const ambitoHTML = `<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:14px">
+    ${ambitos.map(a=>`<button onclick="uiState.informe_ambito='${a.id}';render()" style="padding:8px;border-radius:8px;border:none;cursor:pointer;font-size:11px;font-weight:700;background:${ambitoSel===a.id?a.color:'#ECEFF1'};color:${ambitoSel===a.id?'white':a.color}">${a.label}</button>`).join('')}
   </div>`;
 
   // KPIs resumen
@@ -1985,8 +2026,122 @@ function renderInformes() {
     </div>`).join('')}`;
   }
 
+  function contenidoDisponibilidad() {
+    const disponibilidad = appData.disponibilidad || {};
+    const FLOTA = ['GKFD84','WR9192','XR8555','GCFF12','BPBL35','XA1114','DSDV36'];
+    const ESTADO_COLOR = {
+      'Disponible':      { bg:'#E8F5E9', text:'#2E7D32' },
+      'En servicio':     { bg:'#E3F2FD', text:'#1565C0' },
+      'Mantención':      { bg:'#FFF3E0', text:'#E65100' },
+      'Puesta en marcha':{ bg:'#F3E5F5', text:'#6A1B9A' },
+    };
+
+    const dias = Object.keys(disponibilidad).sort((a,b)=>{
+      const pa=a.split('-'),pb=b.split('-');
+      return new Date(pb[2],pb[1]-1,pb[0])-new Date(pa[2],pa[1]-1,pa[0]);
+    });
+
+    if (dias.length===0) return `<div style="text-align:center;color:#aaa;padding:20px;font-size:12px">Sin registros de disponibilidad</div>`;
+
+    // Resumen por equipo en el período filtrado
+    const resumenEquipos = {};
+    FLOTA.forEach(p => { resumenEquipos[p] = { enServicio:0, disponible:0, mantencion:0, total:0 }; });
+    dias.forEach(fecha => {
+      const dd = disponibilidad[fecha]||{};
+      FLOTA.forEach(p => {
+        const e = dd[p]?.estado||'';
+        resumenEquipos[p].total++;
+        if (e==='En servicio') resumenEquipos[p].enServicio++;
+        else if (e==='Disponible') resumenEquipos[p].disponible++;
+        else if (e==='Mantención') resumenEquipos[p].mantencion++;
+      });
+    });
+
+    return `<div style="font-size:9px;font-weight:700;color:#6A1B9A;margin-bottom:8px;letter-spacing:0.5px">RESUMEN POR EQUIPO (${dias.length} días)</div>
+    ${FLOTA.map(p=>{
+      const r=resumenEquipos[p];
+      const ocup=r.total>0?Math.round((r.enServicio/r.total)*100):0;
+      return `<div style="padding:10px 12px;background:#F8F9FA;border-radius:8px;margin-bottom:6px;border-left:3px solid #6A1B9A">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <span style="font-size:12px;font-weight:700;color:#333">${p}</span>
+          <span style="font-size:11px;font-weight:700;color:#1565C0">${ocup}% ocupado</span>
+        </div>
+        <div style="display:flex;gap:6px;margin-top:4px;flex-wrap:wrap">
+          <span style="font-size:9px;background:#E3F2FD;color:#1565C0;padding:2px 6px;border-radius:6px">${r.enServicio}d en serv.</span>
+          <span style="font-size:9px;background:#E8F5E9;color:#2E7D32;padding:2px 6px;border-radius:6px">${r.disponible}d disp.</span>
+          ${r.mantencion?`<span style="font-size:9px;background:#FFF3E0;color:#E65100;padding:2px 6px;border-radius:6px">${r.mantencion}d mant.</span>`:''}
+        </div>
+      </div>`;
+    }).join('')}
+    <div style="font-size:9px;font-weight:700;color:#6A1B9A;margin:12px 0 8px;letter-spacing:0.5px">DETALLE POR DÍA</div>
+    ${dias.slice(0,10).map(fecha=>{
+      const dd=disponibilidad[fecha]||{};
+      const enServ=FLOTA.filter(p=>dd[p]?.estado==='En servicio').length;
+      const ocup=FLOTA.length>0?Math.round((enServ/FLOTA.length)*100):0;
+      return `<div style="padding:8px 12px;background:#F8F9FA;border-radius:8px;margin-bottom:5px;border-left:3px solid #9C27B0">
+        <div style="display:flex;justify-content:space-between">
+          <span style="font-size:11px;font-weight:700;color:#333">📅 ${fecha}</span>
+          <span style="font-size:11px;font-weight:700;color:#1565C0">${ocup}% ocupación</span>
+        </div>
+        <div style="font-size:10px;color:#777;margin-top:2px">${enServ} equipos en servicio de ${FLOTA.length}</div>
+      </div>`;
+    }).join('')}`;
+  }
+
+  function contenidoRRHH() {
+    const servicios = appData.servicios || [];
+    const filtrados = filtrarPeriodo(servicios);
+    const porConductor = {};
+    filtrados.forEach(s => {
+      const c = s.conductor||'Sin asignar';
+      if (!porConductor[c]) porConductor[c] = { servicios:0, km:0 };
+      porConductor[c].servicios++;
+      porConductor[c].km += s.km||0;
+    });
+    const conductoresActivos = Object.keys(porConductor).length;
+    return `<div style="font-size:9px;font-weight:700;color:#5D4037;margin-bottom:8px;letter-spacing:0.5px">CARGA DE TRABAJO POR CONDUCTOR</div>
+    ${conductoresActivos===0?'<div style="color:#aaa;font-size:12px;text-align:center;padding:10px">Sin datos</div>':
+    Object.entries(porConductor).sort((a,b)=>b[1].servicios-a[1].servicios).map(([c,d])=>`
+      <div style="padding:10px 12px;background:#F8F9FA;border-radius:8px;margin-bottom:6px;border-left:3px solid #5D4037">
+        <div style="display:flex;justify-content:space-between">
+          <span style="font-size:12px;font-weight:700;color:#333">${c}</span>
+          <span style="font-size:11px;color:#5D4037;font-weight:700">${d.servicios} servicio${d.servicios!==1?'s':''}</span>
+        </div>
+        ${d.km?`<div style="font-size:10px;color:#777;margin-top:2px">${d.km.toLocaleString()} km recorridos</div>`:''}
+      </div>`).join('')}`;
+  }
+
+  function contenidoScalingUp() {
+    const su = appData.scalingup || {};
+    const fases = su.f6Items || [];
+    const pendTotal = (appData.fases||[]).reduce((a,f)=>{
+      return a + (f.pendientes||[]).filter(p=>!p.done).length;
+    },0);
+    return `<div style="font-size:9px;font-weight:700;color:#37474F;margin-bottom:8px;letter-spacing:0.5px">AVANCE ESCALAMIENTO</div>
+    ${fases.length===0?'<div style="color:#aaa;font-size:12px;text-align:center;padding:10px">Sin fases configuradas</div>':
+    fases.map((f,i)=>{
+      const items = f.items||[];
+      const done = items.filter(it=>it.done).length;
+      const pct = items.length>0?Math.round((done/items.length)*100):0;
+      return `<div style="padding:10px 12px;background:#F8F9FA;border-radius:8px;margin-bottom:6px;border-left:3px solid #37474F">
+        <div style="font-size:11px;font-weight:700;color:#333">Fase ${i+1} — ${f.titulo||''}</div>
+        <div style="height:6px;background:#ECEFF1;border-radius:3px;margin-top:5px;overflow:hidden">
+          <div style="height:100%;width:${pct}%;background:#37474F;border-radius:3px"></div>
+        </div>
+        <div style="font-size:9px;color:#888;margin-top:3px">${done}/${items.length} completados</div>
+      </div>`;
+    }).join('')}
+    <div style="padding:10px 12px;background:#ECEFF1;border-radius:8px;margin-top:8px">
+      <div style="font-size:11px;font-weight:700;color:#37474F">Pendientes totales del sistema</div>
+      <div style="font-size:22px;font-weight:900;color:#37474F">${pendTotal}</div>
+    </div>`;
+  }
+
   const contenido = ambitoSel==='comercial' ? contenidoComercial() :
-                    ambitoSel==='operacional' ? contenidoOperacional() : contenidoFinanciero();
+                    ambitoSel==='operacional' ? contenidoOperacional() :
+                    ambitoSel==='financiero' ? contenidoFinanciero() :
+                    ambitoSel==='rrhh' ? contenidoRRHH() :
+                    contenidoScalingUp();
 
   return `<div style="padding:12px">
     ${periodoHTML}
@@ -1997,113 +2152,149 @@ function renderInformes() {
 }
 
 function renderDisponibilidad() {
-  const hoy = new Date();
-  const fechaHoy = `${String(hoy.getDate()).padStart(2,'0')}-${String(hoy.getMonth()+1).padStart(2,'0')}-${hoy.getFullYear()}`;
   if (!appData.disponibilidad) appData.disponibilidad = {};
-  if (!appData.disponibilidad[fechaHoy]) appData.disponibilidad[fechaHoy] = {};
-  const diaData = appData.disponibilidad[fechaHoy];
-
-  const FLOTA = ['GKFD84','WR9192','XR8555','GCFF12','BPBL35','XA1114','DSDV36'];
-  const ESTADOS = ['Disponible','En servicio','Mantención','Puesta en marcha'];
+  const FLOTA = appData.patentes || ['GKFD84','WR9192','XR8555','GCFF12','BPBL35','XA1114','DSDV36'];
+  const conductores = appData.conductores || ['Manuel Madrid','Felipe Vidal','Manuel Madariaga','Sebastián Zúñiga','Pablo Riquelme','Tercero'];
+  const ESTADOS = ['Disponible','En servicio','Mantención'];
+  const TIPOS_MANT = ['Frenos','Caja de cambios','Motor','Suspensión','Eléctrico','Neumáticos','Diferencial','Embrague','Dirección','Preventivo','Puesta en marcha','Otro'];
   const ESTADO_COLOR = {
-    'Disponible':     { bg:'#E8F5E9', border:'#2E7D32', text:'#2E7D32' },
-    'En servicio':    { bg:'#E3F2FD', border:'#1565C0', text:'#1565C0' },
-    'Mantención':     { bg:'#FFF3E0', border:'#E65100', text:'#E65100' },
-    'Puesta en marcha':{ bg:'#F3E5F5', border:'#6A1B9A', text:'#6A1B9A' },
-    '':               { bg:'#F5F5F5', border:'#CFD8DC', text:'#888' },
+    'Disponible':  { bg:'#E8F5E9', border:'#2E7D32', text:'#2E7D32' },
+    'En servicio': { bg:'#E3F2FD', border:'#1565C0', text:'#1565C0' },
+    'Mantención':  { bg:'#FFF3E0', border:'#E65100', text:'#E65100' },
+    '':            { bg:'#F5F5F5', border:'#CFD8DC', text:'#888' },
   };
 
-  const conductores = appData.conductores || ['Manuel Madrid','Felipe Vidal','Manuel Madariaga','Sebastián Zúñiga','Pablo Riquelme','Tercero'];
+  // Estado del formulario activo
+  const fd = uiState.disp_form || {};
+  const hoyISO = (() => { const h=new Date(); return `${h.getFullYear()}-${String(h.getMonth()+1).padStart(2,'0')}-${String(h.getDate()).padStart(2,'0')}`; })();
 
-  // Resumen
-  const resumen = { disponible:0, enServicio:0, mantencion:0, puestaEnMarcha:0, sinRegistro:0 };
-  FLOTA.forEach(p => {
-    const e = diaData[p]?.estado || '';
-    if (e === 'Disponible') resumen.disponible++;
-    else if (e === 'En servicio') resumen.enServicio++;
-    else if (e === 'Mantención') resumen.mantencion++;
-    else if (e === 'Puesta en marcha') resumen.puestaEnMarcha++;
-    else resumen.sinRegistro++;
-  });
+  const patenteOpts = FLOTA.map(p=>`<option value="${p}">${p}</option>`).join('');
+  const conductorOpts = conductores.map(c=>`<option value="${c}">${c}</option>`).join('');
+  const estadoOpts = ESTADOS.map(e=>`<option value="${e}" ${fd.estado===e?'selected':''}>${e}</option>`).join('');
+  const tipoMantOpts = TIPOS_MANT.map(t=>`<option value="${t}" ${fd.tipoMant===t?'selected':''}>${t}</option>`).join('');
 
-  const ocupacion = FLOTA.length > 0 ? Math.round((resumen.enServicio / FLOTA.length) * 100) : 0;
-
-  const resumenHTML = `<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:14px">
-    <div style="background:#E3F2FD;border-radius:8px;padding:10px;text-align:center">
-      <div style="font-size:9px;color:#888;font-weight:700">OCUPACIÓN</div>
-      <div style="font-size:24px;font-weight:900;color:#1565C0">${ocupacion}%</div>
-      <div style="font-size:9px;color:#1565C0">${resumen.enServicio} de ${FLOTA.length} equipos</div>
+  const formHTML = `<div style="padding:10px 12px;background:#f4f6f8;border-radius:10px;border:1px solid #dde4e8;margin-bottom:12px">
+    <div style="font-size:10px;font-weight:700;color:#455A64;letter-spacing:1px;margin-bottom:8px;padding-bottom:5px;border-bottom:2px solid #CFD8DC">REGISTRAR ESTADO DE EQUIPO</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px">
+      <div>
+        <div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">FECHA</div>
+        <input id="disp_fecha" type="date" value="${fd.fecha||hoyISO}" onchange="uiState.disp_form=uiState.disp_form||{};uiState.disp_form.fecha=this.value" style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit;background:white">
+      </div>
+      <div>
+        <div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">PATENTE</div>
+        <select id="disp_patente" onchange="uiState.disp_form=uiState.disp_form||{};uiState.disp_form.patente=this.value" style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit;background:white;-webkit-appearance:auto">
+          <option value="">Seleccionar...</option>
+          ${patenteOpts}
+        </select>
+      </div>
+      <div>
+        <div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">ESTADO</div>
+        <select id="disp_estado" onchange="uiState.disp_form=uiState.disp_form||{};uiState.disp_form.estado=this.value;render()" style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit;background:white;-webkit-appearance:auto">
+          <option value="">Seleccionar...</option>
+          ${estadoOpts}
+        </select>
+      </div>
+      ${fd.estado==='En servicio' ? `<div>
+        <div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">CONDUCTOR</div>
+        <select id="disp_conductor" onchange="uiState.disp_form=uiState.disp_form||{};uiState.disp_form.conductor=this.value" style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit;background:white;-webkit-appearance:auto">
+          <option value="">Seleccionar...</option>
+          ${conductorOpts}
+        </select>
+      </div>` : ''}
+      ${fd.estado==='Mantención' ? `<div>
+        <div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">TIPO MANTENCIÓN</div>
+        <select id="disp_tipo_mant" onchange="uiState.disp_form=uiState.disp_form||{};uiState.disp_form.tipoMant=this.value;render()" style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit;background:white;-webkit-appearance:auto">
+          <option value="">Seleccionar tipo...</option>
+          ${tipoMantOpts}
+        </select>
+        ${fd.tipoMant==='Otro' ? `<input id="disp_mant_manual" value="${fd.mantManual||''}" onchange="uiState.disp_form=uiState.disp_form||{};uiState.disp_form.mantManual=this.value" placeholder="Describir mantención..." style="margin-top:4px;width:100%;border:1px solid #FFA726;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit">` : ''}
+      </div>` : ''}
     </div>
-    <div style="background:#E8F5E9;border-radius:8px;padding:10px;text-align:center">
-      <div style="font-size:9px;color:#888;font-weight:700">DISPONIBLES</div>
-      <div style="font-size:24px;font-weight:900;color:#2E7D32">${resumen.disponible}</div>
-      <div style="font-size:9px;color:#2E7D32">equipos libres</div>
-    </div>
-    <div style="background:#FFF3E0;border-radius:8px;padding:10px;text-align:center">
-      <div style="font-size:9px;color:#888;font-weight:700">MANTENCIÓN</div>
-      <div style="font-size:24px;font-weight:900;color:#E65100">${resumen.mantencion}</div>
-    </div>
-    <div style="background:#F3E5F5;border-radius:8px;padding:10px;text-align:center">
-      <div style="font-size:9px;color:#888;font-weight:700">SIN REGISTRAR</div>
-      <div style="font-size:24px;font-weight:900;color:#9E9E9E">${resumen.sinRegistro}</div>
-    </div>
+    <button onclick="guardarDisponibilidad()" style="width:100%;padding:10px;background:#455A64;color:white;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;margin-top:4px">💾 Guardar registro</button>
   </div>`;
 
-  // Tarjetas por patente
-  const tarjetasHTML = FLOTA.map(patente => {
-    const reg = diaData[patente] || {};
-    const estado = reg.estado || '';
-    const col = ESTADO_COLOR[estado] || ESTADO_COLOR[''];
-    const isOpen = !!uiState[`disp_open_${patente}`];
+  // Registros guardados agrupados por fecha
+  const todasFechas = Object.keys(appData.disponibilidad).sort((a,b)=>{
+    const pa=a.split('-'),pb=b.split('-');
+    return new Date(pb[2],pb[1]-1,pb[0])-new Date(pa[2],pa[1]-1,pa[0]);
+  });
 
-    const detalle = estado === 'En servicio' ? `
-      <div style="margin-top:8px">
-        <div style="font-size:9px;font-weight:700;color:#888;margin-bottom:3px">CONDUCTOR</div>
-        <select onchange="saveDisp('${patente}','conductor',this.value)" style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;background:white;-webkit-appearance:auto">
-          <option value="">Seleccionar...</option>
-          ${conductores.map(c=>`<option value="${c}" ${reg.conductor===c?'selected':''}>${c}</option>`).join('')}
-        </select>
-      </div>` :
-    estado === 'Mantención' ? `
-      <div style="margin-top:8px">
-        <div style="font-size:9px;font-weight:700;color:#888;margin-bottom:3px">TIPO DE MANTENCIÓN</div>
-        <select onchange="saveTipoMant('${patente}',this.value)" style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;background:white;-webkit-appearance:auto">
-          <option value="">Seleccionar tipo...</option>
-          ${['Frenos','Caja de cambios','Motor','Suspensión','Eléctrico','Neumáticos','Diferencial','Embrague','Dirección','Preventivo','Otro'].map(t=>`<option value="${t}" ${reg.tipoMant===t?'selected':''}>${t}</option>`).join('')}
-          <option value="__manual__">Otro (ingresar manualmente)</option>
-        </select>
-        ${reg.tipoMant === '__manual__' || reg.tipoMantManual ? `
-        <input value="${reg.tipoMantManual||''}" onchange="saveDisp('${patente}','tipoMantManual',this.value)" placeholder="Describir mantención..." style="margin-top:4px;width:100%;border:1px solid #FFA726;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit">` : ''}
-      </div>` : '';
+  const registrosHTML = todasFechas.length === 0 ? `<div style="text-align:center;color:#aaa;font-size:11px;padding:16px">Sin registros aún</div>` :
+  todasFechas.map(fecha => {
+    const regs = appData.disponibilidad[fecha] || {};
+    const patentes = Object.keys(regs);
+    if (patentes.length===0) return '';
+    const isOpen = !!uiState[`disp_hist_${fecha}`];
+    const enServ = patentes.filter(p=>regs[p].estado==='En servicio').length;
+    const disp = patentes.filter(p=>regs[p].estado==='Disponible').length;
+    const mant = patentes.filter(p=>regs[p].estado==='Mantención').length;
+    const ocup = FLOTA.length>0?Math.round((enServ/FLOTA.length)*100):0;
 
-    return `<div style="border-radius:10px;border:2px solid ${col.border};background:${col.bg};margin-bottom:8px;overflow:hidden">
-      <div onclick="uiState['disp_open_${patente}']=!uiState['disp_open_${patente}'];render()" style="padding:10px 14px;cursor:pointer;display:flex;justify-content:space-between;align-items:center">
-        <div>
-          <span style="font-size:14px;font-weight:900;color:#333;letter-spacing:1px">${patente}</span>
-          ${reg.conductor ? `<span style="font-size:10px;color:#555;margin-left:8px">— ${reg.conductor}</span>` : ''}
-          ${reg.tipoMant && reg.tipoMant !== '__manual__' ? `<span style="font-size:10px;color:#E65100;margin-left:8px">— ${reg.tipoMant}</span>` : ''}
-          ${reg.tipoMantManual ? `<span style="font-size:10px;color:#E65100;margin-left:8px">— ${reg.tipoMantManual}</span>` : ''}
+    return `<div style="border:1px solid #dde;border-radius:8px;margin-bottom:6px;overflow:hidden">
+      <div onclick="uiState['disp_hist_${fecha}']=!uiState['disp_hist_${fecha}'];render()" style="padding:10px 12px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;background:#F8F9FA">
+        <span style="font-size:12px;font-weight:700;color:#455A64">📅 ${fecha}</span>
+        <div style="display:flex;gap:5px;align-items:center">
+          <span style="font-size:9px;background:#E3F2FD;color:#1565C0;padding:2px 6px;border-radius:6px;font-weight:700">${ocup}% ocup.</span>
+          <span style="font-size:9px;background:#E8F5E9;color:#2E7D32;padding:2px 6px;border-radius:6px">${disp} disp.</span>
+          ${mant?`<span style="font-size:9px;background:#FFF3E0;color:#E65100;padding:2px 6px;border-radius:6px">${mant} mant.</span>`:''}
+          <span style="font-size:10px;color:#aaa">${isOpen?'▲':'▼'}</span>
         </div>
-        <span style="font-size:10px;font-weight:700;color:${col.text};background:white;padding:3px 8px;border-radius:10px">${estado || 'Sin registrar'}</span>
       </div>
-      ${isOpen ? `<div style="padding:0 14px 14px">
-        <div style="font-size:9px;font-weight:700;color:#888;margin-bottom:4px">ESTADO</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
-          ${ESTADOS.map(e=>`<button onclick="saveDisp('${patente}','estado','${e}');render()" style="padding:8px;border-radius:7px;border:2px solid ${e===estado?ESTADO_COLOR[e].border:'#dde'};background:${e===estado?ESTADO_COLOR[e].bg:'white'};font-size:11px;font-weight:700;color:${e===estado?ESTADO_COLOR[e].text:'#555'};cursor:pointer">${e}</button>`).join('')}
-        </div>
-        ${detalle}
-      </div>` : ''}
+      ${isOpen?`<div style="padding:8px 12px 10px">
+        ${patentes.map(p=>{
+          const r=regs[p];
+          const col=ESTADO_COLOR[r.estado||'']||ESTADO_COLOR[''];
+          return `<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid #f0f0f0">
+            <span style="font-size:11px;font-weight:700;color:#333">${p}</span>
+            <div style="display:flex;gap:4px;align-items:center;flex-wrap:wrap;justify-content:flex-end">
+              ${r.conductor?`<span style="font-size:9px;color:#555">${r.conductor}</span>`:''}
+              ${r.tipoMant?`<span style="font-size:9px;color:#E65100">${r.tipoMant==='Otro'?(r.mantManual||'Otro'):r.tipoMant}</span>`:''}
+              <span style="font-size:9px;font-weight:700;color:${col.text};background:${col.bg};padding:2px 7px;border-radius:6px">${r.estado||'Sin registrar'}</span>
+            </div>
+          </div>`;
+        }).join('')}
+      </div>`:''}
     </div>`;
   }).join('');
 
-  return `<div style="padding:12px">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-      <div style="font-size:11px;font-weight:700;color:#455A64">📅 ${fechaHoy}</div>
-      <div style="font-size:9px;color:#888">Toca cada equipo para registrar</div>
-    </div>
-    ${resumenHTML}
-    ${tarjetasHTML}
+  return `<div style="padding:2px">
+    ${formHTML}
+    <div style="font-size:9px;font-weight:700;color:#888;letter-spacing:0.5px;margin-bottom:8px">REGISTROS DEL MES</div>
+    ${registrosHTML}
   </div>`;
+}
+
+function descargarRespaldo() {
+  const fecha = new Date();
+  const nombreArchivo = `GS_Respaldo_${String(fecha.getDate()).padStart(2,'0')}-${String(fecha.getMonth()+1).padStart(2,'0')}-${fecha.getFullYear()}.json`;
+  const datos = JSON.stringify(appData, null, 2);
+  const blob = new Blob([datos], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = nombreArchivo; a.click();
+  URL.revokeObjectURL(url);
+}
+
+function guardarDisponibilidad() {
+  const fecha = document.getElementById('disp_fecha')?.value;
+  const patente = document.getElementById('disp_patente')?.value;
+  const estado = document.getElementById('disp_estado')?.value;
+  const conductor = document.getElementById('disp_conductor')?.value||'';
+  const tipoMant = document.getElementById('disp_tipo_mant')?.value||'';
+  const mantManual = document.getElementById('disp_mant_manual')?.value||'';
+
+  if (!patente || !estado || !fecha) return alert('Completa fecha, patente y estado');
+
+  // Convertir fecha ISO a dd-mm-yyyy
+  const p = fecha.split('-');
+  const fechaKey = `${p[2]}-${p[1]}-${p[0]}`;
+
+  if (!appData.disponibilidad) appData.disponibilidad = {};
+  if (!appData.disponibilidad[fechaKey]) appData.disponibilidad[fechaKey] = {};
+  appData.disponibilidad[fechaKey][patente] = { estado, conductor, tipoMant, mantManual };
+  uiState.disp_form = {};
+  saveData();
+  render();
 }
 
 function saveDisp(patente, campo, valor) {
@@ -2113,14 +2304,12 @@ function saveDisp(patente, campo, valor) {
   if (!appData.disponibilidad[fechaHoy]) appData.disponibilidad[fechaHoy] = {};
   if (!appData.disponibilidad[fechaHoy][patente]) appData.disponibilidad[fechaHoy][patente] = {};
   appData.disponibilidad[fechaHoy][patente][campo] = valor;
-  if (campo === 'estado') {
-    // limpiar campos del estado anterior
+  if (campo==='estado') {
     appData.disponibilidad[fechaHoy][patente].conductor = '';
     appData.disponibilidad[fechaHoy][patente].tipoMant = '';
-    appData.disponibilidad[fechaHoy][patente].tipoMantManual = '';
+    appData.disponibilidad[fechaHoy][patente].mantManual = '';
   }
-  saveData();
-  render();
+  saveData(); render();
 }
 
 function saveTipoMant(patente, valor) {
@@ -2130,69 +2319,111 @@ function saveTipoMant(patente, valor) {
   if (!appData.disponibilidad[fechaHoy]) appData.disponibilidad[fechaHoy] = {};
   if (!appData.disponibilidad[fechaHoy][patente]) appData.disponibilidad[fechaHoy][patente] = {};
   appData.disponibilidad[fechaHoy][patente].tipoMant = valor;
-  if (valor !== '__manual__') appData.disponibilidad[fechaHoy][patente].tipoMantManual = '';
-  saveData();
-  render();
+  saveData(); render();
 }
 
 function renderMiDia() {
-  const foco = appData.midia_foco || [];
   const hoy = new Date();
-  const COLORES = { comercial:'#607D8B', operacional:'#757575', financiero:'#546E7A', control:'#37474F' };
+  const COLORES = { 
+    comercial:'#1565C0', operacional:'#455A64', 
+    financiero:'#2E7D32', rrhh:'#5D4037', control:'#37474F' 
+  };
+  const AMBITOS_ORDEN = ['comercial','operacional','financiero','rrhh'];
+  const PRIO_COLORS = { 1:'#C62828', 2:'#F57F17', 3:'#1565C0' };
+  const PRIO_LABELS = { 1:'P1', 2:'P2', 3:'P3' };
 
-  // Sección FOCO DEL DÍA
-  const focoHTML = foco.length === 0
-    ? `<div style="text-align:center;padding:18px 12px;color:#aaa;font-size:12px">Aún no tienes ítems en tu foco.<br>Selecciona desde los ámbitos abajo ↓</div>`
-    : foco.map((item, fi) => {
-        const col = COLORES[item.faseId] || '#607D8B';
-        return `<div style="display:flex;align-items:flex-start;gap:10px;padding:9px 12px;border-radius:8px;background:#f8f9fa;margin-bottom:6px;border-left:3px solid ${col}">
+  if (!appData.prioridades) appData.prioridades = {};
+
+  // ── FOCO DEL DÍA — todos los pendientes con prioridad ordenados 1→2→3 ──
+  const todosConPrio = [];
+  AMBITOS_ORDEN.forEach(fid => {
+    const fase = appData.fases.find(f => f.id === fid);
+    if (!fase) return;
+    (fase.pendientes||[]).forEach((p, pi) => {
+      if (p.done) return;
+      const key = `${fid}::${pi}`;
+      const prio = appData.prioridades[key];
+      if (prio) todosConPrio.push({ fase, fid, p, pi, prio, key });
+    });
+  });
+  todosConPrio.sort((a,b) => a.prio - b.prio);
+
+  const focoHTML = todosConPrio.length === 0
+    ? `<div style="text-align:center;padding:16px;color:#aaa;font-size:11px">Sin pendientes priorizados.<br>Asigna prioridad P1/P2/P3 abajo ↓</div>`
+    : todosConPrio.map(({fase, fid, p, pi, prio}) => {
+        const col = COLORES[fid]||'#607D8B';
+        const pCol = PRIO_COLORS[prio];
+        return `<div style="display:flex;align-items:flex-start;gap:8px;padding:9px 12px;border-radius:8px;background:#f8f9fa;margin-bottom:6px;border-left:3px solid ${pCol}">
+          <span style="font-size:10px;font-weight:900;color:white;background:${pCol};padding:2px 7px;border-radius:5px;flex-shrink:0;margin-top:1px">${PRIO_LABELS[prio]}</span>
           <div style="flex:1">
-            <div style="font-size:9px;font-weight:800;color:${col};letter-spacing:1px;text-transform:uppercase;margin-bottom:2px">${item.faseNombre}</div>
-            <div style="font-size:13px;color:#222;font-weight:${item.done?'400':'600'};text-decoration:${item.done?'line-through':'none'};color:${item.done?'#aaa':'#222'}">${item.texto}</div>
+            <div style="font-size:8px;font-weight:800;color:${col};letter-spacing:1px;margin-bottom:2px">${fase.nombre}</div>
+            <div style="font-size:12px;color:#222;line-height:1.4">${p.texto}</div>
           </div>
-          <div style="display:flex;flex-direction:column;gap:5px;align-items:center;flex-shrink:0">
-            <button onclick="toggleFocoDone(${fi})" style="background:${item.done?col:'white'};border:2px solid ${col};border-radius:50%;width:22px;height:22px;cursor:pointer;font-size:11px;display:flex;align-items:center;justify-content:center;color:${item.done?'white':col}">${item.done?'✓':'○'}</button>
-            <button onclick="quitarFoco(${fi})" style="background:none;border:none;color:#ccc;cursor:pointer;font-size:14px;line-height:1" title="Quitar del foco">×</button>
-          </div>
+          <button onclick="setPrioridad('${fid}',${pi},0)" style="background:none;border:none;color:#ccc;cursor:pointer;font-size:14px" title="Quitar prioridad">×</button>
         </div>`;
       }).join('');
 
-  // Sección PENDIENTES POR ÁMBITO
-  const ambitos = appData.fases.filter(f => f.id !== 'control');
-  const focoIds = new Set(foco.map(f => f.faseId + '::' + f.texto));
+  // ── PENDIENTES POR ÁMBITO con prioridad y tareas rutinarias ──
+  const ambitosHTML = AMBITOS_ORDEN.map(fid => {
+    const fase = appData.fases.find(f => f.id === fid);
+    if (!fase) return '';
+    const col = COLORES[fid]||'#607D8B';
+    const isOpen = !!appData.midia_open?.[fid];
+    const pendActivos = (fase.pendientes||[]).filter(p => !p.done);
+    const rutinarias = fase.rutinarias||[];
 
-  const ambitosHTML = ambitos.map(fase => {
-    const col = COLORES[fase.id] || '#607D8B';
-    const pendActivos = fase.pendientes.filter(p => !p.done);
-    if (pendActivos.length === 0) return '';
-    const isOpen = !!appData.midia_open?.[fase.id];
-    const itemsHTML = pendActivos.map((p, pi) => {
-      const key = fase.id + '::' + p.texto;
-      const enFoco = focoIds.has(key);
-      return `<div style="display:flex;align-items:flex-start;gap:8px;padding:7px 10px;border-bottom:1px solid #f0f0f0">
-        <div style="flex:1;font-size:12px;color:#333;line-height:1.4">${p.badge && p.badge!=='none'?`<span style="font-size:9px;font-weight:800;background:${col};color:white;padding:1px 6px;border-radius:3px;margin-right:5px">${p.badge.toUpperCase()}</span>`:''}${p.texto}</div>
-        <button onclick="agregarFoco('${fase.id}','${fase.nombre}',${fase.pendientes.indexOf(p)})" style="flex-shrink:0;background:${enFoco?col:'white'};border:1.5px solid ${col};border-radius:5px;padding:3px 8px;font-size:10px;font-weight:700;color:${enFoco?'white':col};cursor:pointer">${enFoco?'✓':'+ foco'}</button>
-      </div>`;
-    }).join('');
+    const pendHTML = pendActivos.length === 0 
+      ? `<div style="padding:8px 12px;font-size:11px;color:#aaa">Sin pendientes activos</div>`
+      : pendActivos.map((p, pi) => {
+          const key = `${fid}::${pi}`;
+          const prio = appData.prioridades[key]||0;
+          return `<div style="display:flex;align-items:flex-start;gap:6px;padding:7px 12px;border-bottom:1px solid #f0f0f0">
+            <div style="flex:1;font-size:11px;color:#333;line-height:1.4">
+              ${p.badge&&p.badge!=='none'?`<span style="font-size:8px;font-weight:800;background:${col};color:white;padding:1px 5px;border-radius:3px;margin-right:4px">${p.badge.toUpperCase()}</span>`:''}${p.texto}
+            </div>
+            <div style="display:flex;gap:3px;flex-shrink:0">
+              ${[1,2,3].map(n=>`<button onclick="setPrioridad('${fid}',${pi},${n})" style="width:24px;height:24px;border-radius:5px;border:1.5px solid ${PRIO_COLORS[n]};background:${prio===n?PRIO_COLORS[n]:'white'};color:${prio===n?'white':PRIO_COLORS[n]};font-size:9px;font-weight:900;cursor:pointer">${n}</button>`).join('')}
+            </div>
+          </div>`;
+        }).join('');
 
-    return `<div style="margin-bottom:6px;border-radius:8px;overflow:hidden;border:1px solid #e8eaec">
-      <div onclick="toggleMidiaAmb('${fase.id}')" style="display:flex;justify-content:space-between;align-items:center;padding:9px 12px;background:${col};cursor:pointer">
-        <div style="font-size:10px;font-weight:800;color:white;letter-spacing:1px">${fase.nombre}</div>
+    const rutHTML = rutinarias.length === 0
+      ? `<div style="padding:8px 12px;font-size:11px;color:#aaa">Sin tareas rutinarias</div>`
+      : rutinarias.map(r => `<div style="padding:6px 12px;font-size:11px;color:#555;border-bottom:1px solid #f5f5f5">— ${r.titulo}</div>`).join('');
+
+    return `<div style="margin-bottom:8px;border-radius:8px;overflow:hidden;border:1px solid #e8eaec">
+      <div onclick="toggleMidiaAmb('${fid}')" style="display:flex;justify-content:space-between;align-items:center;padding:10px 12px;background:${col};cursor:pointer">
+        <span style="font-size:10px;font-weight:800;color:white;letter-spacing:1px">${fase.nombre}</span>
         <div style="display:flex;align-items:center;gap:8px">
-          <span style="font-size:10px;color:rgba(255,255,255,0.8)">${pendActivos.length} pendientes</span>
-          <span style="color:white;font-size:12px">${isOpen?'▲':'▼'}</span>
+          <span style="font-size:9px;color:rgba(255,255,255,0.8)">${pendActivos.length} pendientes</span>
+          <span style="color:white;font-size:11px">${isOpen?'▲':'▼'}</span>
         </div>
       </div>
-      ${isOpen ? `<div>${itemsHTML}</div>` : ''}
+      ${isOpen ? `
+        <div style="padding:6px 0 2px;background:#FAFAFA">
+          <div style="font-size:8px;font-weight:800;color:#888;letter-spacing:1px;padding:0 12px;margin-bottom:3px">TAREAS RUTINARIAS</div>
+          ${rutHTML}
+          <div style="font-size:8px;font-weight:800;color:#888;letter-spacing:1px;padding:8px 12px 3px;border-top:1px solid #eee;margin-top:4px">PENDIENTES — asigna prioridad</div>
+          ${pendHTML}
+        </div>` : ''}
     </div>`;
   }).join('');
 
   return `<div style="padding:12px">
-    <div style="font-size:10px;font-weight:800;letter-spacing:1.5px;color:#37474F;margin-bottom:8px">⚡ DÍA — ${hoy.toLocaleDateString('es-CL',{weekday:'long',day:'numeric',month:'long'})}</div>
-    <div style="margin-bottom:16px">${focoHTML}</div>
-    <div style="font-size:10px;font-weight:800;letter-spacing:1.5px;color:#888;margin-bottom:8px;border-top:1px solid #eee;padding-top:12px">PENDIENTES POR ÁMBITO</div>
+    <div style="font-size:10px;font-weight:800;letter-spacing:1.5px;color:#37474F;margin-bottom:10px">⚡ DÍA — ${hoy.toLocaleDateString('es-CL',{weekday:'long',day:'numeric',month:'long'})}</div>
+    <div style="font-size:9px;font-weight:800;color:#C62828;letter-spacing:1px;margin-bottom:6px">FOCO DEL DÍA</div>
+    <div style="margin-bottom:14px">${focoHTML}</div>
+    <div style="font-size:9px;font-weight:800;color:#888;letter-spacing:1px;margin-bottom:8px;border-top:1px solid #eee;padding-top:12px">PENDIENTES POR ÁMBITO</div>
     ${ambitosHTML}
   </div>`;
+}
+
+function setPrioridad(faseId, pendIdx, valor) {
+  if (!appData.prioridades) appData.prioridades = {};
+  const key = `${faseId}::${pendIdx}`;
+  if (valor === 0) delete appData.prioridades[key];
+  else appData.prioridades[key] = valor;
+  saveData(); render();
 }
 
 function agregarFoco(faseId, faseNombre, pendIdx) {
@@ -2203,11 +2434,8 @@ function agregarFoco(faseId, faseNombre, pendIdx) {
   if (!pend) return;
   const key = faseId + '::' + pend.texto;
   const yaEsta = appData.midia_foco.findIndex(f => f.faseId + '::' + f.texto === key);
-  if (yaEsta >= 0) {
-    appData.midia_foco.splice(yaEsta, 1);
-  } else {
-    appData.midia_foco.push({ faseId, faseNombre, texto: pend.texto, done: false });
-  }
+  if (yaEsta >= 0) appData.midia_foco.splice(yaEsta, 1);
+  else appData.midia_foco.push({ faseId, faseNombre, texto: pend.texto, done: false });
   saveData(); render();
 }
 
@@ -2235,8 +2463,11 @@ function renderScalingUp() {
   const SU_COLOR = '#455A64';
   const SU_LIGHT = '#ECEFF1';
 
-  // ── ESTABILIZACIÓN: 3 bloques por ámbito (Comercial / Operacional / Financiero) ──
+  // ── ESTABILIZACIÓN: vacío por ahora ──
   function estabilizacionContent() {
+    return `<div style="padding:20px;text-align:center;color:#aaa;font-size:12px">Estabilización — pendiente de configurar</div>`;
+  }
+  function estabilizacionContent_OLD() {
     const ambitos = [
       {
         id: 'estab_comercial', nombre: 'COMERCIAL', color: '#607D8B',
