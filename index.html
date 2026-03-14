@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-  <meta name="version" content="2026031401">
+  <meta name="version" content="2026031402">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Panel de Gestión — Global Solutions</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -3466,21 +3466,22 @@ function aplicarAcceso() {
       }
     }, 100);
   } else {
-    // Primero mostrar todos los botones
-    document.querySelectorAll('.filter-btn').forEach(b => b.style.display = '');
-    // Si no es acceso total, ocultar lo que no corresponde
-    if (acceso !== 'all') {
-      const permitidos = acceso.split(',').map(a => a.trim());
-      document.querySelectorAll('.filter-btn').forEach(b => {
-        const onclick = b.getAttribute('onclick') || '';
-        const match = onclick.match(/filtrar\('([^']+)'/);
-        const v = match ? match[1] : null;
-        if (v && v !== 'todas' && v !== 'control' && v !== 'scalingup' && !permitidos.includes(v)) {
-          b.style.display = 'none';
-        }
-      });
-    }
     render();
+    // Aplicar filtros después del render para que los botones existan en el DOM
+    setTimeout(() => {
+      document.querySelectorAll('.filter-btn').forEach(b => b.style.display = '');
+      if (acceso !== 'all') {
+        const permitidos = acceso.split(',').map(a => a.trim());
+        document.querySelectorAll('.filter-btn').forEach(b => {
+          const oc = b.getAttribute('onclick') || '';
+          const m = oc.match(/filtrar\('([^']+)'/);
+          const v = m ? m[1] : null;
+          if (v && v !== 'todas' && v !== 'control' && v !== 'scalingup' && !permitidos.includes(v)) {
+            b.style.display = 'none';
+          }
+        });
+      }
+    }, 50);
   }
 }
 // ============ FIN LOGIN ============
