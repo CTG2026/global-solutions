@@ -2,6 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
+  <meta name="version" content="2026031401">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Panel de Gestión — Global Solutions</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -706,6 +707,19 @@ function loadData() {
   if (ctrlFase && !ctrlFase.personalPendientes) {
     ctrlFase.personalPendientes = [];
   }
+  // Migración: cargar servicios febrero 2026 si no existen
+  if (!appData.servicios) appData.servicios = [];
+  const tieneFeb = appData.servicios.some(s => s.mes === 'feb' && s.anio === '2026');
+  if (!tieneFeb && typeof SERVICIOS_FEBRERO_2026 !== 'undefined') {
+    appData.servicios = [...appData.servicios, ...SERVICIOS_FEBRERO_2026];
+    saveData();
+  }
+  // Migración: RRHH
+  if (!appData.fases.find(f => f.id === 'rrhh')) {
+    appData.fases.push({ id:'rrhh', numero:'04', nombre:'RRHH', subtitulo:'Gestionar personas', color:'#5D4037', colorClaro:'#EFEBE9', emoji:'—', rutinarias:[], pendientes:[] });
+  }
+  // Migración: prioridades
+  if (!appData.prioridades) appData.prioridades = {};
 }
 
 function saveUI() {
@@ -3413,6 +3427,8 @@ function loginVolverRol() {
 function cerrarSesion() {
   localStorage.removeItem('gs_session');
   sessionRol = null;
+  // Restaurar todos los botones de filtro
+  document.querySelectorAll('.filter-btn').forEach(b => b.style.display = '');
   sessionConductor = null;
   mostrarLogin();
 }
@@ -3421,6 +3437,8 @@ function aplicarAcceso() {
   if (!sessionRol) { mostrarLogin(); return; }
   document.getElementById('login-screen').style.display = 'none';
   document.querySelector('.container').style.display = 'block';
+  // Forzar render primero para que existan los botones en el DOM
+  render();
   // Mostrar nombre en topbar
   const info = document.getElementById('session-info');
   if (info) {
@@ -3447,23 +3465,44 @@ function aplicarAcceso() {
         }
       }
     }, 100);
-  } else if (acceso !== 'all') {
-    // Ocultar ámbitos a los que no tiene acceso
-    const permitidos = acceso.split(',').map(a => a.trim());
-    document.querySelectorAll('.filter-btn').forEach(b => {
-      const v = b.getAttribute('onclick')?.match(/filtrar\('([^']+)'/)?.[1];
-      if (v && v !== 'todas' && v !== 'control' && v !== 'scaling' && !permitidos.includes(v)) {
-        b.style.display = 'none';
-      }
-    });
-    render();
   } else {
+    // Primero mostrar todos los botones
+    document.querySelectorAll('.filter-btn').forEach(b => b.style.display = '');
+    // Si no es acceso total, ocultar lo que no corresponde
+    if (acceso !== 'all') {
+      const permitidos = acceso.split(',').map(a => a.trim());
+      document.querySelectorAll('.filter-btn').forEach(b => {
+        const onclick = b.getAttribute('onclick') || '';
+        const match = onclick.match(/filtrar\('([^']+)'/);
+        const v = match ? match[1] : null;
+        if (v && v !== 'todas' && v !== 'control' && v !== 'scalingup' && !permitidos.includes(v)) {
+          b.style.display = 'none';
+        }
+      });
+    }
     render();
   }
 }
 // ============ FIN LOGIN ============
 
 loadData(); iniciarLogin(); initSupabase();
+
+// Service Worker — forzar actualización automática
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/global-solutions/sw.js').then(reg => {
+    reg.addEventListener('updatefound', () => {
+      const newWorker = reg.installing;
+      newWorker.addEventListener('statechange', () => {
+        if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+          newWorker.postMessage({ action: 'skipWaiting' });
+        }
+      });
+    });
+  });
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    window.location.reload();
+  });
+}
 </script>
 </body>
 </html>
