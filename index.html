@@ -420,7 +420,8 @@ const DEFAULT_DATA = {
       id: "financiero", numero: "03", nombre: "FINANCIERO", subtitulo: "Cobrar servicio",
       color: "#546E7A", colorClaro: "#EEEEEE", emoji: "—",
       rutinarias: [
-        { titulo: "Proceso Liquidación", proc: "Revisar lista de servicios pendientes de liquidar. Seleccionar cada servicio por su ID, ingresar precio neto, petróleo y adicionales. Al guardar queda liquidado y pasa automáticamente a cuentas por cobrar.", subtareas: ["Revisar servicios pendientes del día","Ingresar precio neto por servicio","Registrar petróleo y adicionales","Confirmar liquidación"], liquidacionServicios: true },
+        { titulo: "Avance Liquidación", proc: "Revisar servicios con TAG asignado pendientes de agrupar en liquidación. Verificar datos de cada servicio antes de cerrar.", subtareas: [], liquidacionServicios: true },
+        { titulo: "Cierre Liquidación", proc: "Crear liquidación agrupando uno o varios servicios por TAG o guía. Calcular total, descargar documento y gestionar estado de cobro.", subtareas: [], cierreLiquidacion: true },
         { titulo: "Facturación y cobro", proc: "Por cada servicio completado: emitir factura al cliente. Evaluar si aplica factoring para anticipo. Registrar en el sistema de cobranza con fecha de vencimiento. Confirmar pago y liquidar comisión del conductor.", subtareas: ["Emitir factura por servicio completado","Evaluar y gestionar factoring si aplica","Confirmar pago y registrar cobro efectivo","Liquidar comisión conductor"] },
         { titulo: "Control de caja y presupuesto", proc: "Cada día descargar cartola bancaria y categorizar movimientos. Actualizar el flujo de caja. Contrastar ingresos y gastos vs presupuesto mensual. Revisar si la proyección de la semana cubre el punto de equilibrio.", subtareas: ["Descargar y categorizar cartola bancaria","Actualizar flujo de caja real","Contrastar vs presupuesto mensual","Revisar proyección de ingresos próxima semana"] },
         { titulo: "Cuentas por cobrar", proc: "Revisar lista de facturas emitidas: cuáles están pagadas, cuáles pendientes, cuáles vencidas. Gestionar cobro directo de las vencidas. Actualizar registro de factoring activo.", subtareas: ["Cargar estado de cobranza del día","Gestionar cobros vencidos","Actualizar registro de factoring activo"] },
@@ -884,6 +885,7 @@ async function addServicio() {
     ? (document.getElementById('srv_cliente_nuevo')?.value.trim() || '')
     : clienteSelect;
   const origen = document.getElementById('srv_origen')?.value.trim();
+  const tag = document.getElementById('srv_tag')?.value.trim() || '';
   const km = 0;
   const viaticos = 0;
   const peajes = parseInt(document.getElementById('srv_peajes')?.value) || 0;
@@ -896,7 +898,7 @@ async function addServicio() {
   const mes = partesFecha[1] || String(hoy.getMonth()+1).padStart(2,'0');
   const id = 'S' + String(appData.servicios.length + 1).padStart(2,'0');
   const guias = uiState.srv_guias || [{ num:'', destino:'', fecha_descarga:'' }];
-  const servicio = { id, fecha: fechaFinal, anio, mes, patente, conductor, tipoEquipo, cliente, precio: 0, petroleo: 0, adicional: 0, liquidado: false, origen, km, viaticos, peajes, guias };
+  const servicio = { id, fecha: fechaFinal, anio, mes, patente, conductor, tipoEquipo, cliente, precio: 0, petroleo: 0, adicional: 0, liquidado: false, origen, tag, km, viaticos, peajes, guias };
   appData.servicios.push(servicio);
   upsertServicioSupabase(servicio);
   appData.dashboard.ventas_mes = (appData.dashboard.ventas_mes || 0) + precio;
@@ -1108,8 +1110,19 @@ function renderFase(fase) {
     }
     const tieneDisponibilidad = fase.rutinarias.some(r => r.disponibilidadDiaria);
     if (!tieneDisponibilidad) {
-      fase.rutinarias.push({ titulo: 'Disponibilidad y Ocupación diaria', proc: 'Registrar el estado de cada equipo al inicio del día: Disponible, En servicio, Mantención o Puesta en marcha.', subtareas: [], disponibilidadDiaria: true, done: false });
+      // Insertar en segundo lugar
+      const idx = fase.rutinarias.findIndex(r => r.registroServicio);
+      fase.rutinarias.splice(idx + 1, 0, { titulo: 'Disponibilidad y Ocupación diaria', proc: 'Registrar el estado de cada equipo al inicio del día.', subtareas: [], disponibilidadDiaria: true, done: false });
       saveData();
+    } else {
+      // Asegurar que disponibilidad esté en segundo lugar
+      const idxReg = fase.rutinarias.findIndex(r => r.registroServicio);
+      const idxDisp = fase.rutinarias.findIndex(r => r.disponibilidadDiaria);
+      if (idxDisp !== idxReg + 1 && idxReg !== -1 && idxDisp !== -1) {
+        const disp = fase.rutinarias.splice(idxDisp, 1)[0];
+        fase.rutinarias.splice(idxReg + 1, 0, disp);
+        saveData();
+      }
     }
   }
 
@@ -1117,7 +1130,12 @@ function renderFase(fase) {
   if (fase.id === 'financiero') {
     const tieneLiquidacion = fase.rutinarias.some(r => r.liquidacionServicios);
     if (!tieneLiquidacion) {
-      fase.rutinarias.unshift({ titulo: 'Proceso Liquidación', proc: 'Revisar servicios pendientes, ingresar precio, petróleo y adicionales por cada ID.', subtareas: [], liquidacionServicios: true, done: false });
+      fase.rutinarias.unshift({ titulo: 'Avance Liquidación', proc: 'Revisar servicios con TAG asignado pendientes de agrupar en liquidación.', subtareas: [], liquidacionServicios: true, done: false });
+      saveData();
+    }
+    const tieneCierre = fase.rutinarias.some(r => r.cierreLiquidacion);
+    if (!tieneCierre) {
+      fase.rutinarias.push({ titulo: 'Cierre Liquidación', proc: 'Crear liquidación agrupando servicios por TAG o guía. Calcular total, descargar y gestionar cobro.', subtareas: [], cierreLiquidacion: true, done: false });
       saveData();
     }
   }
@@ -1333,6 +1351,10 @@ function renderFase(fase) {
             </div>
           <div style="grid-column:1/-1"><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">ORIGEN</div>
             <input id="srv_origen" placeholder="ej: San Felipe" style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit"></div>
+          <div style="grid-column:1/-1">
+            <div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">TAG <span style="font-weight:400;color:#aaa">(asignar en Financiero)</span></div>
+            <input id="srv_tag" placeholder="ej: TAG-001" style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit">
+          </div>
         </div>
 
         <div style="font-size:9px;font-weight:700;color:#607D8B;margin-bottom:5px;letter-spacing:0.5px">GUÍAS DE DESPACHO</div>
@@ -1372,6 +1394,8 @@ function renderFase(fase) {
       <div class="acord-body ${isOpen?'open':''}">
         ${liquidacionHTML}
         ${serviciosHTML}
+        ${tarea.liquidacionServicios ? `<div style="margin:-4px">${renderAvanceLiquidacion()}</div>` : ''}
+        ${tarea.cierreLiquidacion ? `<div style="margin:-4px">${renderCierreLiquidacion()}</div>` : ''}
         ${tarea.disponibilidadDiaria ? `<div style="margin:-4px">${renderDisponibilidad()}</div>` : ''}
         ${tarea.pipelineTask ? `<div style="margin-bottom:8px">${renderPipeline()}</div>` : ''}
         ${tarea.respaldoTask ? `<div style="padding:8px 0">
@@ -1470,7 +1494,6 @@ function renderFase(fase) {
   const pipelineContent = fase.id === 'comercial' ? renderPipeline() : '';
   const disponibilidadContent = fase.id === 'operacional' ? renderDisponibilidad() : '';
   const tabContent = tab==='rutinarias' ? rutHTML + addTareaHTML :
-    tab==='plan' ? planFaseHTML() :
     tab==='midia' ? miDiaContent :
     tab==='informes' ? informesContent :
     tab==='personal' ? personalContent :
@@ -1560,24 +1583,6 @@ function rowToServicio(r) {
     margen: r.margen,
     rendimiento: r.rendimiento,
   };
-}
-
-async function syncServiciosDesdeSupabase() {
-  if (!supaConectado || !supa) return;
-  try {
-    const { data, error } = await supa.from('servicios').select('*').order('created_at');
-    if (!error && data) {
-      // Migrar servicios locales a Supabase si la tabla está vacía
-      if (data.length === 0 && appData.servicios && appData.servicios.length > 0) {
-        for (const s of appData.servicios) {
-          await supa.from('servicios').insert(servicioToRow(s));
-        }
-      } else if (data.length > 0) {
-        appData.servicios = data.map(rowToServicio);
-        saveData();
-      }
-    }
-  } catch(e) { console.warn('Error sync servicios', e); }
 }
 
 async function guardarServicioSupabase(servicio) {
@@ -1735,7 +1740,7 @@ async function upsertServicioSupabase(s) {
     const row = {
       id: s.id, fecha: s.fecha, anio: s.anio||'', mes: s.mes||'',
       patente: s.patente||'', conductor: s.conductor||'',
-      tipo_equipo: s.tipoEquipo||'', cliente: s.cliente||'',
+      tipo_equipo: s.tipoEquipo||'', cliente: s.cliente||'', tag: s.tag||'',
       origen: s.origen||'', peajes: s.peajes||0,
       guias: s.guias||[], precio: s.precio||0, km: s.km||0,
       litros: s.litros||0, monto_comb: s.montoComb||0,
@@ -1749,36 +1754,6 @@ async function upsertServicioSupabase(s) {
 }
 
 // ── SYNC DISPONIBILIDAD SUPABASE ─────────────────────────
-async function syncDisponibilidadDesdeSupabase() {
-  if (!supa || !supaConectado) return;
-  try {
-    const { data, error } = await supa.from('disponibilidad').select('*');
-    if (error) { console.warn('Error sync disponibilidad:', error); return; }
-    if (!appData.disponibilidad) appData.disponibilidad = {};
-    if (data && data.length > 0) {
-      // Reconstruir estructura local {fecha: {patente: {estado,conductor,...}}}
-      data.forEach(r => {
-        if (!appData.disponibilidad[r.fecha]) appData.disponibilidad[r.fecha] = {};
-        appData.disponibilidad[r.fecha][r.patente] = {
-          estado: r.estado||'',
-          conductor: r.conductor||'',
-          tipoMant: r.tipo_mant||'',
-          mantManual: r.mant_manual||''
-        };
-      });
-      saveData();
-    } else {
-      // Migrar local a Supabase
-      const local = appData.disponibilidad || {};
-      for (const fecha of Object.keys(local)) {
-        for (const patente of Object.keys(local[fecha])) {
-          const r = local[fecha][patente];
-          await upsertDisponibilidadSupa(fecha, patente, r);
-        }
-      }
-    }
-  } catch(e) { console.warn('Error sync disponibilidad:', e); }
-}
 
 async function upsertDisponibilidadSupa(fecha, patente, r) {
   if (!supa || !supaConectado) return;
@@ -1948,7 +1923,22 @@ function renderPipeline() {
             ${ETAPAS_PIPELINE.map(e=>`<option value="${e}" ${c.etapa===e?'selected':''}>${ETAPA_LABELS[e]}</option>`).join('')}
           </select>
           <input id="pip_accion_${ci}" value="${c.proximaAccion||''}" placeholder="Próxima acción" style="border:1px solid #dde;border-radius:6px;padding:6px 9px;font-size:12px;outline:none;font-family:inherit">
-          <input id="pip_notas_${ci}" value="${c.notas||''}" placeholder="Notas" style="border:1px solid #dde;border-radius:6px;padding:6px 9px;font-size:12px;outline:none;font-family:inherit">
+        </div>
+        <!-- Notas múltiples -->
+        <div style="margin-top:8px">
+          <div style="font-size:9px;font-weight:700;color:#888;letter-spacing:0.5px;margin-bottom:4px">NOTAS</div>
+          ${(c.notasMultiples||[]).map((n,ni) => `
+            <div style="padding:6px 8px;background:#F8F9FA;border-radius:6px;margin-bottom:4px;border-left:2px solid #607D8B;position:relative">
+              <div style="font-size:9px;color:#aaa;margin-bottom:2px">${n.fecha}</div>
+              <div style="font-size:11px;color:#333;line-height:1.4">${n.texto}</div>
+              <button onclick="eliminarNotaPipeline(${ci},${ni})" style="position:absolute;top:4px;right:6px;background:none;border:none;color:#ccc;cursor:pointer;font-size:12px">×</button>
+            </div>
+          `).join('')}
+          <div style="display:flex;gap:6px;margin-top:4px">
+            <input id="pip_nota_nueva_${ci}" placeholder="Agregar nota..." style="flex:1;border:1px solid #dde;border-radius:6px;padding:6px 9px;font-size:12px;outline:none;font-family:inherit"
+                   onkeydown="if(event.key==='Enter')agregarNotaPipeline(${ci})">
+            <button onclick="agregarNotaPipeline(${ci})" style="background:#607D8B;color:white;border:none;border-radius:6px;padding:6px 12px;font-size:12px;font-weight:700;cursor:pointer">+ Nota</button>
+          </div>
         </div>
         <div style="display:flex;gap:6px;margin-top:8px">
           <button onclick="guardarPipeline(${ci})" style="flex:1;background:#607D8B;color:white;border:none;border-radius:6px;padding:7px;font-size:12px;font-weight:700;cursor:pointer">✓ Guardar</button>
@@ -2018,7 +2008,29 @@ function editarPipeline(ci) {
 }
 function cancelarEditPipeline(ci) { delete uiState[`pip_edit_${ci}`]; render(); }
 function cancelarAddPipeline() { delete uiState['pip_add']; render(); }
-async function guardarPipeline(ci) {
+async function agregarNotaPipeline(ci) {
+  const input = document.getElementById('pip_nota_nueva_' + ci);
+  if (!input || !input.value.trim()) return;
+  const lista = appData.pipeline;
+  if (!lista[ci].notasMultiples) lista[ci].notasMultiples = [];
+  const hoy = new Date();
+  const fecha = `${String(hoy.getDate()).padStart(2,'0')}-${String(hoy.getMonth()+1).padStart(2,'0')}-${hoy.getFullYear()}`;
+  lista[ci].notasMultiples.push({ fecha, texto: input.value.trim() });
+  guardarPipelineSupabase(lista[ci]);
+  saveData();
+  render();
+}
+
+function eliminarNotaPipeline(ci, ni) {
+  const lista = appData.pipeline;
+  if (!lista[ci].notasMultiples) return;
+  lista[ci].notasMultiples.splice(ni, 1);
+  guardarPipelineSupabase(lista[ci]);
+  saveData();
+  render();
+}
+
+function guardarPipeline(ci) {
   if (!appData.pipeline) appData.pipeline = [];
   const item = appData.pipeline[ci];
   appData.pipeline[ci] = {
@@ -2200,41 +2212,72 @@ function renderInformes() {
   }
 
   function contenidoOperacional() {
-    const porCamion = {}, porConductor = {};
+    const FLOTA = appData.patentes || ['GKFD84','WR9192','XR8555','GCFF12','BPBL35','XA1114','DSDV36'];
+
+    // Por equipo (flota completa)
+    const porPatente = {};
+    FLOTA.forEach(p => porPatente[p] = { servicios:0, km:0, ingresos:0, conductores:new Set() });
     filtrados.forEach(s => {
-      const p = s.patente || 'Sin patente';
+      const p = s.patente || 'TERCERO';
+      if (!porPatente[p]) porPatente[p] = { servicios:0, km:0, ingresos:0, conductores:new Set() };
+      porPatente[p].servicios++;
+      porPatente[p].km += s.km||0;
+      porPatente[p].ingresos += s.precio||0;
+      if (s.conductor) porPatente[p].conductores.add(s.conductor);
+    });
+
+    // Días en mantención por patente
+    const dispData = appData.disponibilidad || {};
+    const diasMant = {};
+    FLOTA.forEach(p => diasMant[p] = 0);
+    Object.values(dispData).forEach(diaObj => {
+      Object.entries(diaObj).forEach(([pat, reg]) => {
+        if (reg.estado === 'Mantención') diasMant[pat] = (diasMant[pat]||0) + 1;
+      });
+    });
+
+    // Por conductor
+    const porConductor = {};
+    filtrados.forEach(s => {
       const c = s.conductor || 'Sin conductor';
-      if (!porCamion[p]) porCamion[p] = { servicios:0, km:0, litros:0 };
       if (!porConductor[c]) porConductor[c] = { servicios:0, km:0 };
-      porCamion[p].servicios++;
-      porCamion[p].km += s.km||0;
-      porCamion[p].litros += s.litros||0;
       porConductor[c].servicios++;
       porConductor[c].km += s.km||0;
     });
-    return `<div style="font-size:9px;font-weight:700;color:#455A64;margin-bottom:8px;letter-spacing:0.5px">POR CAMIÓN</div>
-    ${Object.entries(porCamion).sort((a,b)=>b[1].servicios-a[1].servicios).map(([p,d])=>`
-      <div style="padding:10px 12px;background:#F8F9FA;border-radius:8px;margin-bottom:6px;border-left:3px solid #455A64">
-        <div style="display:flex;justify-content:space-between">
+
+    const equiposHTML = FLOTA.map(p => {
+      const d = porPatente[p];
+      const conductList = [...d.conductores].join(', ') || '—';
+      return `<div style="padding:10px 12px;background:#F8F9FA;border-radius:8px;margin-bottom:6px;border-left:3px solid #455A64">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px">
           <span style="font-size:12px;font-weight:700;color:#333">${p}</span>
-          <span style="font-size:11px;color:#607D8B">${d.servicios} servicio${d.servicios!==1?'s':''}</span>
+          <span style="font-size:11px;font-weight:700;color:#455A64">${d.servicios} servicio${d.servicios!==1?'s':''}</span>
         </div>
-        <div style="display:flex;gap:8px;margin-top:3px;flex-wrap:wrap">
-          ${d.km?`<span style="font-size:9px;background:#E3F2FD;color:#1565C0;padding:2px 6px;border-radius:6px">${d.km.toLocaleString()} km</span>`:''}
-          ${d.litros?`<span style="font-size:9px;background:#F3E5F5;color:#6A1B9A;padding:2px 6px;border-radius:6px">${(d.km/d.litros).toFixed(1)} km/L</span>`:''}
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px">
+          <div style="font-size:10px;color:#777">KM: <strong style="color:#333">${d.km>0?d.km.toLocaleString():'Sin dato'}</strong></div>
+          <div style="font-size:10px;color:#777">Ingresos: <strong style="color:#333">${d.ingresos>0?'$'+d.ingresos.toLocaleString():'—'}</strong></div>
+          <div style="font-size:10px;color:#E65100">Días mantención: <strong>${diasMant[p]||0}</strong></div>
+          <div style="font-size:10px;color:#777">Conductor: <strong style="color:#333">${conductList}</strong></div>
         </div>
-      </div>`).join('') || '<div style="color:#aaa;font-size:12px;text-align:center;padding:10px">Sin datos</div>'}
-    <div style="font-size:9px;font-weight:700;color:#455A64;margin:12px 0 8px;letter-spacing:0.5px">POR CONDUCTOR</div>
-    ${Object.entries(porConductor).sort((a,b)=>b[1].servicios-a[1].servicios).map(([c,d])=>`
-      <div style="padding:10px 12px;background:#F8F9FA;border-radius:8px;margin-bottom:6px;border-left:3px solid #607D8B">
-        <div style="display:flex;justify-content:space-between">
-          <span style="font-size:12px;font-weight:700;color:#333">${c}</span>
-          <span style="font-size:11px;color:#607D8B">${d.servicios} servicio${d.servicios!==1?'s':''}</span>
-        </div>
-        ${d.km?`<div style="font-size:10px;color:#777;margin-top:2px">${d.km.toLocaleString()} km</div>`:''}
-      </div>`).join('') || '<div style="color:#aaa;font-size:12px;text-align:center;padding:10px">Sin datos</div>'}`;
+      </div>`;
+    }).join('');
+
+    const conductoresHTML = Object.entries(porConductor).sort((a,b)=>b[1].servicios-a[1].servicios).map(([c,d]) =>
+      `<div style="padding:8px 12px;background:#F8F9FA;border-radius:8px;margin-bottom:5px;border-left:3px solid #607D8B;display:flex;justify-content:space-between">
+        <span style="font-size:11px;font-weight:700;color:#333">${c}</span>
+        <span style="font-size:11px;color:#455A64;font-weight:700">${d.servicios} servicios${d.km?' · '+d.km.toLocaleString()+' km':''}</span>
+      </div>`
+    ).join('');
+
+    return `
+      <div style="font-size:9px;font-weight:700;color:#455A64;letter-spacing:0.5px;margin-bottom:8px">INDICADORES POR EQUIPO</div>
+      ${equiposHTML}
+      <div style="font-size:9px;font-weight:700;color:#607D8B;letter-spacing:0.5px;margin:12px 0 8px">SERVICIOS POR CONDUCTOR</div>
+      ${conductoresHTML||'<div style="color:#aaa;font-size:11px;text-align:center;padding:8px">Sin datos</div>'}
+    `;
   }
 
+  
   function contenidoFinanciero() {
     const pe = appData.dashboard.meta_pe || 20320000;
     const pct = totalIngresos > 0 ? Math.min(Math.round(totalIngresos/pe*100),100) : 0;
@@ -2403,6 +2446,212 @@ function renderInformes() {
   </div>`;
 }
 
+// ── MÓDULO AVANCE LIQUIDACIÓN ─────────────────────────────
+function renderAvanceLiquidacion() {
+  const servicios = appData.servicios || [];
+  const pendientes = servicios.filter(s => !s.enLiquidacion && !s.liquidacionId);
+  
+  if (pendientes.length === 0) {
+    return `<div style="text-align:center;padding:16px;color:#aaa;font-size:11px">Sin servicios pendientes de liquidar</div>`;
+  }
+
+  // Agrupar por TAG
+  const porTag = {};
+  pendientes.forEach(s => {
+    const tag = s.tag || 'Sin TAG';
+    if (!porTag[tag]) porTag[tag] = [];
+    porTag[tag].push(s);
+  });
+
+  return `<div style="padding:2px">
+    <div style="font-size:9px;font-weight:700;color:#546E7A;letter-spacing:0.5px;margin-bottom:8px">SERVICIOS PENDIENTES DE LIQUIDAR</div>
+    ${Object.entries(porTag).map(([tag, svcs]) => {
+      const total = svcs.reduce((a,s) => a+( s.precio||0), 0);
+      const isOpen = !!uiState['avliq_tag_' + tag];
+      return `<div style="border:1px solid #dde;border-radius:8px;margin-bottom:6px;overflow:hidden">
+        <div onclick="uiState['avliq_tag_${tag}']=!uiState['avliq_tag_${tag}'];render()" 
+             style="padding:10px 12px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;background:#F8F9FA">
+          <div>
+            <div style="font-size:11px;font-weight:700;color:#333">TAG: ${tag}</div>
+            <div style="font-size:9px;color:#888;margin-top:1px">${svcs.length} servicio${svcs.length!==1?'s':''}</div>
+          </div>
+          <div style="display:flex;gap:6px;align-items:center">
+            <span style="font-size:11px;font-weight:700;color:#546E7A">$${total.toLocaleString()}</span>
+            <span style="font-size:10px;color:#aaa">${isOpen?'▲':'▼'}</span>
+          </div>
+        </div>
+        ${isOpen ? `<div style="padding:8px 12px">
+          ${svcs.map(s => {
+            const guias = (s.guias||[]).map(g=>g.num).filter(Boolean).join(', ') || '—';
+            return `<div style="padding:6px 0;border-bottom:1px solid #f5f5f5;display:flex;justify-content:space-between;align-items:center">
+              <div>
+                <div style="font-size:11px;font-weight:700;color:#333">${s.id} — ${s.cliente||'—'}</div>
+                <div style="font-size:9px;color:#777">${s.fecha} · ${s.patente} · Guías: ${guias}</div>
+              </div>
+              <div style="text-align:right">
+                <div style="font-size:11px;font-weight:700;color:#546E7A">$${(s.precio||0).toLocaleString()}</div>
+                <div style="font-size:9px;color:${s.tag?'#2E7D32':'#E65100'}">${s.tag?'TAG: '+s.tag:'Sin TAG'}</div>
+              </div>
+            </div>`;
+          }).join('')}
+          <div style="margin-top:8px">
+            <button onclick="prepararCierreLiquidacion('${tag}')" 
+                    style="width:100%;padding:9px;background:#546E7A;color:white;border:none;border-radius:7px;font-size:11px;font-weight:700;cursor:pointer">
+              → Crear liquidación con este TAG
+            </button>
+          </div>
+        </div>` : ''}
+      </div>`;
+    }).join('')}
+  </div>`;
+}
+
+// ── MÓDULO CIERRE LIQUIDACIÓN ──────────────────────────────
+function renderCierreLiquidacion() {
+  if (!appData.liquidaciones) appData.liquidaciones = [];
+  const lf = uiState.liq_form || {};
+  const liquidaciones = appData.liquidaciones;
+  const servicios = appData.servicios || [];
+
+  // Generar número de liquidación
+  const nextNum = 'LIQ-' + String(liquidaciones.length + 1).padStart(3, '0');
+  const hoyISO = (() => { const h=new Date(); return `${h.getFullYear()}-${String(h.getMonth()+1).padStart(2,'0')}-${String(h.getDate()).padStart(2,'0')}`; })();
+
+  // Servicios disponibles para adjuntar
+  const disponibles = servicios.filter(s => !s.liquidacionId);
+  const adjuntados = (lf.serviciosIds||[]).map(id => servicios.find(s=>s.id===id)).filter(Boolean);
+  const totalLiq = adjuntados.reduce((a,s)=>a+(s.precio||0),0);
+
+  const svcOpts = disponibles.map(s => {
+    const guias = (s.guias||[]).map(g=>g.num).filter(Boolean).join(',') || '—';
+    return `<option value="${s.id}">${s.id} — ${s.cliente||'—'} — Guía ${guias} — $${(s.precio||0).toLocaleString()}</option>`;
+  }).join('');
+
+  const formHTML = `<div style="padding:10px 12px;background:#f4f6f8;border-radius:10px;border:1px solid #dde4e8;margin-bottom:12px">
+    <div style="font-size:10px;font-weight:700;color:#546E7A;letter-spacing:1px;margin-bottom:8px;padding-bottom:5px;border-bottom:2px solid #CFD8DC">
+      NUEVA LIQUIDACIÓN — ${nextNum}
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px">
+      <div>
+        <div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">FECHA</div>
+        <input id="liq_fecha_nueva" type="date" value="${lf.fecha||hoyISO}" 
+               onchange="uiState.liq_form=uiState.liq_form||{};uiState.liq_form.fecha=this.value"
+               style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit;background:white">
+      </div>
+      <div>
+        <div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">EMAIL CLIENTE</div>
+        <input id="liq_email" type="email" value="${lf.email||''}" placeholder="cliente@empresa.cl"
+               onchange="uiState.liq_form=uiState.liq_form||{};uiState.liq_form.email=this.value"
+               style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit;background:white">
+      </div>
+    </div>
+
+    <div style="font-size:9px;font-weight:700;color:#888;margin-bottom:4px">ADJUNTAR SERVICIO POR ID O GUÍA</div>
+    <div style="display:flex;gap:6px;margin-bottom:8px">
+      <select id="liq_svc_select" style="flex:1;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:11px;outline:none;font-family:inherit;background:white;-webkit-appearance:auto">
+        <option value="">Seleccionar servicio...</option>
+        ${svcOpts}
+      </select>
+      <button onclick="adjuntarServicioLiq()" 
+              style="background:#546E7A;color:white;border:none;border-radius:6px;padding:7px 12px;font-size:12px;font-weight:700;cursor:pointer">+ Agregar</button>
+    </div>
+
+    ${adjuntados.length > 0 ? `
+    <div style="background:white;border:1px solid #dde;border-radius:8px;margin-bottom:8px;overflow:hidden">
+      <div style="font-size:9px;font-weight:700;color:#546E7A;padding:6px 10px;background:#ECEFF1;letter-spacing:0.5px">SERVICIOS ADJUNTADOS</div>
+      ${adjuntados.map(s => {
+        const guias = (s.guias||[]).map(g=>g.num).filter(Boolean).join(', ') || '—';
+        return `<div style="padding:7px 10px;border-bottom:1px solid #f5f5f5;display:flex;justify-content:space-between;align-items:center">
+          <div>
+            <div style="font-size:11px;font-weight:700;color:#333">${s.id} — ${s.cliente||'—'}</div>
+            <div style="font-size:9px;color:#777">${s.fecha} · Guías: ${guias} · ${s.patente}</div>
+          </div>
+          <div style="display:flex;gap:6px;align-items:center">
+            <span style="font-size:11px;font-weight:700;color:#546E7A">$${(s.precio||0).toLocaleString()}</span>
+            <button onclick="quitarServicioLiq('${s.id}')" style="background:none;border:none;color:#ccc;cursor:pointer;font-size:14px">×</button>
+          </div>
+        </div>`;
+      }).join('')}
+      <div style="padding:8px 10px;background:#F8F9FA;display:flex;justify-content:space-between">
+        <span style="font-size:11px;font-weight:700;color:#333">TOTAL LIQUIDACIÓN</span>
+        <span style="font-size:14px;font-weight:900;color:#546E7A">$${totalLiq.toLocaleString()}</span>
+      </div>
+    </div>` : ''}
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+      <button onclick="crearLiquidacion()" 
+              style="grid-column:1/-1;padding:10px;background:#546E7A;color:white;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer">
+        💾 Crear liquidación ${nextNum}
+      </button>
+      ${adjuntados.length > 0 ? `
+      <button onclick="descargarLiquidacion()" 
+              style="padding:9px;background:#37474F;color:white;border:none;border-radius:7px;font-size:11px;font-weight:700;cursor:pointer">
+        📥 Descargar
+      </button>
+      <button onclick="enviarLiquidacionMail()" 
+              style="padding:9px;background:#1565C0;color:white;border:none;border-radius:7px;font-size:11px;font-weight:700;cursor:pointer">
+        📤 Enviar por correo
+      </button>` : ''}
+    </div>
+  </div>
+
+  <!-- Liquidaciones existentes -->
+  ${liquidaciones.length === 0 ? '<div style="text-align:center;color:#aaa;font-size:11px;padding:12px">Sin liquidaciones creadas aún</div>' :
+  `<div style="font-size:9px;font-weight:700;color:#888;letter-spacing:0.5px;margin-bottom:8px">LIQUIDACIONES CREADAS</div>` +
+  liquidaciones.slice().reverse().map(liq => {
+    const isOpen = !!uiState['liq_open_' + liq.id];
+    const ESTADO_COLOR = {
+      'creada':    { bg:'#FFF9C4', text:'#F9A825', label:'⏳ Creada' },
+      'enviada':   { bg:'#E3F2FD', text:'#1565C0', label:'📤 Enviada' },
+      'facturada': { bg:'#F3E5F5', text:'#6A1B9A', label:'🧾 Facturada' },
+      'pagada':    { bg:'#E8F5E9', text:'#2E7D32', label:'✅ Pagada' },
+    };
+    const ec = ESTADO_COLOR[liq.estado] || ESTADO_COLOR['creada'];
+    const svcsLiq = (liq.serviciosIds||[]).map(id => servicios.find(s=>s.id===id)).filter(Boolean);
+    
+    return `<div style="border:1px solid #dde;border-radius:8px;margin-bottom:6px;overflow:hidden">
+      <div onclick="uiState['liq_open_${liq.id}']=!uiState['liq_open_${liq.id}'];render()" 
+           style="padding:10px 12px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;background:#F8F9FA">
+        <div>
+          <div style="font-size:12px;font-weight:700;color:#333">${liq.id}</div>
+          <div style="font-size:9px;color:#888">${liq.fecha} · ${svcsLiq.length} servicio${svcsLiq.length!==1?'s':''}</div>
+        </div>
+        <div style="display:flex;gap:6px;align-items:center">
+          <span style="font-size:9px;font-weight:700;padding:2px 8px;border-radius:6px;background:${ec.bg};color:${ec.text}">${ec.label}</span>
+          <span style="font-size:11px;font-weight:700;color:#546E7A">$${(liq.total||0).toLocaleString()}</span>
+          <span style="font-size:10px;color:#aaa">${isOpen?'▲':'▼'}</span>
+        </div>
+      </div>
+      ${isOpen ? `<div style="padding:10px 12px">
+        ${svcsLiq.map(s => {
+          const guias = (s.guias||[]).map(g=>g.num).filter(Boolean).join(', ') || '—';
+          return `<div style="padding:5px 0;border-bottom:1px solid #f5f5f5;font-size:11px;color:#555">
+            <strong style="color:#333">${s.id}</strong> — ${s.cliente||'—'} — Guías: ${guias} — <strong>$${(s.precio||0).toLocaleString()}</strong>
+          </div>`;
+        }).join('')}
+        
+        <!-- Botones de estado -->
+        <div style="display:flex;gap:5px;margin-top:10px;flex-wrap:wrap">
+          ${liq.estado !== 'enviada' && liq.estado !== 'facturada' && liq.estado !== 'pagada' ? 
+            `<button onclick="cambiarEstadoLiq('${liq.id}','enviada')" style="flex:1;padding:8px;background:#E3F2FD;color:#1565C0;border:1px solid #1565C0;border-radius:7px;font-size:10px;font-weight:700;cursor:pointer">📤 Marcar enviada</button>` : ''}
+          ${liq.estado === 'enviada' ? 
+            `<button onclick="cambiarEstadoLiq('${liq.id}','facturada')" style="flex:1;padding:8px;background:#F3E5F5;color:#6A1B9A;border:1px solid #6A1B9A;border-radius:7px;font-size:10px;font-weight:700;cursor:pointer">🧾 Marcar facturada</button>` : ''}
+          ${liq.estado === 'facturada' ? `
+            <input id="factura_${liq.id}" placeholder="N° factura" value="${liq.nFactura||''}" 
+                   style="flex:1;border:1px solid #6A1B9A;border-radius:7px;padding:7px;font-size:11px;outline:none"
+                   onchange="appData.liquidaciones.find(l=>l.id==='${liq.id}').nFactura=this.value;saveData()">
+            <button onclick="cambiarEstadoLiq('${liq.id}','pagada')" style="padding:8px 12px;background:#E8F5E9;color:#2E7D32;border:1px solid #2E7D32;border-radius:7px;font-size:10px;font-weight:700;cursor:pointer">✅ Marcar pagada</button>
+          ` : ''}
+          <button onclick="descargarLiquidacionExistente('${liq.id}')" style="padding:8px 12px;background:#ECEFF1;color:#37474F;border:1px solid #CFD8DC;border-radius:7px;font-size:10px;font-weight:700;cursor:pointer">📥 Descargar</button>
+          <button onclick="enviarLiquidacionMailExistente('${liq.id}')" style="padding:8px 12px;background:#ECEFF1;color:#1565C0;border:1px solid #CFD8DC;border-radius:7px;font-size:10px;font-weight:700;cursor:pointer">📤 Correo</button>
+        </div>
+      </div>` : ''}
+    </div>`;
+  }).join('')}`;
+
+  return `<div style="padding:2px">${formHTML}</div>`;
+}
+
 function renderDisponibilidad() {
   if (!appData.disponibilidad) appData.disponibilidad = {};
   const FLOTA = appData.patentes || ['GKFD84','WR9192','XR8555','GCFF12','BPBL35','XA1114','DSDV36'];
@@ -2441,7 +2690,7 @@ function renderDisponibilidad() {
       </div>
       <div>
         <div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">ESTADO</div>
-        <select id="disp_estado" onchange="uiState.disp_form=uiState.disp_form||{};uiState.disp_form.estado=this.value;render()" style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit;background:white;-webkit-appearance:auto">
+        <select id="disp_estado" onchange="uiState.disp_form=uiState.disp_form||{};uiState.disp_form.patente=document.getElementById('disp_patente')?.value||uiState.disp_form.patente||'';uiState.disp_form.fecha=document.getElementById('disp_fecha')?.value||uiState.disp_form.fecha||'';uiState.disp_form.estado=this.value;render()" style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit;background:white;-webkit-appearance:auto">
           <option value="">Seleccionar...</option>
           ${estadoOpts}
         </select>
@@ -2455,7 +2704,7 @@ function renderDisponibilidad() {
       </div>` : ''}
       ${fd.estado==='Mantención' ? `<div>
         <div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">TIPO MANTENCIÓN</div>
-        <select id="disp_tipo_mant" onchange="uiState.disp_form=uiState.disp_form||{};uiState.disp_form.tipoMant=this.value;render()" style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit;background:white;-webkit-appearance:auto">
+        <select id="disp_tipo_mant" onchange="uiState.disp_form=uiState.disp_form||{};uiState.disp_form.patente=document.getElementById('disp_patente')?.value||uiState.disp_form.patente||'';uiState.disp_form.fecha=document.getElementById('disp_fecha')?.value||uiState.disp_form.fecha||'';uiState.disp_form.tipoMant=this.value;render()" style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit;background:white;-webkit-appearance:auto">
           <option value="">Seleccionar tipo...</option>
           ${tipoMantOpts}
         </select>
@@ -2525,6 +2774,153 @@ function descargarRespaldo() {
   const a = document.createElement('a');
   a.href = url; a.download = nombreArchivo; a.click();
   URL.revokeObjectURL(url);
+}
+
+// ── FUNCIONES LIQUIDACIÓN ─────────────────────────────────
+function adjuntarServicioLiq() {
+  const sel = document.getElementById('liq_svc_select');
+  if (!sel || !sel.value) return;
+  if (!uiState.liq_form) uiState.liq_form = {};
+  if (!uiState.liq_form.serviciosIds) uiState.liq_form.serviciosIds = [];
+  if (!uiState.liq_form.serviciosIds.includes(sel.value)) {
+    uiState.liq_form.serviciosIds.push(sel.value);
+  }
+  render();
+}
+
+function quitarServicioLiq(svcId) {
+  if (!uiState.liq_form || !uiState.liq_form.serviciosIds) return;
+  uiState.liq_form.serviciosIds = uiState.liq_form.serviciosIds.filter(id => id !== svcId);
+  render();
+}
+
+function prepararCierreLiquidacion(tag) {
+  // Pre-cargar servicios del TAG en el formulario de cierre
+  const servicios = (appData.servicios||[]).filter(s => s.tag === tag && !s.liquidacionId);
+  uiState.liq_form = { serviciosIds: servicios.map(s=>s.id), fecha: null, email: '' };
+  // Abrir tarea Cierre Liquidación
+  const fase = appData.fases.find(f => f.id === 'financiero');
+  if (fase) {
+    const idx = fase.rutinarias.findIndex(r => r.cierreLiquidacion);
+    if (idx !== -1) {
+      uiState['acord_financiero_' + idx] = true;
+    }
+  }
+  render();
+}
+
+function crearLiquidacion() {
+  const lf = uiState.liq_form || {};
+  if (!lf.serviciosIds || lf.serviciosIds.length === 0) return alert('Agrega al menos un servicio');
+  if (!appData.liquidaciones) appData.liquidaciones = [];
+  
+  const fecha = document.getElementById('liq_fecha_nueva')?.value || new Date().toISOString().split('T')[0];
+  const email = document.getElementById('liq_email')?.value || '';
+  const p = fecha.split('-');
+  const fechaStr = `${p[2]}-${p[1]}-${p[0]}`;
+  const id = 'LIQ-' + String(appData.liquidaciones.length + 1).padStart(3,'0');
+  const servicios = appData.servicios || [];
+  const total = lf.serviciosIds.reduce((a,sid) => {
+    const s = servicios.find(sv=>sv.id===sid);
+    return a + (s?s.precio||0:0);
+  }, 0);
+
+  const nuevaLiq = { id, fecha: fechaStr, email, serviciosIds: [...lf.serviciosIds], total, estado: 'creada', nFactura: '' };
+  appData.liquidaciones.push(nuevaLiq);
+
+  // Marcar servicios como liquidados
+  lf.serviciosIds.forEach(sid => {
+    const s = servicios.find(sv=>sv.id===sid);
+    if (s) { s.liquidacionId = id; upsertServicioSupabase(s); }
+  });
+
+  uiState.liq_form = {};
+  saveData();
+  render();
+  alert('✅ Liquidación ' + id + ' creada correctamente');
+}
+
+function cambiarEstadoLiq(liqId, nuevoEstado) {
+  const liq = (appData.liquidaciones||[]).find(l=>l.id===liqId);
+  if (!liq) return;
+  liq.estado = nuevoEstado;
+  saveData();
+  render();
+}
+
+function _armarTextoLiquidacion(liq) {
+  const servicios = appData.servicios || [];
+  const svcs = (liq.serviciosIds||[]).map(id => servicios.find(s=>s.id===id)).filter(Boolean);
+  let lineas = `LIQUIDACIÓN ${liq.id}\nFecha: ${liq.fecha}\n\n`;
+  lineas += `DETALLE DE SERVICIOS:\n`;
+  svcs.forEach(s => {
+    const guias = (s.guias||[]).map(g=>g.num).filter(Boolean).join(', ')||'—';
+    lineas += `• ${s.id} | ${s.cliente||'—'} | ${s.fecha} | Guías: ${guias} | $${(s.precio||0).toLocaleString()}\n`;
+  });
+  lineas += `\nTOTAL: $${(liq.total||0).toLocaleString()}\n`;
+  if (liq.nFactura) lineas += `Factura N°: ${liq.nFactura}\n`;
+  return lineas;
+}
+
+function descargarLiquidacion() {
+  const lf = uiState.liq_form || {};
+  const servicios = appData.servicios || [];
+  const svcs = (lf.serviciosIds||[]).map(id => servicios.find(s=>s.id===id)).filter(Boolean);
+  const total = svcs.reduce((a,s)=>a+(s.precio||0),0);
+  const nextNum = 'LIQ-' + String((appData.liquidaciones||[]).length + 1).padStart(3,'0');
+  let texto = `LIQUIDACIÓN ${nextNum}\n`;
+  texto += `Fecha: ${lf.fecha||''}\n\nDETALLE:\n`;
+  svcs.forEach(s => {
+    const guias = (s.guias||[]).map(g=>g.num).filter(Boolean).join(', ')||'—';
+    texto += `• ${s.id} | ${s.cliente||'—'} | ${s.fecha} | Guías: ${guias} | $${(s.precio||0).toLocaleString()}\n`;
+  });
+  texto += `\nTOTAL: $${total.toLocaleString()}`;
+  const blob = new Blob([texto], {type:'text/plain;charset=utf-8'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = `${nextNum}.txt`; a.click();
+  URL.revokeObjectURL(url);
+}
+
+function descargarLiquidacionExistente(liqId) {
+  const liq = (appData.liquidaciones||[]).find(l=>l.id===liqId);
+  if (!liq) return;
+  const texto = _armarTextoLiquidacion(liq);
+  const blob = new Blob([texto], {type:'text/plain;charset=utf-8'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = `${liq.id}.txt`; a.click();
+  URL.revokeObjectURL(url);
+}
+
+function enviarLiquidacionMail() {
+  const lf = uiState.liq_form || {};
+  const email = document.getElementById('liq_email')?.value || '';
+  const servicios = appData.servicios || [];
+  const svcs = (lf.serviciosIds||[]).map(id => servicios.find(s=>s.id===id)).filter(Boolean);
+  const total = svcs.reduce((a,s)=>a+(s.precio||0),0);
+  const nextNum = 'LIQ-' + String((appData.liquidaciones||[]).length + 1).padStart(3,'0');
+  let cuerpo = `Estimado cliente,%0D%0A%0D%0AAdjuntamos liquidación ${nextNum}.%0D%0A%0D%0ADETALLE:%0D%0A`;
+  svcs.forEach(s => {
+    const guias = (s.guias||[]).map(g=>g.num).filter(Boolean).join(', ')||'—';
+    cuerpo += `• ${s.id} | ${s.cliente||'—'} | ${s.fecha} | Guías: ${guias} | $${(s.precio||0).toLocaleString()}%0D%0A`;
+  });
+  cuerpo += `%0D%0ATOTAL: $${total.toLocaleString()}%0D%0A%0D%0ASaludos,%0D%0AGlobal Solutions SpA`;
+  window.location.href = `mailto:${email}?subject=Liquidación ${nextNum} — Global Solutions SpA&body=${cuerpo}`;
+}
+
+function enviarLiquidacionMailExistente(liqId) {
+  const liq = (appData.liquidaciones||[]).find(l=>l.id===liqId);
+  if (!liq) return;
+  const servicios = appData.servicios || [];
+  const svcs = (liq.serviciosIds||[]).map(id => servicios.find(s=>s.id===id)).filter(Boolean);
+  let cuerpo = `Estimado cliente,%0D%0A%0D%0AAdjuntamos liquidación ${liq.id}.%0D%0A%0D%0ADETALLE:%0D%0A`;
+  svcs.forEach(s => {
+    const guias = (s.guias||[]).map(g=>g.num).filter(Boolean).join(', ')||'—';
+    cuerpo += `• ${s.id} | ${s.cliente||'—'} | ${s.fecha} | Guías: ${guias} | $${(s.precio||0).toLocaleString()}%0D%0A`;
+  });
+  cuerpo += `%0D%0ATOTAL: $${(liq.total||0).toLocaleString()}%0D%0A%0D%0ASaludos,%0D%0AGlobal Solutions SpA`;
+  window.location.href = `mailto:${liq.email||''}?subject=Liquidación ${liq.id} — Global Solutions SpA&body=${cuerpo}`;
 }
 
 function guardarDisponibilidad() {
