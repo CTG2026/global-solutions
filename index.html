@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-  <meta name="version" content="2026031402">
+  <meta name="version" content="2026031403">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Panel de Gestión — Global Solutions</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -3301,7 +3301,7 @@ function render() {
 
 // ============ SISTEMA DE LOGIN ============
 const ROLES = [
-  { id: 'cgestion',   nombre: 'Controler',     pin: '0001', acceso: 'todo' },
+  { id: 'cgestion',   nombre: 'Controler',     pin: '0001', acceso: 'all' },
   { id: 'coordinador',nombre: 'Coordinador',   pin: '0002', acceso: 'all' },
   { id: 'mantenimiento', nombre: 'Mantenimiento', pin: '0003', acceso: 'operacional' },
   { id: 'admin',      nombre: 'Administrativo',pin: '0004', acceso: 'all' },
@@ -3435,52 +3435,59 @@ function cerrarSesion() {
 
 function aplicarAcceso() {
   if (!sessionRol) { mostrarLogin(); return; }
+
+  // Mostrar panel, ocultar login
   document.getElementById('login-screen').style.display = 'none';
   document.querySelector('.container').style.display = 'block';
-  // Forzar render primero para que existan los botones en el DOM
-  render();
+
   // Mostrar nombre en topbar
   const info = document.getElementById('session-info');
-  if (info) {
-    const nombre = sessionConductor || sessionRol.nombre;
-    info.textContent = nombre.toUpperCase();
-  }
+  if (info) info.textContent = (sessionConductor || sessionRol.nombre).toUpperCase();
+
   const acceso = sessionRol.acceso;
+
   if (acceso === 'conductor') {
-    // Ocultar todos los filtros excepto Operacional
-    document.querySelectorAll('.filter-btn').forEach(b => {
-      b.style.display = 'none';
-    });
-    // Activar vista operacional directamente
+    // Conductor: solo ve operacional y hoja de servicio
     vistaActual = 'operacional';
     render();
-    // Abrir acordeón de registro de servicio automáticamente
     setTimeout(() => {
+      // Ocultar todos los filtros
+      document.querySelectorAll('.filter-btn').forEach(b => b.style.display = 'none');
+      // Abrir hoja de servicio automáticamente
       const fase = appData.fases.find(f => f.id === 'operacional');
       if (fase) {
         const idx = fase.rutinarias.findIndex(r => r.registroServicio);
-        if (idx !== -1) {
-          uiState[`acord_operacional_${idx}`] = true;
-          render();
-        }
+        if (idx !== -1) { uiState['acord_operacional_' + idx] = true; render(); }
       }
     }, 100);
-  } else {
+
+  } else if (acceso === 'all') {
+    // Acceso total: mostrar todo
+    vistaActual = 'todas';
     render();
-    // Aplicar filtros después del render para que los botones existan en el DOM
     setTimeout(() => {
       document.querySelectorAll('.filter-btn').forEach(b => b.style.display = '');
-      if (acceso !== 'all') {
-        const permitidos = acceso.split(',').map(a => a.trim());
-        document.querySelectorAll('.filter-btn').forEach(b => {
-          const oc = b.getAttribute('onclick') || '';
-          const m = oc.match(/filtrar\('([^']+)'/);
-          const v = m ? m[1] : null;
-          if (v && v !== 'todas' && v !== 'control' && v !== 'scalingup' && !permitidos.includes(v)) {
-            b.style.display = 'none';
-          }
-        });
-      }
+    }, 50);
+
+  } else {
+    // Acceso parcial: mostrar solo ámbitos permitidos
+    const permitidos = acceso.split(',').map(a => a.trim());
+    vistaActual = 'todas';
+    render();
+    setTimeout(() => {
+      document.querySelectorAll('.filter-btn').forEach(b => {
+        const oc = b.getAttribute('onclick') || '';
+        const m = oc.match(/filtrar\('([^']+)'/);
+        const v = m ? m[1] : null;
+        // Siempre mostrar Todos y Control
+        if (!v || v === 'todas' || v === 'control' || v === 'scalingup') {
+          b.style.display = '';
+        } else if (permitidos.includes(v)) {
+          b.style.display = '';
+        } else {
+          b.style.display = 'none';
+        }
+      });
     }, 50);
   }
 }
@@ -3488,20 +3495,10 @@ function aplicarAcceso() {
 
 loadData(); iniciarLogin(); initSupabase();
 
-// Service Worker — forzar actualización automática
+// Desregistrar cualquier Service Worker anterior
 if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('/global-solutions/sw.js').then(reg => {
-    reg.addEventListener('updatefound', () => {
-      const newWorker = reg.installing;
-      newWorker.addEventListener('statechange', () => {
-        if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-          newWorker.postMessage({ action: 'skipWaiting' });
-        }
-      });
-    });
-  });
-  navigator.serviceWorker.addEventListener('controllerchange', () => {
-    window.location.reload();
+  navigator.serviceWorker.getRegistrations().then(regs => {
+    regs.forEach(reg => reg.unregister());
   });
 }
 </script>
