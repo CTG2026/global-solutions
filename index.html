@@ -2030,7 +2030,7 @@ function eliminarNotaPipeline(ci, ni) {
   render();
 }
 
-function guardarPipeline(ci) {
+async function guardarPipeline(ci) {
   if (!appData.pipeline) appData.pipeline = [];
   const item = appData.pipeline[ci];
   appData.pipeline[ci] = {
