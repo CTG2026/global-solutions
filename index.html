@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-  <meta name="version" content="2026031838">
+  <meta name="version" content="2026031843">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Panel de Gestión — Global Solutions</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -304,7 +304,7 @@
       <button class="copy-btn" onclick="exportarDatos()" style="background:#37474F;border-color:#546E7A;font-size:11px;padding:8px 14px">⬇ Exportar</button>
       <label class="copy-btn" style="background:#37474F;border-color:#546E7A;font-size:11px;padding:8px 14px;cursor:pointer">⬆ Importar<input type="file" accept=".json" onchange="importarDatos(event)" style="display:none"></label>
     </div>
-    <div class="footer">v38b · Marzo 2026 · Global Solutions SpA</div>
+    <div class="footer">v43 · Marzo 2026 · Global Solutions SpA</div>
   </div>
 
   <!-- Modal dashboard individual -->
@@ -370,7 +370,7 @@ const DEFAULT_DATA = {
     facturas_cobrar: 0,
     historial: [],
   },
-  conductores: ['Manuel Madrid','Felipe Vidal','Manuel Madariaga','Sebastián Zúñiga','Pablo Riquelme'],
+  conductores: ['Manuel Madrid','Felipe Vidal','Felipe Madariaga','Sebastián Zúñiga','Pablo Riquelme'],
   midia_foco: [],
   midia_open: {},
   pipeline: [
@@ -774,12 +774,35 @@ function renderCierreServicios() {
           ${srvDetalle(s)}
           <div style="height:1px;background:#eee;margin:10px 0"></div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px">
-            <div style="grid-column:1/-1"><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">PRECIO NETO ($)</div>
-              <input id="cs_precio_${s.id}" type="number" value="${s.precio||''}" placeholder="ej: 450000" style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:14px;font-weight:700;outline:none;font-family:inherit"></div>
+            <div style="grid-column:1/-1">
+              <div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">PRECIO NETO ($)</div>
+              <input id="cs_precio_${s.id}" type="number" value="${s.precio||''}" placeholder="ej: 450000"
+                oninput="(function(v){const c=document.getElementById('cs_comision_${s.id}');if(c)c.textContent='Comisión conductor (10%): $'+Math.round((parseInt(v)||0)*0.1).toLocaleString('es-CL');})(this.value)"
+                style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:14px;font-weight:700;outline:none;font-family:inherit">
+              <div id="cs_comision_${s.id}" style="font-size:10px;color:#1565C0;font-weight:600;margin-top:3px;padding:4px 8px;background:#E3F2FD;border-radius:5px">
+                ${s.precio ? 'Comisión conductor (10%): $'+Math.round(s.precio*0.1).toLocaleString('es-CL') : 'Ingresa el precio para ver la comisión'}
+              </div>
+            </div>
             <div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">KILÓMETROS</div>
               <input id="cs_km_${s.id}" type="number" value="${s.km||''}" placeholder="ej: 320" style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit"></div>
             <div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">TAG</div>
               <input id="cs_tag_${s.id}" value="${s.tag||''}" placeholder="ej: TAG-001" style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit"></div>
+            <div style="grid-column:1/-1"><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">OC (Orden de Compra del broker/cliente) <span style="font-weight:400;color:#aaa">— opcional</span></div>
+              <input id="cs_oc_${s.id}" value="${s.oc||''}" placeholder="ej: OC-2026-001" style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit"></div>
+            ${(s.puntos&&s.puntos.length>1)?`<div style="grid-column:1/-1">
+              <div style="font-size:9px;font-weight:700;color:#1565C0;margin-bottom:6px;background:#E3F2FD;padding:4px 8px;border-radius:5px">PUNTOS DE RUTA — costos por punto</div>
+              ${(s.puntos||s.guias||[]).map((p,pi)=>`
+                <div style="padding:6px 8px;background:#F8F9FA;border-radius:6px;margin-bottom:5px">
+                  <div style="font-size:10px;font-weight:700;color:#455A64;margin-bottom:4px">Punto ${pi+1}: ${p.origen||'—'} → ${p.destino||p.destino||'—'}</div>
+                  <div style="font-size:9px;color:#777;margin-bottom:4px">Guía: ${p.num||p.guia||'—'}</div>
+                  <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px">
+                    <div><div style="font-size:9px;color:#888;margin-bottom:2px">OC punto</div>
+                      <input id="cs_oc_p${pi}_${s.id}" placeholder="OC-..." style="width:100%;border:1px solid #dde;border-radius:5px;padding:5px 7px;font-size:11px;outline:none;font-family:inherit"></div>
+                    <div><div style="font-size:9px;color:#888;margin-bottom:2px">Costo punto ($)</div>
+                      <input id="cs_costo_p${pi}_${s.id}" type="number" placeholder="0" style="width:100%;border:1px solid #dde;border-radius:5px;padding:5px 7px;font-size:11px;outline:none;font-family:inherit"></div>
+                  </div>
+                </div>`).join('')}
+            </div>`:''}
             <div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">PEAJES ($)</div>
               <input id="cs_peajes_${s.id}" type="number" value="${s.peajes||''}" placeholder="ej: 8000" style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit"></div>
             <div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">VIÁTICOS ($)</div>
@@ -798,12 +821,16 @@ function guardarCierre(id) {
   const idx=appData.servicios.findIndex(s=>s.id===id);
   if(idx===-1)return;
   const precio=parseInt(document.getElementById(`cs_precio_${id}`)?.value)||0;
+  if(!precio) { alert('El precio neto es obligatorio para cerrar el servicio.'); return; }
   const km=parseInt(document.getElementById(`cs_km_${id}`)?.value)||0;
   const tag=document.getElementById(`cs_tag_${id}`)?.value.trim()||'';
+  const oc=document.getElementById(`cs_oc_${id}`)?.value.trim()||'';
   const peajes=parseInt(document.getElementById(`cs_peajes_${id}`)?.value)||appData.servicios[idx].peajes||0;
   const viaticos=parseInt(document.getElementById(`cs_via_${id}`)?.value)||0;
   const adicional=parseInt(document.getElementById(`cs_adic_${id}`)?.value)||0;
-  Object.assign(appData.servicios[idx],{precio,km,tag,peajes,viaticos,adicional,cerrado:true});
+  // Calcular comisión conductor: 10% del precio neto
+  const comisionConductor=Math.round(precio*0.10);
+  Object.assign(appData.servicios[idx],{precio,km,tag,oc,peajes,viaticos,adicional,comisionConductor,cerrado:true,estado:'cerrado'});
   appData.dashboard.ventas_mes=(appData.servicios||[]).filter(s=>s.cerrado&&s.precio).reduce((a,s)=>a+(s.precio||0),0);
   uiState['cs_'+id]=false;
   upsertServicioSupabase(appData.servicios[idx]);
@@ -1139,6 +1166,14 @@ function srvDetalle(s) {
       <div><span style="font-size:9px;color:#aaa">Patente</span><div style="font-size:11px;color:#333">${s.patente||'—'}</div></div>
       <div style="grid-column:1/-1"><span style="font-size:9px;color:#aaa">Tipo de equipo</span><div style="font-size:11px;color:#333">${s.tipoEquipo||'—'}</div></div>
     </div>
+    ${s.cerrado && s.precio ? `<div style="margin-top:8px;padding:6px 8px;background:#E8F5E9;border-radius:6px;display:flex;justify-content:space-between;align-items:center">
+      <span style="font-size:9px;color:#2E7D32;font-weight:700">PRECIO NETO</span>
+      <span style="font-size:13px;font-weight:800;color:#2E7D32">$${s.precio.toLocaleString('es-CL')}</span>
+    </div>
+    <div style="margin-top:4px;padding:6px 8px;background:#E3F2FD;border-radius:6px;display:flex;justify-content:space-between;align-items:center">
+      <span style="font-size:9px;color:#1565C0;font-weight:700">COMISIÓN CONDUCTOR (10%)</span>
+      <span style="font-size:13px;font-weight:800;color:#1565C0">$${Math.round(s.precio*0.1).toLocaleString('es-CL')}</span>
+    </div>` : ''}
   </div>`;
 }
 function loadData() {
@@ -1361,7 +1396,7 @@ function toggleClienteNuevo(val) {
 function mostrarAgregarConductor() {
   const nombre = prompt('Nombre del conductor nuevo:');
   if (!nombre || !nombre.trim()) return;
-  if (!appData.conductores) appData.conductores = ['Manuel Madrid','Felipe Vidal','Manuel Madariaga','Sebastián Zúñiga','Pablo Riquelme'];
+  if (!appData.conductores) appData.conductores = ['Manuel Madrid','Felipe Vidal','Felipe Madariaga','Sebastián Zúñiga','Pablo Riquelme'];
   if (!appData.conductores.includes(nombre.trim())) {
     appData.conductores.push(nombre.trim());
     saveData(); render();
@@ -1378,6 +1413,20 @@ function mostrarAgregarPatente() {
   }
 }
 
+function addPunto() {
+  if (!uiState.srv_puntos) uiState.srv_puntos = [];
+  uiState.srv_puntos.push({ origen:'', destino:'', tipo:'descarga', guia:'', fecha_guia:'', fecha_descarga:'' });
+  render();
+}
+function delPunto(pi) {
+  if (!uiState.srv_puntos || uiState.srv_puntos.length <= 1) return;
+  uiState.srv_puntos.splice(pi, 1);
+  render();
+}
+function updPunto(pi, campo, valor) {
+  if (!uiState.srv_puntos) return;
+  uiState.srv_puntos[pi][campo] = valor;
+}
 function addGuia() {
   if (!uiState.srv_guias) uiState.srv_guias = [{ num:'', destino:'', fecha_descarga:'' }];
   uiState.srv_guias.push({ num:'', destino:'', fecha_descarga:'' });
@@ -1424,11 +1473,8 @@ async function addServicio() {
   const cliente = clienteSelect === '__nuevo__'
     ? (document.getElementById('srv_cliente_nuevo')?.value.trim() || '')
     : clienteSelect;
-  const origen = document.getElementById('srv_origen')?.value.trim();
-  const tag = document.getElementById('srv_tag')?.value.trim() || '';
-  const km = 0;
-  const viaticos = 0;
-  const peajes = parseInt(document.getElementById('srv_peajes')?.value) || 0;
+  const peajes = parseInt(document.getElementById('srv_peajes')?.value);
+  if (peajes === undefined || peajes === null || isNaN(peajes)) { alert('Ingresa los peajes — escribe 0 si no hay.'); return; }
   if (!patente && !cliente) return;
   if (!appData.servicios) appData.servicios = [];
   const hoy = new Date();
@@ -1437,8 +1483,17 @@ async function addServicio() {
   const anio = partesFecha[2] || hoy.getFullYear().toString();
   const mes = partesFecha[1] || String(hoy.getMonth()+1).padStart(2,'0');
   const id = generarIdServicio(appData.servicios, fechaFinal);
-  const guias = uiState.srv_guias || [{ num:'', destino:'', fecha_descarga:'' }];
-  const servicio = { id, fecha: fechaFinal, anio, mes, patente, conductor, tipoEquipo, cliente, precio: 0, petroleo: 0, adicional: 0, liquidado: false, origen, tag, km, viaticos, peajes, guias };
+  // Usar puntos de ruta (nuevo sistema) con fallback a guias antiguo
+  const puntos = (uiState.srv_puntos || []).filter(p => p.guia||p.origen||p.destino);
+  const origen = puntos.length ? puntos[0].origen : '';
+  // Convertir puntos a guias para compatibilidad con el resto del sistema
+  const guias = puntos.length
+    ? puntos.map(p => ({ num: p.guia, destino: p.destino, fecha_descarga: p.fecha_descarga, origen: p.origen, tipo: p.tipo, fecha_guia: p.fecha_guia }))
+    : [{ num:'', destino:'', fecha_descarga:'' }];
+  const tag = '';
+  const km = 0;
+  const viaticos = 0;
+  const servicio = { id, fecha: fechaFinal, anio, mes, patente, conductor, tipoEquipo, cliente, precio: 0, petroleo: 0, adicional: 0, liquidado: false, origen, tag, km, viaticos, peajes, guias, puntos };
   appData.servicios.push(servicio);
   // Agregar conductor nuevo a la lista si no existe
   if (conductor && !(appData.conductores||[]).includes(conductor)) {
@@ -1447,6 +1502,7 @@ async function addServicio() {
   }
   // Limpiar formulario inmediatamente y actualizar lista
   uiState.srv_guias = [{ num:'', destino:'', fecha_descarga:'' }];
+  uiState.srv_puntos = [{ origen:'', destino:'', tipo:'descarga', guia:'', fecha_guia:'', fecha_descarga:'' }];
   saveData();
   render(); // render inmediato para mostrar el nuevo servicio en la lista
 
@@ -1693,6 +1749,15 @@ function renderFase(fase) {
     fase.rutinarias.push({titulo:'Cotización PDF',proc:'Generar cotización formal en PDF.',subtareas:[],cotizacionTask:true,done:false});
     saveData();
   }
+  // Pipeline siempre primero en comercial
+  if (fase.id==='comercial') {
+    const pipIdx = fase.rutinarias.findIndex(r=>r.pipelineTask);
+    if (pipIdx > 0) {
+      const [pip] = fase.rutinarias.splice(pipIdx, 1);
+      fase.rutinarias.unshift(pip);
+      saveData();
+    }
+  }
 
   // v37d: filtrar tareas según rol activo
   const _acceso = sessionRol ? sessionRol.acceso : 'all';
@@ -1827,7 +1892,7 @@ function renderFase(fase) {
       const servicios = (appData.servicios || []);
       const hoyISO = (() => { const h=new Date(); return `${h.getFullYear()}-${String(h.getMonth()+1).padStart(2,'0')}-${String(h.getDate()).padStart(2,'0')}`; })();
       const hoyStr = (() => { const h=new Date(); return `${String(h.getDate()).padStart(2,'0')}-${String(h.getMonth()+1).padStart(2,'0')}-${h.getFullYear()}`; })();
-      const ultimos3 = servicios.slice(-3).reverse();
+      const ultimos3 = servicios.slice(-5).reverse();
       const lista = ultimos3.length ? ultimos3.map((s)=>{
         const idxReal = servicios.indexOf(s);
         const destStr = (s.guias||[]).map(g=>g.destino).filter(Boolean).join(' / ') || s.destino || '—';
@@ -1845,7 +1910,7 @@ function renderFase(fase) {
       const clientesDefault = DEFAULT_DATA.pipeline.filter(c=>c.etapa==='activo').map(c=>c.cliente);
       const clientesLocal = (appData.pipeline||[]).filter(c=>c.etapa==='activo').map(c=>c.cliente);
       const clientesActivos = [...new Set([...clientesDefault, ...clientesLocal])].sort();
-      const conductoresDefault = ['Manuel Madrid','Felipe Vidal','Manuel Madariaga','Sebastián Zúñiga','Pablo Riquelme','Tercero'];
+      const conductoresDefault = ['Manuel Madrid','Felipe Vidal','Felipe Madariaga','Sebastián Zúñiga','Pablo Riquelme','Tercero'];
       if (!appData.conductores || appData.conductores.length < 2) {
         appData.conductores = conductoresDefault;
         saveData();
@@ -1868,31 +1933,87 @@ function renderFase(fase) {
           </div>
         </div>`).join('');
 
+      // Puntos de ruta (reemplaza guias simples)
+      if (!uiState.srv_puntos || !uiState.srv_puntos.length) {
+        uiState.srv_puntos = [{ origen:'', destino:'', tipo:'descarga', guia:'', fecha_guia:'', fecha_descarga:'' }];
+      }
+      const puntos = uiState.srv_puntos;
+      const TIPOS_PUNTO = ['carga','descarga','carga y descarga'];
+
+      const puntosHTML = puntos.map((p,pi) => `
+        <div style="background:white;border:1px solid #CFD8DC;border-radius:8px;padding:10px;margin-bottom:8px">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+            <span style="font-size:10px;font-weight:800;color:#455A64;letter-spacing:1px">PUNTO ${pi+1}</span>
+            <div style="display:flex;gap:8px;align-items:center">
+              <select onchange="updPunto(${pi},'tipo',this.value)" style="border:1px solid #dde;border-radius:5px;padding:3px 6px;font-size:10px;outline:none;font-family:inherit;background:white;-webkit-appearance:auto">
+                ${TIPOS_PUNTO.map(t=>`<option value="${t}" ${p.tipo===t?'selected':''}>${t.toUpperCase()}</option>`).join('')}
+              </select>
+              ${puntos.length>1?`<span onclick="delPunto(${pi})" style="color:#bbb;cursor:pointer;font-size:16px">×</span>`:''}
+            </div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:5px">
+            <div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">ORIGEN</div>
+              <input value="${p.origen}" onchange="updPunto(${pi},'origen',this.value)" placeholder="ej: Santiago" style="width:100%;border:1px solid #dde;border-radius:5px;padding:6px 8px;font-size:12px;outline:none;font-family:inherit"></div>
+            <div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">DESTINO</div>
+              <input value="${p.destino}" onchange="updPunto(${pi},'destino',this.value)" placeholder="ej: Marchigue" style="width:100%;border:1px solid #dde;border-radius:5px;padding:6px 8px;font-size:12px;outline:none;font-family:inherit"></div>
+            <div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">N° GUÍA</div>
+              <input value="${p.guia}" onchange="updPunto(${pi},'guia',this.value)" placeholder="ej: 123456" style="width:100%;border:1px solid #dde;border-radius:5px;padding:6px 8px;font-size:12px;outline:none;font-family:inherit"></div>
+            <div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">FECHA GUÍA</div>
+              <input value="${p.fecha_guia}" onchange="updPunto(${pi},'fecha_guia',this.value)" type="date" style="width:100%;border:1px solid #dde;border-radius:5px;padding:6px 8px;font-size:12px;outline:none;font-family:inherit"></div>
+            <div style="grid-column:1/-1"><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">FECHA DESCARGA</div>
+              <input value="${p.fecha_descarga}" onchange="updPunto(${pi},'fecha_descarga',this.value)" type="date" style="width:100%;border:1px solid #dde;border-radius:5px;padding:6px 8px;font-size:12px;outline:none;font-family:inherit"></div>
+          </div>
+        </div>`).join('');
+
       return `<div style="margin-bottom:10px;padding:10px 12px;background:#f4f6f8;border-radius:10px;border:1px solid #dde4e8">
 
-        <div style="font-size:10px;font-weight:700;color:#455A64;letter-spacing:1px;margin-bottom:8px;padding-bottom:5px;border-bottom:2px solid #CFD8DC">BLOQUE 1 — CONDUCTOR</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px">
+        <!-- ID + FECHA -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:10px">
           <div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">ID SERVICIO</div>
             <div style="background:#455A64;color:white;border-radius:6px;padding:7px 9px;font-size:14px;font-weight:700;letter-spacing:2px">${nextId}</div></div>
           <div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">FECHA SALIDA</div>
             <input id="srv_fecha" type="date" value="${hoyISO}" style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit;background:white"></div>
-          <div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">PATENTE</div>
-            <select id="srv_patente" onchange="togglePatenteTercero()" style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit;background:white;-webkit-appearance:auto">
-              <option value="">Seleccionar patente...</option>
-              ${patenteOpts}
-              <option value="__tercero__">Tercero (ingresar manualmente)</option>
-            </select>
-            <input id="srv_patente_manual" placeholder="Ingresar patente..." style="display:none;margin-top:4px;width:100%;border:1px solid #FFA726;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit;text-transform:uppercase">
-            <div style="margin-top:3px"><span onclick="mostrarAgregarPatente()" style="font-size:10px;color:#607D8B;cursor:pointer;text-decoration:underline">+ Agregar patente nueva</span></div>
-            </div>
+        </div>
+
+        <!-- CLIENTE -->
+        <div style="margin-bottom:8px">
+          <div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">CLIENTE</div>
+          <select id="srv_cliente" onchange="toggleClienteNuevo(this.value)" style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit;background:white;-webkit-appearance:auto">
+            <option value="">Seleccionar cliente...</option>
+            ${clientesActivos.map(c=>`<option value="${c}">${c}</option>`).join('')}
+            <option value="__nuevo__">+ Cliente no está en la lista...</option>
+          </select>
+          <div id="srv_cliente_nuevo_box" style="display:none;margin-top:5px">
+            <input id="srv_cliente_nuevo" placeholder="Escribir nombre del cliente" style="width:100%;border:1px solid #FFE082;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit;background:#FFFDE7">
+            <div style="font-size:9px;color:#F9A825;margin-top:3px">Quedará pendiente de agregar al pipeline.</div>
+          </div>
+        </div>
+
+        <!-- PUNTOS DE RUTA -->
+        <div style="font-size:10px;font-weight:800;color:#455A64;letter-spacing:1px;margin-bottom:8px;padding-bottom:5px;border-bottom:2px solid #CFD8DC">PUNTOS DE RUTA</div>
+        ${puntosHTML}
+        <button onclick="addPunto()" style="width:100%;background:white;color:#455A64;border:1px dashed #90A4AE;border-radius:6px;padding:8px;font-size:11px;cursor:pointer;font-weight:700;margin-bottom:12px">+ Agregar punto de ruta</button>
+
+        <!-- CONDUCTOR / EQUIPO -->
+        <div style="font-size:10px;font-weight:800;color:#455A64;letter-spacing:1px;margin-bottom:8px;padding-bottom:5px;border-bottom:2px solid #CFD8DC">CONDUCTOR Y EQUIPO</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:10px">
           <div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">CONDUCTOR</div>
             <select id="srv_conductor" onchange="toggleConductorTercero()" style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit;background:white;-webkit-appearance:auto">
-              <option value="">Seleccionar conductor...</option>
+              <option value="">Seleccionar...</option>
               ${conductoresOpts}
             </select>
-            <div style="margin-top:3px"><span onclick="mostrarAgregarConductor()" style="font-size:10px;color:#607D8B;cursor:pointer;text-decoration:underline">+ Agregar conductor nuevo</span></div>
-            </div>
-          <div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">TIPO DE EQUIPO</div>
+            <div style="margin-top:3px"><span onclick="mostrarAgregarConductor()" style="font-size:10px;color:#607D8B;cursor:pointer;text-decoration:underline">+ Agregar nuevo</span></div>
+          </div>
+          <div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">PATENTE</div>
+            <select id="srv_patente" onchange="togglePatenteTercero()" style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit;background:white;-webkit-appearance:auto">
+              <option value="">Seleccionar...</option>
+              ${patenteOpts}
+              <option value="__tercero__">Tercero</option>
+            </select>
+            <input id="srv_patente_manual" placeholder="Ingresar patente..." style="display:none;margin-top:4px;width:100%;border:1px solid #FFA726;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit;text-transform:uppercase">
+            <div style="margin-top:3px"><span onclick="mostrarAgregarPatente()" style="font-size:10px;color:#607D8B;cursor:pointer;text-decoration:underline">+ Agregar nueva</span></div>
+          </div>
+          <div style="grid-column:1/-1"><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">TIPO DE EQUIPO</div>
             <select id="srv_tipo_equipo" style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit;background:white;-webkit-appearance:auto">
               <option value="">Seleccionar...</option>
               <option value="Camión solo">Camión solo</option>
@@ -1900,37 +2021,18 @@ function renderFase(fase) {
               <option value="Rampla">Rampla</option>
               <option value="Camión 3/4">Camión 3/4</option>
               <option value="Camioneta">Camioneta</option>
-            </select></div>
-          <div style="grid-column:1/-1"><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">CLIENTE</div>
-            <select id="srv_cliente" onchange="toggleClienteNuevo(this.value)" style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit;background:white;-webkit-appearance:auto">
-              <option value="">Seleccionar cliente...</option>
-              ${clientesActivos.map(c=>`<option value="${c}">${c}</option>`).join('')}
-              <option value="__nuevo__">+ Cliente no está en la lista...</option>
             </select>
-            <div id="srv_cliente_nuevo_box" style="display:none;margin-top:5px">
-              <input id="srv_cliente_nuevo" placeholder="Escribir nombre del cliente" style="width:100%;border:1px solid #FFE082;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit;background:#FFFDE7">
-              <div style="font-size:9px;color:#F9A825;margin-top:3px">Este cliente quedará pendiente de agregar al pipeline por Carlos o Pablo.</div>
-            </div>
-            </div>
-          <div style="grid-column:1/-1"><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">ORIGEN</div>
-            <input id="srv_origen" placeholder="ej: San Felipe" style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit"></div>
-          <div style="grid-column:1/-1">
-            <div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">TAG <span style="font-weight:400;color:#aaa">(asignar en Financiero)</span></div>
-            <input id="srv_tag" placeholder="ej: TAG-001" style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit">
           </div>
         </div>
 
-        <div style="font-size:9px;font-weight:700;color:#607D8B;margin-bottom:5px;letter-spacing:0.5px">GUÍAS DE DESPACHO</div>
-        <div id="guias-container">${guiasHTML}</div>
-        <button onclick="addGuia()" style="width:100%;background:white;color:#455A64;border:1px dashed #90A4AE;border-radius:6px;padding:7px;font-size:11px;cursor:pointer;font-weight:700;margin-bottom:10px">+ Agregar guía</button>
-
-        <div style="font-size:10px;font-weight:700;color:#888;letter-spacing:1px;margin-bottom:8px;padding-bottom:5px;border-bottom:2px solid #CFD8DC">CONDUCTOR — PEAJES</div>
-        <div style="margin-bottom:8px">
+        <!-- PEAJES -->
+        <div style="margin-bottom:12px">
           <div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">PEAJES ($)</div>
-          <input id="srv_peajes" type="number" placeholder="ej: 8000" style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit">
+          <input id="srv_peajes" type="number" placeholder="ej: 8000 — obligatorio" style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit">
         </div>
+
         <button onclick="addServicio()" style="width:100%;background:#455A64;color:white;border:none;border-radius:8px;padding:16px;font-size:15px;cursor:pointer;font-weight:700;min-height:54px;-webkit-tap-highlight-color:transparent;touch-action:manipulation">+ Registrar servicio</button>
-        ${servicios.length ? `<div style="margin-top:12px"><div style="font-size:10px;font-weight:700;color:#607D8B;letter-spacing:1px;margin-bottom:4px">SERVICIOS DEL MES (${servicios.length})</div>${lista}</div>` : `<div style="margin-top:6px">${lista}</div>`}
+        ${servicios.length ? `<div style="margin-top:12px"><div style="font-size:10px;font-weight:700;color:#607D8B;letter-spacing:1px;margin-bottom:4px">ÚLTIMOS 5 SERVICIOS (${servicios.length} en total)</div>${lista}</div>` : `<div style="margin-top:6px">${lista}</div>`}
       </div>`;
     })() : '';
 
@@ -2483,12 +2585,57 @@ function renderPipeline() {
       return `<div style="background:#f8f9fa;border:1px solid #dde;border-radius:8px;padding:12px;margin-bottom:8px">
         <div style="font-size:9px;font-weight:800;color:#888;letter-spacing:1px;margin-bottom:8px">EDITANDO CLIENTE</div>
         <div style="display:grid;gap:6px">
-          <input id="pip_cliente_${ci}" value="${c.cliente}" placeholder="Cliente" style="border:1px solid #dde;border-radius:6px;padding:6px 9px;font-size:12px;outline:none;font-family:inherit">
-          <input id="pip_contacto_${ci}" value="${c.contacto||''}" placeholder="Contacto" style="border:1px solid #dde;border-radius:6px;padding:6px 9px;font-size:12px;outline:none;font-family:inherit">
-          <select id="pip_etapa_${ci}" style="border:1px solid #dde;border-radius:6px;padding:6px 9px;font-size:12px;outline:none;background:white">
-            ${ETAPAS_PIPELINE.map(e=>`<option value="${e}" ${c.etapa===e?'selected':''}>${ETAPA_LABELS[e]}</option>`).join('')}
-          </select>
+          <div style="font-size:9px;font-weight:800;color:#607D8B;letter-spacing:1px">DATOS GENERALES</div>
+          <input id="pip_cliente_${ci}" value="${c.cliente}" placeholder="Nombre cliente *" style="border:1px solid #dde;border-radius:6px;padding:6px 9px;font-size:13px;font-weight:700;outline:none;font-family:inherit">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+            <div><div style="font-size:9px;color:#888;margin-bottom:2px">Etapa</div>
+              <select id="pip_etapa_${ci}" style="width:100%;border:1px solid #dde;border-radius:6px;padding:6px 9px;font-size:12px;outline:none;background:white;-webkit-appearance:auto">
+                ${ETAPAS_PIPELINE.map(e=>`<option value="${e}" ${c.etapa===e?'selected':''}>${ETAPA_LABELS[e]}</option>`).join('')}
+              </select></div>
+            <div><div style="font-size:9px;color:#888;margin-bottom:2px">Categoría industria</div>
+              <select id="pip_cat_${ci}" style="width:100%;border:1px solid #dde;border-radius:6px;padding:6px 9px;font-size:12px;outline:none;background:white;-webkit-appearance:auto">
+                ${['Agrícola','Agroindustrial','Broker','Construcción','Logística','Minería','Retail','Proveedor Agrícola','Otro'].concat((appData.categoriasCliente||[]).filter(x=>!['Agrícola','Agroindustrial','Broker','Construcción','Logística','Minería','Retail','Proveedor Agrícola','Otro'].includes(x))).map(cat=>`<option value="${cat}" ${(c.categoria||'')===(cat)?'selected':''}>${cat}</option>`).join('')}
+              </select></div>
+          </div>
           <input id="pip_accion_${ci}" value="${c.proximaAccion||''}" placeholder="Próxima acción" style="border:1px solid #dde;border-radius:6px;padding:6px 9px;font-size:12px;outline:none;font-family:inherit">
+
+          <div style="font-size:9px;font-weight:800;color:#607D8B;letter-spacing:1px;margin-top:4px;padding-top:6px;border-top:1px solid #eee">CONTACTOS</div>
+          ${(c.contactos||[{nombre:'',cargo:'',telefono:'',email:''}]).map((ct,cti)=>`
+            <div style="background:#F8F9FA;border-radius:6px;padding:8px;border:1px solid #eee">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px">
+                <span style="font-size:9px;font-weight:700;color:#607D8B">CONTACTO ${cti+1}</span>
+                ${cti>0?`<span onclick="delContactoPip(${ci},${cti})" style="color:#ddd;cursor:pointer;font-size:13px">×</span>`:''}
+              </div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px">
+                <input value="${ct.nombre||''}" onchange="updContactoPip(${ci},${cti},'nombre',this.value)" placeholder="Nombre" style="border:1px solid #dde;border-radius:5px;padding:5px 7px;font-size:11px;outline:none;font-family:inherit">
+                <input value="${ct.cargo||''}" onchange="updContactoPip(${ci},${cti},'cargo',this.value)" placeholder="Cargo / Función" style="border:1px solid #dde;border-radius:5px;padding:5px 7px;font-size:11px;outline:none;font-family:inherit">
+                <input value="${ct.telefono||''}" onchange="updContactoPip(${ci},${cti},'telefono',this.value)" placeholder="Teléfono" style="border:1px solid #dde;border-radius:5px;padding:5px 7px;font-size:11px;outline:none;font-family:inherit">
+                <input value="${ct.email||''}" onchange="updContactoPip(${ci},${cti},'email',this.value)" placeholder="Email" style="border:1px solid #dde;border-radius:5px;padding:5px 7px;font-size:11px;outline:none;font-family:inherit">
+              </div>
+            </div>`).join('')}
+          <button onclick="addContactoPip(${ci})" style="background:white;border:1px dashed #90A4AE;border-radius:6px;padding:6px;font-size:10px;color:#607D8B;cursor:pointer;font-weight:700">+ Agregar contacto</button>
+
+          <div style="font-size:9px;font-weight:800;color:#607D8B;letter-spacing:1px;margin-top:4px;padding-top:6px;border-top:1px solid #eee">DATOS DE FACTURACIÓN</div>
+          <input id="pip_rut_${ci}" value="${c.rut||''}" placeholder="RUT ej: 76.123.456-7" style="border:1px solid #dde;border-radius:6px;padding:6px 9px;font-size:12px;outline:none;font-family:inherit">
+          <input id="pip_email_factura_${ci}" value="${c.emailFactura||''}" placeholder="Email facturación" style="border:1px solid #dde;border-radius:6px;padding:6px 9px;font-size:12px;outline:none;font-family:inherit">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+            <div><div style="font-size:9px;color:#888;margin-bottom:2px">Tipo cliente</div>
+              <select id="pip_tipo_${ci}" style="width:100%;border:1px solid #dde;border-radius:6px;padding:6px 9px;font-size:12px;outline:none;background:white;-webkit-appearance:auto">
+                <option value="directo" ${(c.tipoCliente||'directo')==='directo'?'selected':''}>Directo</option>
+                <option value="broker" ${c.tipoCliente==='broker'?'selected':''}>Broker</option>
+              </select></div>
+            <div><div style="font-size:9px;color:#888;margin-bottom:2px">Pago (días)</div>
+              <select id="pip_pago_${ci}" style="width:100%;border:1px solid #dde;border-radius:6px;padding:6px 9px;font-size:12px;outline:none;background:white;-webkit-appearance:auto">
+                <option value="30" ${(c.condicionPago||'30')==='30'?'selected':''}>30 días</option>
+                <option value="60" ${c.condicionPago==='60'?'selected':''}>60 días</option>
+                <option value="90" ${c.condicionPago==='90'?'selected':''}>90 días</option>
+                <option value="contado" ${c.condicionPago==='contado'?'selected':''}>Contado</option>
+              </select></div>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;padding:6px 8px;background:#FFF3E0;border-radius:6px">
+            <input type="checkbox" id="pip_aprueba_${ci}" ${c.requiereAprobacion?'checked':''} style="cursor:pointer">
+            <label for="pip_aprueba_${ci}" style="font-size:11px;color:#E65100;cursor:pointer;font-weight:600">Requiere aprobación antes de facturar</label>
+          </div>
         </div>
         <!-- Notas múltiples -->
         <div style="margin-top:8px">
@@ -2519,7 +2666,10 @@ function renderPipeline() {
             <span style="font-size:13px;font-weight:800;color:#222">${c.cliente}</span>
             <span style="font-size:9px;font-weight:800;background:${col};color:white;padding:2px 7px;border-radius:10px;letter-spacing:0.5px">${ETAPA_LABELS[c.etapa]||c.etapa}</span>
           </div>
-          ${c.contacto ? `<div style="font-size:11px;color:#777;margin-bottom:3px">👤 ${c.contacto}</div>` : ''}
+          ${c.categoria ? `<span style="font-size:9px;font-weight:700;background:#ECEFF1;color:#546E7A;padding:1px 6px;border-radius:8px;margin-bottom:4px;display:inline-block">${c.categoria}</span>` : ''}
+          ${(c.contactos||[]).filter(ct=>ct.nombre).map(ct=>`<div style="font-size:10px;color:#777;margin-bottom:2px">👤 ${ct.nombre}${ct.cargo?' · '+ct.cargo:''}${ct.telefono?' · '+ct.telefono:''}</div>`).join('')}
+          ${c.rut ? `<div style="font-size:10px;color:#546E7A;margin-bottom:2px">RUT: <strong>${c.rut}</strong>${c.requiereAprobacion?' · <span style="color:#E65100">aprobación requerida</span>':''}</div>` : ''}
+          ${c.condicionPago ? `<div style="font-size:10px;color:#888;margin-bottom:2px">Pago: ${c.condicionPago} días · ${c.tipoCliente==='broker'?'Broker':'Cliente directo'}</div>` : ''}
           ${c.proximaAccion ? `<div style="font-size:11px;color:#444;margin-bottom:2px">→ ${c.proximaAccion}</div>` : ''}
           ${c.notas ? `<div style="font-size:10px;color:#aaa;font-style:italic">${c.notas}</div>` : ''}
           ${(c.notasMultiples&&c.notasMultiples.length) ? `<div style="margin-top:5px;border-top:1px solid #f0f0f0;padding-top:4px">${c.notasMultiples.slice(-3).map(n=>`<div style="font-size:10px;color:#455A64;padding:2px 0"><span style="color:#bbb;margin-right:4px">${n.fecha}</span>${n.texto}</div>`).join('')}</div>` : ''}
@@ -2549,6 +2699,31 @@ function renderPipeline() {
           </select>
           <input id="pip_new_accion" placeholder="Próxima acción" style="border:1px solid #dde;border-radius:6px;padding:6px 9px;font-size:12px;outline:none;font-family:inherit">
           <input id="pip_new_notas" placeholder="Notas" style="border:1px solid #dde;border-radius:6px;padding:6px 9px;font-size:12px;outline:none;font-family:inherit">
+          <div style="font-size:9px;font-weight:800;color:#607D8B;letter-spacing:1px;margin-top:4px;padding-top:6px;border-top:1px solid #eee">DATOS DE FACTURACIÓN</div>
+          <input id="pip_new_rut" placeholder="RUT ej: 76.123.456-7" style="border:1px solid #dde;border-radius:6px;padding:6px 9px;font-size:12px;outline:none;font-family:inherit">
+          <input id="pip_new_email_factura" placeholder="Email facturación" style="border:1px solid #dde;border-radius:6px;padding:6px 9px;font-size:12px;outline:none;font-family:inherit">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+            <div>
+              <div style="font-size:9px;color:#888;margin-bottom:2px">Tipo cliente</div>
+              <select id="pip_new_tipo" style="width:100%;border:1px solid #dde;border-radius:6px;padding:6px 9px;font-size:12px;outline:none;background:white;-webkit-appearance:auto">
+                <option value="directo">Directo</option>
+                <option value="broker">Broker</option>
+              </select>
+            </div>
+            <div>
+              <div style="font-size:9px;color:#888;margin-bottom:2px">Pago (días)</div>
+              <select id="pip_new_pago" style="width:100%;border:1px solid #dde;border-radius:6px;padding:6px 9px;font-size:12px;outline:none;background:white;-webkit-appearance:auto">
+                <option value="30">30 días</option>
+                <option value="60">60 días</option>
+                <option value="90">90 días</option>
+                <option value="contado">Contado</option>
+              </select>
+            </div>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;padding:6px 8px;background:#FFF3E0;border-radius:6px">
+            <input type="checkbox" id="pip_new_aprueba" style="cursor:pointer">
+            <label for="pip_new_aprueba" style="font-size:11px;color:#E65100;cursor:pointer;font-weight:600">Requiere aprobación antes de facturar</label>
+          </div>
         </div>
         <div style="display:flex;gap:6px;margin-top:8px">
           <button onclick="agregarPipeline()" style="flex:1;background:#607D8B;color:white;border:none;border-radius:6px;padding:7px;font-size:12px;font-weight:700;cursor:pointer">+ Agregar cliente</button>
@@ -2603,11 +2778,19 @@ async function guardarPipeline(ci) {
   appData.pipeline[ci] = {
     id: item.id || '',
     cliente: document.getElementById(`pip_cliente_${ci}`)?.value.trim() || item.cliente,
-    contacto: document.getElementById(`pip_contacto_${ci}`)?.value.trim() || '',
+    contacto: '',
+    contactos: item.contactos || [],
+    categoria: document.getElementById(`pip_cat_${ci}`)?.value || item.categoria || '',
     etapa: document.getElementById(`pip_etapa_${ci}`)?.value || 'prospecto',
     proximaAccion: document.getElementById(`pip_accion_${ci}`)?.value.trim() || '',
-    notas: document.getElementById(`pip_notas_${ci}`)?.value.trim() || '',
+    notas: item.notas || '',
     ultimaGestion: item.ultimaGestion || '',
+    notasMultiples: item.notasMultiples || [],
+    rut: document.getElementById(`pip_rut_${ci}`)?.value.trim() || item.rut || '',
+    emailFactura: document.getElementById(`pip_email_factura_${ci}`)?.value.trim() || item.emailFactura || '',
+    tipoCliente: document.getElementById(`pip_tipo_${ci}`)?.value || item.tipoCliente || 'directo',
+    condicionPago: document.getElementById(`pip_pago_${ci}`)?.value || item.condicionPago || '30',
+    requiereAprobacion: document.getElementById(`pip_aprueba_${ci}`)?.checked || false,
   };
   delete uiState[`pip_edit_${ci}`];
   await guardarPipelineSupabase(appData.pipeline[ci]);
@@ -2627,11 +2810,31 @@ async function agregarPipeline() {
     proximaAccion: document.getElementById('pip_new_accion')?.value.trim() || '',
     notas: document.getElementById('pip_new_notas')?.value.trim() || '',
     ultimaGestion: mes,
+    notasMultiples: [],
+    rut: document.getElementById('pip_new_rut')?.value.trim() || '',
+    emailFactura: document.getElementById('pip_new_email_factura')?.value.trim() || '',
+    tipoCliente: document.getElementById('pip_new_tipo')?.value || 'directo',
+    condicionPago: document.getElementById('pip_new_pago')?.value || '30',
+    requiereAprobacion: document.getElementById('pip_new_aprueba')?.checked || false,
   };
   appData.pipeline.push(nuevo);
   await guardarPipelineSupabase(nuevo);
   delete uiState['pip_add'];
   saveData(); render();
+}
+function addContactoPip(ci) {
+  if (!appData.pipeline[ci].contactos) appData.pipeline[ci].contactos=[];
+  appData.pipeline[ci].contactos.push({nombre:'',cargo:'',telefono:'',email:''});
+  render();
+}
+function delContactoPip(ci,cti) {
+  if (!appData.pipeline[ci]?.contactos) return;
+  appData.pipeline[ci].contactos.splice(cti,1);
+  render();
+}
+function updContactoPip(ci,cti,campo,valor) {
+  if (!appData.pipeline[ci]?.contactos) return;
+  appData.pipeline[ci].contactos[cti][campo]=valor;
 }
 async function delPipeline(ci) {
   if (!appData.pipeline) return;
@@ -3226,7 +3429,7 @@ function renderCierreLiquidacion() {
 function renderDisponibilidad() {
   if (!appData.disponibilidad) appData.disponibilidad = {};
   const FLOTA = appData.patentes || ['GKFD84','WR9192','XR8555','GCFF12','BPBL35','XA1114','DSDV36'];
-  const conductores = appData.conductores || ['Manuel Madrid','Felipe Vidal','Manuel Madariaga','Sebastián Zúñiga','Pablo Riquelme','Tercero'];
+  const conductores = appData.conductores || ['Manuel Madrid','Felipe Vidal','Felipe Madariaga','Sebastián Zúñiga','Pablo Riquelme','Tercero'];
   const ESTADOS = ['Disponible','En servicio','Mantención'];
   const TIPOS_MANT = ['Frenos','Caja de cambios','Motor','Suspensión','Eléctrico','Neumáticos','Diferencial','Embrague','Dirección','Preventivo','Puesta en marcha','Otro'];
   const ESTADO_COLOR = {
@@ -3545,98 +3748,259 @@ function saveTipoMant(patente, valor) {
 
 function renderMiDia() {
   const hoy = new Date();
-  const COLORES = { 
-    comercial:'#1565C0', operacional:'#455A64', 
-    financiero:'#2E7D32', rrhh:'#5D4037', control:'#37474F' 
-  };
-  const AMBITOS_ORDEN = ['comercial','operacional','financiero','rrhh'];
-  const PRIO_COLORS = { 1:'#C62828', 2:'#F57F17', 3:'#1565C0' };
-  const PRIO_LABELS = { 1:'P1', 2:'P2', 3:'P3' };
+  const diasSemana = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
+  const meses = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+  const fechaStr = `${diasSemana[hoy.getDay()]} ${hoy.getDate()} de ${meses[hoy.getMonth()]} ${hoy.getFullYear()}`;
 
-  if (!appData.prioridades) appData.prioridades = {};
+  const servicios = appData.servicios || [];
+  const liquidaciones = appData.liquidaciones || [];
 
-  // ── FOCO DEL DÍA — todos los pendientes con prioridad ordenados 1→2→3 ──
-  const todosConPrio = [];
-  AMBITOS_ORDEN.forEach(fid => {
-    const fase = appData.fases.find(f => f.id === fid);
-    if (!fase) return;
-    (fase.pendientes||[]).forEach((p, pi) => {
-      if (p.done) return;
-      const key = `${fid}::${pi}`;
-      const prio = appData.prioridades[key];
-      if (prio) todosConPrio.push({ fase, fid, p, pi, prio, key });
-    });
+  // ── PRIORIDADES AUTOMÁTICAS DEL SISTEMA ──────────────────
+  const prioSistema = [];
+
+  // Servicios sin cerrar
+  const sinCerrar = servicios.filter(s => !s.cerrado && s.precio === 0);
+  if (sinCerrar.length) prioSistema.push({
+    tipo: 'urgente', ambito: 'FINANCIERO',
+    texto: `${sinCerrar.length} servicio${sinCerrar.length>1?'s':''} sin cerrar — completar precio y km`,
+    accion: "filtrar('financiero')"
   });
-  todosConPrio.sort((a,b) => a.prio - b.prio);
 
-  const focoHTML = todosConPrio.length === 0
-    ? `<div style="text-align:center;padding:16px;color:#aaa;font-size:11px">Sin pendientes priorizados.<br>Asigna prioridad P1/P2/P3 abajo ↓</div>`
-    : todosConPrio.map(({fase, fid, p, pi, prio}) => {
-        const col = COLORES[fid]||'#607D8B';
-        const pCol = PRIO_COLORS[prio];
-        return `<div style="display:flex;align-items:flex-start;gap:8px;padding:9px 12px;border-radius:8px;background:#f8f9fa;margin-bottom:6px;border-left:3px solid ${pCol}">
-          <span style="font-size:10px;font-weight:900;color:white;background:${pCol};padding:2px 7px;border-radius:5px;flex-shrink:0;margin-top:1px">${PRIO_LABELS[prio]}</span>
-          <div style="flex:1">
-            <div style="font-size:8px;font-weight:800;color:${col};letter-spacing:1px;margin-bottom:2px">${fase.nombre}</div>
-            <div style="font-size:12px;color:#222;line-height:1.4">${p.texto}</div>
+  // Liquidaciones creadas sin enviar
+  const liqPendEnvio = liquidaciones.filter(l => l.estado === 'creada');
+  if (liqPendEnvio.length) prioSistema.push({
+    tipo: 'urgente', ambito: 'FINANCIERO',
+    texto: `${liqPendEnvio.length} liquidación${liqPendEnvio.length>1?'es':''} creada${liqPendEnvio.length>1?'s':''} sin enviar al cliente`,
+    accion: "filtrar('financiero')"
+  });
+
+  // Liquidaciones enviadas sin facturar
+  const liqEnviadas = liquidaciones.filter(l => l.estado === 'enviada');
+  if (liqEnviadas.length) prioSistema.push({
+    tipo: 'alerta', ambito: 'FINANCIERO',
+    texto: `${liqEnviadas.length} liquidación${liqEnviadas.length>1?'es':''} enviada${liqEnviadas.length>1?'s':''} pendiente${liqEnviadas.length>1?'s':''} de facturación`,
+    accion: "filtrar('financiero')"
+  });
+
+  // Pipeline — clientes activos sin servicios recientes (más de 7 días)
+  const hoyMs = hoy.getTime();
+  const clientesActivos = (appData.pipeline||[]).filter(c => c.etapa==='activo');
+  const clientesSinSrv = clientesActivos.filter(cl => {
+    const ultSrv = servicios.filter(s => s.cliente===cl.cliente).slice(-1)[0];
+    if (!ultSrv) return true;
+    const p = (ultSrv.fecha||'').split('-');
+    if (p.length<3) return false;
+    const d = new Date(parseInt(p[2]), parseInt(p[1])-1, parseInt(p[0]));
+    return (hoyMs - d.getTime()) > 7*24*60*60*1000;
+  });
+  if (clientesSinSrv.length) prioSistema.push({
+    tipo: 'info', ambito: 'COMERCIAL',
+    texto: `${clientesSinSrv.length} cliente${clientesSinSrv.length>1?'s':''} activo${clientesSinSrv.length>1?'s':''} sin servicios en los últimos 7 días`,
+    accion: "filtrar('comercial')"
+  });
+
+  // Disponibilidad — equipos sin registrar hoy
+  const hoyStr = `${String(hoy.getDate()).padStart(2,'0')}-${String(hoy.getMonth()+1).padStart(2,'0')}-${hoy.getFullYear()}`;
+  const dispHoy = Object.values(appData.disponibilidad||{}).flat().filter(d => d.fecha===hoyStr);
+  const patentesCubiertas = [...new Set(dispHoy.map(d=>d.patente))];
+  const FLOTA = appData.patentes || ['GKFD84','WR9192','XR8555','GCFF12','BPBL35','XA1114','DSDV36'];
+  const sinDisp = FLOTA.filter(p => !patentesCubiertas.includes(p));
+  if (sinDisp.length) prioSistema.push({
+    tipo: 'info', ambito: 'OPERACIONAL',
+    texto: `${sinDisp.length} equipo${sinDisp.length>1?'s':''} sin disponibilidad registrada hoy`,
+    accion: "filtrar('operacional')"
+  });
+
+  const TIPO_COLOR = { urgente:'#C62828', alerta:'#E65100', info:'#1565C0' };
+  const TIPO_BG = { urgente:'#FFEBEE', alerta:'#FFF3E0', info:'#E3F2FD' };
+  const TIPO_LABEL = { urgente:'⚡ URGENTE', alerta:'⚠️ ALERTA', info:'ℹ️ INFO' };
+
+  const prioHTML = prioSistema.length
+    ? prioSistema.map(p => `
+      <div onclick="${p.accion}" style="display:flex;align-items:flex-start;gap:8px;padding:10px 12px;border-radius:8px;background:${TIPO_BG[p.tipo]};margin-bottom:6px;border-left:3px solid ${TIPO_COLOR[p.tipo]};cursor:pointer">
+        <div style="flex:1">
+          <div style="display:flex;gap:6px;align-items:center;margin-bottom:2px">
+            <span style="font-size:9px;font-weight:800;color:${TIPO_COLOR[p.tipo]}">${TIPO_LABEL[p.tipo]}</span>
+            <span style="font-size:9px;font-weight:700;color:#888;letter-spacing:0.5px">${p.ambito}</span>
           </div>
-          <button onclick="setPrioridad('${fid}',${pi},0)" style="background:none;border:none;color:#ccc;cursor:pointer;font-size:14px" title="Quitar prioridad">×</button>
-        </div>`;
-      }).join('');
+          <div style="font-size:12px;color:#222;line-height:1.4">${p.texto}</div>
+        </div>
+        <span style="font-size:10px;color:#aaa;flex-shrink:0;margin-top:2px">→</span>
+      </div>`).join('')
+    : `<div style="text-align:center;padding:16px;color:#4CAF50;font-size:12px;font-weight:700">✅ Sin prioridades urgentes — todo al día</div>`;
 
-  // ── PENDIENTES POR ÁMBITO con prioridad y tareas rutinarias ──
-  const ambitosHTML = AMBITOS_ORDEN.map(fid => {
-    const fase = appData.fases.find(f => f.id === fid);
-    if (!fase) return '';
-    const col = COLORES[fid]||'#607D8B';
-    const isOpen = !!appData.midia_open?.[fid];
-    const pendActivos = (fase.pendientes||[]).filter(p => !p.done);
-    const rutinarias = fase.rutinarias||[];
+  // ── INFORME DE CAJA ───────────────────────────────────────
+  const ventasMes = appData.dashboard?.ventas_mes || 0;
+  const liqPagadas = liquidaciones.filter(l => l.estado==='pagada').reduce((a,l)=>a+(l.total||0),0);
+  const porCobrar = liquidaciones.filter(l => l.estado==='facturada'||l.estado==='enviada').reduce((a,l)=>a+(l.total||0),0);
+  const cajaHTML = `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px">
+      <div style="padding:10px;background:#E8F5E9;border-radius:8px;text-align:center">
+        <div style="font-size:9px;font-weight:700;color:#2E7D32;margin-bottom:2px">COBRADO MES</div>
+        <div style="font-size:16px;font-weight:900;color:#2E7D32">$${liqPagadas.toLocaleString('es-CL')}</div>
+      </div>
+      <div style="padding:10px;background:#E3F2FD;border-radius:8px;text-align:center">
+        <div style="font-size:9px;font-weight:700;color:#1565C0;margin-bottom:2px">POR COBRAR</div>
+        <div style="font-size:16px;font-weight:900;color:#1565C0">$${porCobrar.toLocaleString('es-CL')}</div>
+      </div>
+      <div style="padding:10px;background:#F3E5F5;border-radius:8px;text-align:center">
+        <div style="font-size:9px;font-weight:700;color:#6A1B9A;margin-bottom:2px">VENTAS MES</div>
+        <div style="font-size:16px;font-weight:900;color:#6A1B9A">$${ventasMes.toLocaleString('es-CL')}</div>
+      </div>
+      <div style="padding:10px;background:#FFF3E0;border-radius:8px;text-align:center">
+        <div style="font-size:9px;font-weight:700;color:#E65100;margin-bottom:2px">COMPROMISOS HOY</div>
+        <div style="font-size:13px;font-weight:900;color:#E65100">—</div>
+        <div style="font-size:8px;color:#aaa;margin-top:2px">disponible con módulo Cobro</div>
+      </div>
+    </div>
+    <div style="padding:8px 12px;background:#ECEFF1;border-radius:8px;font-size:10px;color:#546E7A;text-align:center">
+      Entradas y salidas proyectadas del día estarán disponibles cuando se complete el módulo Facturación y Cobro
+    </div>`;
 
-    const pendHTML = pendActivos.length === 0 
-      ? `<div style="padding:8px 12px;font-size:11px;color:#aaa">Sin pendientes activos</div>`
-      : pendActivos.map((p, pi) => {
-          const key = `${fid}::${pi}`;
-          const prio = appData.prioridades[key]||0;
-          return `<div style="display:flex;align-items:flex-start;gap:6px;padding:7px 12px;border-bottom:1px solid #f0f0f0">
-            <div style="flex:1;font-size:11px;color:#333;line-height:1.4">
-              ${p.badge&&p.badge!=='none'?`<span style="font-size:8px;font-weight:800;background:${col};color:white;padding:1px 5px;border-radius:3px;margin-right:4px">${p.badge.toUpperCase()}</span>`:''}${p.texto}
-            </div>
-            <div style="display:flex;gap:3px;flex-shrink:0">
-              ${[1,2,3].map(n=>`<button onclick="setPrioridad('${fid}',${pi},${n})" style="width:24px;height:24px;border-radius:5px;border:1.5px solid ${PRIO_COLORS[n]};background:${prio===n?PRIO_COLORS[n]:'white'};color:${prio===n?'white':PRIO_COLORS[n]};font-size:9px;font-weight:900;cursor:pointer">${n}</button>`).join('')}
-            </div>
-          </div>`;
-        }).join('');
+  // ── PIPELINE RÁPIDO ───────────────────────────────────────
+  const pipActivos = (appData.pipeline||[]).filter(c=>c.etapa==='activo').slice(0,5);
+  const pipHTML = pipActivos.length
+    ? pipActivos.map(c=>`
+      <div style="padding:8px 10px;border-bottom:1px solid #f5f5f5;display:flex;justify-content:space-between;align-items:center">
+        <div><div style="font-size:11px;font-weight:700;color:#333">${c.cliente}</div>
+          <div style="font-size:10px;color:#888">${c.proximaAccion||'Sin próxima acción definida'}</div></div>
+        <span style="font-size:9px;font-weight:700;padding:2px 8px;border-radius:10px;background:#E3F2FD;color:#1565C0">ACTIVO</span>
+      </div>`).join('')
+    : '<div style="padding:12px;text-align:center;color:#aaa;font-size:11px">Sin clientes activos en pipeline</div>';
 
-    const rutHTML = rutinarias.length === 0
-      ? `<div style="padding:8px 12px;font-size:11px;color:#aaa">Sin tareas rutinarias</div>`
-      : rutinarias.map(r => `<div style="padding:6px 12px;font-size:11px;color:#555;border-bottom:1px solid #f5f5f5">— ${r.titulo}</div>`).join('');
+  // ── PRIORIDADES MANUALES ──────────────────────────────────
+  if (!appData.priosManuales) appData.priosManuales = [];
+  const priosManHTML = appData.priosManuales.filter(p=>!p.done).map((p,i)=>`
+    <div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid #f5f5f5">
+      <input type="checkbox" onchange="togglePrioManual(${i})" style="cursor:pointer;flex-shrink:0">
+      <span style="font-size:12px;color:#333;flex:1">${p.texto}</span>
+      <span onclick="delPrioManual(${i})" style="color:#ddd;cursor:pointer;font-size:14px">×</span>
+    </div>`).join('') || '<div style="font-size:11px;color:#aaa;padding:8px 0;text-align:center">Sin prioridades manuales</div>';
 
-    return `<div style="margin-bottom:8px;border-radius:8px;overflow:hidden;border:1px solid #e8eaec">
-      <div onclick="toggleMidiaAmb('${fid}')" style="display:flex;justify-content:space-between;align-items:center;padding:10px 12px;background:${col};cursor:pointer">
-        <span style="font-size:10px;font-weight:800;color:white;letter-spacing:1px">${fase.nombre}</span>
-        <div style="display:flex;align-items:center;gap:8px">
-          <span style="font-size:9px;color:rgba(255,255,255,0.8)">${pendActivos.length} pendientes</span>
-          <span style="color:white;font-size:11px">${isOpen?'▲':'▼'}</span>
+  return `<div style="padding:2px">
+
+    <!-- ENCABEZADO DÍA -->
+    <div style="text-align:center;padding:12px 0 16px">
+      <div style="font-size:11px;font-weight:700;color:#607D8B;letter-spacing:2px;text-transform:uppercase">Hoy</div>
+      <div style="font-size:16px;font-weight:800;color:#263238">${fechaStr}</div>
+    </div>
+
+    <!-- BLOQUE AM -->
+    <div style="font-size:10px;font-weight:900;color:#455A64;letter-spacing:2px;margin-bottom:8px;padding:6px 10px;background:#ECEFF1;border-radius:6px">☀️ BLOQUE AM</div>
+
+    <!-- 1. PRIORIDADES DEL DÍA -->
+    <div style="margin-bottom:12px">
+      <div onclick="uiState.dia_prio=!uiState.dia_prio;render()" style="font-size:10px;font-weight:800;color:#C62828;letter-spacing:1px;margin-bottom:8px;cursor:pointer;display:flex;justify-content:space-between;align-items:center">
+        <span>1. PRIORIDADES DEL DÍA <span style="font-size:9px;font-weight:400;color:#aaa">(${prioSistema.length} alertas)</span></span>
+        <span style="color:#aaa">${uiState.dia_prio?'▲':'▼'}</span>
+      </div>
+      ${uiState.dia_prio ? `<div style="background:white;border:1px solid #e8eaec;border-radius:10px;padding:10px 12px">${prioHTML}</div>` : ''}
+    </div>
+
+    <!-- 2. INFORME DE CAJA -->
+    <div style="margin-bottom:12px">
+      <div onclick="uiState.dia_caja=!uiState.dia_caja;render()" style="font-size:10px;font-weight:800;color:#2E7D32;letter-spacing:1px;margin-bottom:8px;cursor:pointer;display:flex;justify-content:space-between">
+        <span>2. INFORME DE CAJA</span><span style="color:#aaa">${uiState.dia_caja?'▲':'▼'}</span>
+      </div>
+      ${uiState.dia_caja ? `<div style="background:white;border:1px solid #e8eaec;border-radius:10px;padding:10px 12px">${cajaHTML}</div>` : ''}
+    </div>
+
+    <!-- 3. GESTIÓN COMERCIAL -->
+    <div style="margin-bottom:12px">
+      <div onclick="uiState.dia_com=!uiState.dia_com;render()" style="font-size:10px;font-weight:800;color:#1565C0;letter-spacing:1px;margin-bottom:8px;cursor:pointer;display:flex;justify-content:space-between">
+        <span>3. GESTIÓN COMERCIAL — PIPELINE</span><span style="color:#aaa">${uiState.dia_com?'▲':'▼'}</span>
+      </div>
+      ${uiState.dia_com ? `<div style="background:white;border:1px solid #e8eaec;border-radius:10px;overflow:hidden">${pipHTML}</div>` : ''}
+    </div>
+
+    <!-- 4. REVISIÓN SISTEMA -->
+    <div style="margin-bottom:16px">
+      <div onclick="uiState.dia_rev=!uiState.dia_rev;render()" style="font-size:10px;font-weight:800;color:#546E7A;letter-spacing:1px;margin-bottom:8px;cursor:pointer;display:flex;justify-content:space-between">
+        <span>4. REVISIÓN SISTEMA ON LINE</span><span style="color:#aaa">${uiState.dia_rev?'▲':'▼'}</span>
+      </div>
+      ${uiState.dia_rev ? `<div style="background:white;border:1px solid #e8eaec;border-radius:10px;padding:10px 12px">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+          <div style="padding:8px;background:#F8F9FA;border-radius:6px;text-align:center">
+            <div style="font-size:9px;color:#888">Servicios mes</div>
+            <div style="font-size:18px;font-weight:900;color:#455A64">${servicios.length}</div>
+          </div>
+          <div style="padding:8px;background:#F8F9FA;border-radius:6px;text-align:center">
+            <div style="font-size:9px;color:#888">Sin cerrar</div>
+            <div style="font-size:18px;font-weight:900;color:${sinCerrar.length?'#C62828':'#4CAF50'}">${sinCerrar.length}</div>
+          </div>
+          <div style="padding:8px;background:#F8F9FA;border-radius:6px;text-align:center">
+            <div style="font-size:9px;color:#888">Liquidaciones</div>
+            <div style="font-size:18px;font-weight:900;color:#546E7A">${liquidaciones.length}</div>
+          </div>
+          <div style="padding:8px;background:#F8F9FA;border-radius:6px;text-align:center">
+            <div style="font-size:9px;color:#888">Por cobrar</div>
+            <div style="font-size:18px;font-weight:900;color:#1565C0">${liqPendEnvio.length+liqEnviadas.length}</div>
+          </div>
+        </div>
+      </div>` : ''}
+    </div>
+
+    <!-- BLOQUE PM -->
+    <div style="font-size:10px;font-weight:900;color:#455A64;letter-spacing:2px;margin-bottom:8px;padding:6px 10px;background:#ECEFF1;border-radius:6px">🌙 BLOQUE PM</div>
+
+    <!-- 5. PENDIENTES GESTIÓN COMERCIAL -->
+    <div style="margin-bottom:12px">
+      <div onclick="uiState.dia_pipfull=!uiState.dia_pipfull;render()" style="font-size:10px;font-weight:800;color:#1565C0;letter-spacing:1px;margin-bottom:8px;cursor:pointer;display:flex;justify-content:space-between">
+        <span>5. PENDIENTES GESTIÓN COMERCIAL</span><span style="color:#aaa">${uiState.dia_pipfull?'▲':'▼'}</span>
+      </div>
+      ${uiState.dia_pipfull ? `<div style="background:white;border:1px solid #e8eaec;border-radius:10px;padding:10px 12px">${renderPipeline()}</div>` : ''}
+    </div>
+
+    <!-- 6. INFORME DEL DÍA -->
+    <div style="margin-bottom:16px">
+      <div onclick="uiState.dia_inf=!uiState.dia_inf;render()" style="font-size:10px;font-weight:800;color:#37474F;letter-spacing:1px;margin-bottom:8px;cursor:pointer;display:flex;justify-content:space-between">
+        <span>6. INFORME DEL DÍA</span><span style="color:#aaa">${uiState.dia_inf?'▲':'▼'}</span>
+      </div>
+      ${uiState.dia_inf ? `<div style="background:white;border:1px solid #e8eaec;border-radius:10px;padding:10px 12px">
+        <div style="font-size:11px;color:#546E7A;margin-bottom:8px">Resumen automático del día</div>
+        <div style="font-size:11px;color:#333;line-height:1.8">
+          <div>📦 Servicios registrados hoy: <strong>${servicios.filter(s=>{const p=(s.fecha||'').split('-');return p.length===3&&parseInt(p[0])===hoy.getDate()&&parseInt(p[1])-1===hoy.getMonth();}).length}</strong></div>
+          <div>💰 Ventas del mes: <strong>$${ventasMes.toLocaleString('es-CL')}</strong></div>
+          <div>📤 Liquidaciones enviadas hoy: <strong>${liqEnviadas.length}</strong></div>
+          <div>✅ Cobrado en el mes: <strong>$${liqPagadas.toLocaleString('es-CL')}</strong></div>
+          <div>🚛 Equipos disponibles hoy: <strong>${patentesCubiertas.length} / ${FLOTA.length}</strong></div>
+        </div>
+      </div>` : ''}
+    </div>
+
+    <!-- 7. PRIORIDADES MANUALES -->
+    <div style="margin-bottom:12px">
+      <div style="font-size:10px;font-weight:800;color:#607D8B;letter-spacing:1px;margin-bottom:8px">7. NOTAS Y PRIORIDADES MANUALES <span style="font-weight:400;color:#aaa">(temporal)</span></div>
+      <div style="background:white;border:1px solid #e8eaec;border-radius:10px;padding:10px 12px">
+        ${priosManHTML}
+        <div style="display:flex;gap:6px;margin-top:8px">
+          <input id="prio_manual_input" placeholder="Agregar prioridad o nota del día..." style="flex:1;border:1px solid #dde;border-radius:6px;padding:8px 10px;font-size:12px;outline:none;font-family:inherit" onkeydown="if(event.key==='Enter')agregarPrioManual()">
+          <button onclick="agregarPrioManual()" style="background:#607D8B;color:white;border:none;border-radius:6px;padding:8px 14px;font-size:12px;font-weight:700;cursor:pointer">+</button>
         </div>
       </div>
-      ${isOpen ? `
-        <div style="padding:6px 0 2px;background:#FAFAFA">
-          <div style="font-size:8px;font-weight:800;color:#888;letter-spacing:1px;padding:0 12px;margin-bottom:3px">TAREAS RUTINARIAS</div>
-          ${rutHTML}
-          <div style="font-size:8px;font-weight:800;color:#888;letter-spacing:1px;padding:8px 12px 3px;border-top:1px solid #eee;margin-top:4px">PENDIENTES — asigna prioridad</div>
-          ${pendHTML}
-        </div>` : ''}
-    </div>`;
-  }).join('');
+    </div>
 
-  return `<div style="padding:12px">
-    <div style="font-size:10px;font-weight:800;letter-spacing:1.5px;color:#37474F;margin-bottom:10px">⚡ DÍA — ${hoy.toLocaleDateString('es-CL',{weekday:'long',day:'numeric',month:'long'})}</div>
-    <div style="font-size:9px;font-weight:800;color:#C62828;letter-spacing:1px;margin-bottom:6px">FOCO DEL DÍA</div>
-    <div style="margin-bottom:14px">${focoHTML}</div>
-    <div style="font-size:9px;font-weight:800;color:#888;letter-spacing:1px;margin-bottom:8px;border-top:1px solid #eee;padding-top:12px">PENDIENTES POR ÁMBITO</div>
-    ${ambitosHTML}
   </div>`;
+}
+
+function agregarPrioManual() {
+  const input = document.getElementById('prio_manual_input');
+  const texto = input?.value.trim();
+  if (!texto) return;
+  if (!appData.priosManuales) appData.priosManuales = [];
+  appData.priosManuales.push({texto, done:false, fecha: new Date().toLocaleDateString('es-CL')});
+  input.value = '';
+  saveData(); render();
+}
+function togglePrioManual(i) {
+  if (!appData.priosManuales) return;
+  appData.priosManuales[i].done = !appData.priosManuales[i].done;
+  saveData(); render();
+}
+function delPrioManual(i) {
+  if (!appData.priosManuales) return;
+  appData.priosManuales.splice(i, 1);
+  saveData(); render();
 }
 
 function setPrioridad(faseId, pendIdx, valor) {
@@ -4325,7 +4689,7 @@ function seleccionarRol(rolId) {
 function mostrarPasoConductor() {
   document.getElementById('login-step-rol').style.display = 'none';
   document.getElementById('login-step-conductor').style.display = 'block';
-  const conductores = appData.conductores || ['Manuel Madrid','Felipe Vidal','Manuel Madariaga','Sebastián Zúñiga','Pablo Riquelme'];
+  const conductores = appData.conductores || ['Manuel Madrid','Felipe Vidal','Felipe Madariaga','Sebastián Zúñiga','Pablo Riquelme'];
   const lista = document.getElementById('conductores-list-login');
   lista.innerHTML = conductores.map((c,i) => `
     <button class="rol-btn" onclick="seleccionarConductor('${c}', ${i})">${c}</button>
