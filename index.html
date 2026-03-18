@@ -2,8 +2,8 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-  <meta name="version" content="2026031436">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="version" content="2026031737">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Panel de Gestión — Global Solutions</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
@@ -304,7 +304,7 @@
       <button class="copy-btn" onclick="exportarDatos()" style="background:#37474F;border-color:#546E7A;font-size:11px;padding:8px 14px">⬇ Exportar</button>
       <label class="copy-btn" style="background:#37474F;border-color:#546E7A;font-size:11px;padding:8px 14px;cursor:pointer">⬆ Importar<input type="file" accept=".json" onchange="importarDatos(event)" style="display:none"></label>
     </div>
-    <div class="footer">v36 · Marzo 2026 · Global Solutions SpA</div>
+    <div class="footer">v37 · Marzo 2026 · Global Solutions SpA</div>
   </div>
 
   <!-- Modal dashboard individual -->
@@ -689,7 +689,7 @@ function renderRendimientoComb() {
         <input id="rc_fecha" type="date" value="${hoyISO}" style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit;background:white"></div>
       <div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">PATENTE</div>
         <select id="rc_patente" style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit;background:white;-webkit-appearance:auto">
-          <option value="">Seleccionar...</option>${patenteOpts}</select></div>
+          <option value="">Seleccionar...</option>${FLOTA.map(p=>`<option value="${p}" ${fd.patente===p?"selected":""}>${p}</option>`).join("")}</select></div>
       <div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">LITROS CARGADOS</div>
         <input id="rc_litros" type="number" placeholder="ej: 120" style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit"></div>
       <div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">ODÓ SALIDA (km)</div>
@@ -851,7 +851,7 @@ function renderLiquidacionesV2() {
           return `<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid #f5f5f5">
             <input type="checkbox" ${seleccionados.includes(s.id)?'checked':''} onchange="toggleSrvLiq('${s.id}',this.checked)" style="cursor:pointer">
             <div style="flex:1"><span style="font-size:11px;font-weight:700;color:#455A64">${s.id}</span>
-              <span style="font-size:10px;color:#777;margin-left:4px">${s.fecha} · Guías: ${guias}</span></div>
+              <span style="font-size:10px;color:#777;margin-left:4px">${s.fecha}</span><span style="font-size:10px;color:#1565C0;font-weight:700;margin-left:6px">GD: ${guias}</span></div>
             <span style="font-size:11px;font-weight:700;color:#546E7A">$${(s.precio||0).toLocaleString('es-CL')}</span>
           </div>`;
         }).join('')}
@@ -1088,8 +1088,19 @@ function generarHTMLCotV2(c){
 function loadData() {
   try { const s = localStorage.getItem('gs_panel_v5'); appData = s ? JSON.parse(s) : JSON.parse(JSON.stringify(DEFAULT_DATA)); } 
   catch(e) { appData = JSON.parse(JSON.stringify(DEFAULT_DATA)); }
-  try { const s = localStorage.getItem('gs_panel_ui_v5'); uiState = s ? JSON.parse(s) : {}; }
-  catch(e) { uiState = {}; }
+  try {
+    const s = localStorage.getItem('gs_panel_ui_v5');
+    uiState = s ? JSON.parse(s) : {};
+    // v37: cerrar acordeones al cargar — vista limpia
+    Object.keys(uiState).forEach(k => {
+      if (k.startsWith('acord_') || k.startsWith('disp_hist_') ||
+          k.startsWith('srv_open_') || k.startsWith('liq_open_') ||
+          k.startsWith('liq_cl_') || k.startsWith('cs_') ||
+          k.startsWith('avliq_tag_')) {
+        delete uiState[k];
+      }
+    });
+  } catch(e) { uiState = {}; }
   // Validar que el orden de fases sea siempre el correcto
   const ordenCorrecto = ['comercial','operacional','financiero','control'];
   if (appData.fases) {
@@ -1849,7 +1860,7 @@ function renderFase(fase) {
           <div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">PEAJES ($)</div>
           <input id="srv_peajes" type="number" placeholder="ej: 8000" style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit">
         </div>
-        <button onclick="addServicio()" style="width:100%;background:#455A64;color:white;border:none;border-radius:8px;padding:11px;font-size:13px;cursor:pointer;font-weight:700">+ Registrar servicio</button>
+        <button onclick="addServicio()" style="width:100%;background:#455A64;color:white;border:none;border-radius:8px;padding:16px;font-size:15px;cursor:pointer;font-weight:700;min-height:54px;-webkit-tap-highlight-color:transparent;touch-action:manipulation">+ Registrar servicio</button>
         ${servicios.length ? `<div style="margin-top:12px"><div style="font-size:10px;font-weight:700;color:#607D8B;letter-spacing:1px;margin-bottom:4px">SERVICIOS DEL MES (${servicios.length})</div>${lista}</div>` : `<div style="margin-top:6px">${lista}</div>`}
       </div>`;
     })() : '';
@@ -2441,6 +2452,7 @@ function renderPipeline() {
           ${c.contacto ? `<div style="font-size:11px;color:#777;margin-bottom:3px">👤 ${c.contacto}</div>` : ''}
           ${c.proximaAccion ? `<div style="font-size:11px;color:#444;margin-bottom:2px">→ ${c.proximaAccion}</div>` : ''}
           ${c.notas ? `<div style="font-size:10px;color:#aaa;font-style:italic">${c.notas}</div>` : ''}
+          ${(c.notasMultiples&&c.notasMultiples.length) ? `<div style="margin-top:5px;border-top:1px solid #f0f0f0;padding-top:4px">${c.notasMultiples.slice(-3).map(n=>`<div style="font-size:10px;color:#455A64;padding:2px 0"><span style="color:#bbb;margin-right:4px">${n.fecha}</span>${n.texto}</div>`).join('')}</div>` : ''}
         </div>
         <div style="display:flex;flex-direction:column;gap:4px;flex-shrink:0">
           <button onclick="editarPipeline(${ci})" style="background:none;border:1px solid #dde;border-radius:5px;padding:3px 8px;font-size:10px;color:#607D8B;cursor:pointer;font-weight:700">✎</button>
@@ -3175,7 +3187,7 @@ function renderDisponibilidad() {
       </div>
       <div>
         <div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">ESTADO</div>
-        <select id="disp_estado" onchange="uiState.disp_form=uiState.disp_form||{};uiState.disp_form.patente=document.getElementById('disp_patente')?.value||uiState.disp_form.patente||'';uiState.disp_form.fecha=document.getElementById('disp_fecha')?.value||uiState.disp_form.fecha||'';uiState.disp_form.estado=this.value;render()" style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit;background:white;-webkit-appearance:auto">
+        <select id="disp_estado" onchange="(function(sel){var dp=document.getElementById('disp_patente');var df=document.getElementById('disp_fecha');uiState.disp_form=uiState.disp_form||{};if(dp&&dp.value)uiState.disp_form.patente=dp.value;if(df&&df.value)uiState.disp_form.fecha=df.value;uiState.disp_form.estado=sel.value;render();})(this)" style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit;background:white;-webkit-appearance:auto">
           <option value="">Seleccionar...</option>
           ${estadoOpts}
         </select>
@@ -3189,7 +3201,7 @@ function renderDisponibilidad() {
       </div>` : ''}
       ${fd.estado==='Mantención' ? `<div>
         <div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">TIPO MANTENCIÓN</div>
-        <select id="disp_tipo_mant" onchange="uiState.disp_form=uiState.disp_form||{};uiState.disp_form.patente=document.getElementById('disp_patente')?.value||uiState.disp_form.patente||'';uiState.disp_form.fecha=document.getElementById('disp_fecha')?.value||uiState.disp_form.fecha||'';uiState.disp_form.tipoMant=this.value;render()" style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit;background:white;-webkit-appearance:auto">
+        <select id="disp_tipo_mant" onchange="(function(sel){var dp=document.getElementById('disp_patente');var df=document.getElementById('disp_fecha');uiState.disp_form=uiState.disp_form||{};if(dp&&dp.value)uiState.disp_form.patente=dp.value;if(df&&df.value)uiState.disp_form.fecha=df.value;uiState.disp_form.tipoMant=sel.value;render();})(this)" style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit;background:white;-webkit-appearance:auto">
           <option value="">Seleccionar tipo...</option>
           ${tipoMantOpts}
         </select>
@@ -4184,7 +4196,7 @@ function render() {
 const ROLES = [
   { id: 'cgestion',   nombre: 'Controler',     pin: '0001', acceso: 'all' },
   { id: 'coordinador',nombre: 'Coordinador',   pin: '0002', acceso: 'all' },
-  { id: 'mantenimiento', nombre: 'Mantenimiento', pin: '0003', acceso: 'operacional' },
+  { id: 'mantenimiento', nombre: 'Mantenimiento', pin: '0003', acceso: 'disponibilidad' },
   { id: 'admin',      nombre: 'Administrativo',pin: '0004', acceso: 'all' },
   { id: 'conductor',  nombre: 'Conductor',     pin: null,   acceso: 'conductor' },
 ];
@@ -4328,19 +4340,30 @@ function aplicarAcceso() {
   const acceso = sessionRol.acceso;
 
   if (acceso === 'conductor') {
-    // Conductor: solo ve operacional y hoja de servicio
+    // Conductor: Operacional, solo Registro Servicio
     vistaActual = 'operacional';
     render();
     setTimeout(() => {
-      // Ocultar todos los filtros
       document.querySelectorAll('.filter-btn').forEach(b => b.style.display = 'none');
-      // Abrir hoja de servicio automáticamente
       const fase = appData.fases.find(f => f.id === 'operacional');
       if (fase) {
         const idx = fase.rutinarias.findIndex(r => r.registroServicio);
         if (idx !== -1) { uiState['acord_operacional_' + idx] = true; render(); }
       }
-    }, 100);
+    }, 150);
+
+  } else if (acceso === 'disponibilidad') {
+    // Mantenimiento: solo Disponibilidad
+    vistaActual = 'operacional';
+    render();
+    setTimeout(() => {
+      document.querySelectorAll('.filter-btn').forEach(b => b.style.display = 'none');
+      const fase = appData.fases.find(f => f.id === 'operacional');
+      if (fase) {
+        const idx = fase.rutinarias.findIndex(r => r.disponibilidadDiaria);
+        if (idx !== -1) { uiState['acord_operacional_' + idx] = true; render(); }
+      }
+    }, 150);
 
   } else if (acceso === 'all') {
     // Acceso total: mostrar todo
@@ -4375,6 +4398,31 @@ function aplicarAcceso() {
 // ============ FIN LOGIN ============
 
 loadData(); iniciarLogin(); initSupabase();
+
+// ── AUTO-REFRESCO v37: cada 3 minutos ──────────────────
+setInterval(async () => {
+  if (!supaConectado || !supa) return;
+  try {
+    await syncServiciosDesdeSupabase();
+    await syncDisponibilidadDesdeSupabase();
+    render();
+  } catch(e) {}
+}, 3 * 60 * 1000);
+
+// ── PULL TO REFRESH móvil ───────────────────────────────
+let _ptY = 0;
+document.addEventListener('touchstart', e => { _ptY = e.touches[0].clientY; }, {passive:true});
+document.addEventListener('touchend', async e => {
+  const dy = e.changedTouches[0].clientY - _ptY;
+  if (dy > 80 && window.scrollY === 0 && supaConectado) {
+    const el = document.getElementById('save-indicator');
+    if (el) { el.textContent = '↻ Actualizando...'; el.classList.add('show'); }
+    await syncServiciosDesdeSupabase();
+    await syncDisponibilidadDesdeSupabase();
+    render();
+    if (el) { el.textContent = '✓ Actualizado'; setTimeout(() => el.classList.remove('show'), 2000); }
+  }
+}, {passive:true});
 
 // Desregistrar cualquier Service Worker anterior
 if ('serviceWorker' in navigator) {
