@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-  <meta name="version" content="2026031737b">
+  <meta name="version" content="2026031737f">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Panel de Gestión — Global Solutions</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -304,7 +304,7 @@
       <button class="copy-btn" onclick="exportarDatos()" style="background:#37474F;border-color:#546E7A;font-size:11px;padding:8px 14px">⬇ Exportar</button>
       <label class="copy-btn" style="background:#37474F;border-color:#546E7A;font-size:11px;padding:8px 14px;cursor:pointer">⬆ Importar<input type="file" accept=".json" onchange="importarDatos(event)" style="display:none"></label>
     </div>
-    <div class="footer">v37b · Marzo 2026 · Global Solutions SpA</div>
+    <div class="footer">v37f · Marzo 2026 · Global Solutions SpA</div>
   </div>
 
   <!-- Modal dashboard individual -->
@@ -689,7 +689,7 @@ function renderRendimientoComb() {
         <input id="rc_fecha" type="date" value="${hoyISO}" style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit;background:white"></div>
       <div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">PATENTE</div>
         <select id="rc_patente" style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit;background:white;-webkit-appearance:auto">
-          <option value="">Seleccionar...</option>${FLOTA.map(p=>`<option value="${p}" ${fd.patente===p?"selected":""}>${p}</option>`).join("")}</select></div>
+          <option value="">Seleccionar...</option>${FLOTA.map(p=>`<option value="${p}">${p}</option>`).join("")}</select></div>
       <div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">LITROS CARGADOS</div>
         <input id="rc_litros" type="number" placeholder="ej: 120" style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit"></div>
       <div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">ODÓ SALIDA (km)</div>
@@ -1634,25 +1634,35 @@ function renderFase(fase) {
     saveData();
   }
 
-  const rutHTML = fase.rutinarias.map((tarea, ti) => {
-    const isOpen = !!uiState[`acord_${fase.id}_${ti}`];
-    const isProcOpen = !!uiState[`proc_${fase.id}_${ti}`];
+  // v37d: filtrar tareas según rol activo
+  const _acceso = sessionRol ? sessionRol.acceso : 'all';
+  const tareasVisibles = fase.rutinarias.filter((tarea) => {
+    if (_acceso === 'disponibilidad') return !!tarea.disponibilidadDiaria;
+    if (_acceso === 'conductor') return !!tarea.registroServicio;
+    return true;
+  });
+
+  const rutHTML = tareasVisibles.map((tarea, ti) => {
+    // Obtener índice real para uiState
+    const tiReal = fase.rutinarias.indexOf(tarea);
+    const isOpen = !!uiState[`acord_${fase.id}_${tiReal}`];
+    const isProcOpen = !!uiState[`proc_${fase.id}_${tiReal}`];
     const isDone = !!tarea.done;
 
     const subsHTML = tarea.subtareas.map((st, si) =>
       `<div class="subtask" style="${isDone?'opacity:0.5':''}">
         <span class="subtask-text">— ${st}</span>
-        <span class="subtask-del" onclick="delSub('${fase.id}',${ti},${si})">×</span>
+        <span class="subtask-del" onclick="delSub('${fase.id}',${tiReal},${si})">×</span>
       </div>`
     ).join('');
 
     const procHTML = `<div class="proc-box" style="margin-top:8px">
-      <strong style="cursor:pointer;display:flex;align-items:center;justify-content:space-between" onclick="toggleProc('${fase.id}',${ti})">
+      <strong style="cursor:pointer;display:flex;align-items:center;justify-content:space-between" onclick="toggleProc('${fase.id}',${tiReal})">
         <span>Procedimiento / Ayuda de memoria</span>
         <span style="font-size:10px;color:#ad6800">${isProcOpen?'▲ cerrar':'▼ ver'}</span>
       </strong>
-      ${isProcOpen ? `<textarea class="proc-edit-area" id="proc_edit_${fase.id}_${ti}">${tarea.proc||''}</textarea>
-        <button class="proc-save-btn" onclick="saveProc('${fase.id}',${ti})">Guardar</button>` :
+      ${isProcOpen ? `<textarea class="proc-edit-area" id="proc_edit_${fase.id}_${tiReal}">${tarea.proc||''}</textarea>
+        <button class="proc-save-btn" onclick="saveProc('${fase.id}',${tiReal})">Guardar</button>` :
         (tarea.proc ? `<div style="font-size:11px;color:#614700;margin-top:4px;line-height:1.5">${tarea.proc}</div>` : '<div style="font-size:11px;color:#aaa;margin-top:4px">Sin procedimiento — clic en ver para agregar.</div>')}
     </div>`;
 
@@ -1865,25 +1875,26 @@ function renderFase(fase) {
       </div>`;
     })() : '';
 
-    return `<div class="acord-item" style="${isDone?'opacity:0.6':''}">
+    const _flag = tarea.registroServicio?'registroServicio':tarea.disponibilidadDiaria?'disponibilidadDiaria':tarea.rendimientoCombTask?'rendimientoCombTask':tarea.liquidacionTask?'liquidacionTask':tarea.cierreServicioTask?'cierreServicioTask':tarea.cotizacionTask?'cotizacionTask':tarea.pipelineTask?'pipelineTask':tarea.respaldoTask?'respaldoTask':'';
+    return `<div class="acord-item" data-flag="${_flag}" style="${isDone?'opacity:0.6':''}">
       <div class="acord-header ${isOpen?'open':''}" style="${isDone?'background:#f5f5f5':''}">
-        <span class="acord-arrow" onclick="toggleAcord('${fase.id}',${ti})" style="padding:4px 6px 4px 0;cursor:pointer">▶</span>
-        ${uiState[`edit_tarea_${fase.id}_${ti}`]
-          ? `<input id="tarea_edit_${fase.id}_${ti}" value="${tarea.titulo.replace(/"/g,'&quot;')}" style="flex:1;border:1px solid ${fase.color};border-radius:5px;padding:3px 6px;font-size:12px;font-weight:700;outline:none" onblur="saveTareaTitulo('${fase.id}',${ti})" onkeydown="if(event.key==='Enter')saveTareaTitulo('${fase.id}',${ti})">`
-          : `<span class="acord-title" style="${isDone?'text-decoration:line-through;color:#aaa':''}" onclick="toggleAcord('${fase.id}',${ti})">${tarea.titulo}</span>`
+        <span class="acord-arrow" onclick="toggleAcord('${fase.id}',${tiReal})" style="padding:4px 6px 4px 0;cursor:pointer">▶</span>
+        ${uiState[`edit_tarea_${fase.id}_${tiReal}`]
+          ? `<input id="tarea_edit_${fase.id}_${tiReal}" value="${tarea.titulo.replace(/"/g,'&quot;')}" style="flex:1;border:1px solid ${fase.color};border-radius:5px;padding:3px 6px;font-size:12px;font-weight:700;outline:none" onblur="saveTareaTitulo('${fase.id}',${tiReal})" onkeydown="if(event.key==='Enter')saveTareaTitulo('${fase.id}',${tiReal})">`
+          : `<span class="acord-title" style="${isDone?'text-decoration:line-through;color:#aaa':''}" onclick="toggleAcord('${fase.id}',${tiReal})">${tarea.titulo}</span>`
         }
-        <span onclick="toggleTareaDone('${fase.id}',${ti})" title="${isDone?'Reactivar':'Tachar tarea'}" style="cursor:pointer;font-size:14px;color:${isDone?fase.color:'#ccc'};padding:0 4px">${isDone?'✓':'○'}</span>
-        <span onclick="editTareaTitulo('${fase.id}',${ti})" title="Editar nombre" style="cursor:pointer;font-size:12px;color:#bbb;padding:0 4px">✎</span>
+        <span onclick="toggleTareaDone('${fase.id}',${tiReal})" title="${isDone?'Reactivar':'Tachar tarea'}" style="cursor:pointer;font-size:14px;color:${isDone?fase.color:'#ccc'};padding:0 4px">${isDone?'✓':'○'}</span>
+        <span onclick="editTareaTitulo('${fase.id}',${tiReal})" title="Editar nombre" style="cursor:pointer;font-size:12px;color:#bbb;padding:0 4px">✎</span>
         ${!tarea.registroServicio&&!tarea.liquidacionServicios&&!tarea.disponibilidadDiaria&&!tarea.pipelineTask&&!tarea.respaldoTask&&!tarea.rendimientoCombTask&&!tarea.cierreServicioTask&&!tarea.liquidacionTask&&!tarea.cotizacionTask?`
-      <span onclick="moverTarea('${fase.id}',${ti},-1)" title="Subir" style="cursor:pointer;font-size:10px;color:#ddd;padding:0 2px">▲</span>
-      <span onclick="moverTarea('${fase.id}',${ti},1)" title="Bajar" style="cursor:pointer;font-size:10px;color:#ddd;padding:0 2px">▼</span>
+      <span onclick="moverTarea('${fase.id}',${tiReal},-1)" title="Subir" style="cursor:pointer;font-size:10px;color:#ddd;padding:0 2px">▲</span>
+      <span onclick="moverTarea('${fase.id}',${tiReal},1)" title="Bajar" style="cursor:pointer;font-size:10px;color:#ddd;padding:0 2px">▼</span>
       ${modoEdicion ? `
-        <span onclick="moverTarea('${fase.id}',${ti},-1)" title="Subir" style="cursor:pointer;font-size:12px;color:#90A4AE;padding:0 3px">↑</span>
-        <span onclick="moverTarea('${fase.id}',${ti},1)" title="Bajar" style="cursor:pointer;font-size:12px;color:#90A4AE;padding:0 3px">↓</span>
-        ${!tarea.registroServicio && !tarea.liquidacionServicios && !tarea.disponibilidadDiaria && !tarea.pipelineTask && !tarea.respaldoTask && !tarea.rendimientoCombTask && !tarea.cierreServicioTask && !tarea.liquidacionTask && !tarea.cotizacionTask ? `<span onclick="delTarea('${fase.id}',${ti})" title="Eliminar tarea" style="cursor:pointer;font-size:16px;color:#E53935;padding:0 4px">×</span>` : ''}
+        <span onclick="moverTarea('${fase.id}',${tiReal},-1)" title="Subir" style="cursor:pointer;font-size:12px;color:#90A4AE;padding:0 3px">↑</span>
+        <span onclick="moverTarea('${fase.id}',${tiReal},1)" title="Bajar" style="cursor:pointer;font-size:12px;color:#90A4AE;padding:0 3px">↓</span>
+        ${!tarea.registroServicio && !tarea.liquidacionServicios && !tarea.disponibilidadDiaria && !tarea.pipelineTask && !tarea.respaldoTask && !tarea.rendimientoCombTask && !tarea.cierreServicioTask && !tarea.liquidacionTask && !tarea.cotizacionTask ? `<span onclick="delTarea('${fase.id}',${tiReal})" title="Eliminar tarea" style="cursor:pointer;font-size:16px;color:#E53935;padding:0 4px">×</span>` : ''}
       ` : ''}
     `:''}
-        <span class="acord-count" onclick="toggleAcord('${fase.id}',${ti})">${tarea.subtareas.length}</span>
+        <span class="acord-count" onclick="toggleAcord('${fase.id}',${tiReal})">${tarea.subtareas.length}</span>
       </div>
       <div class="acord-body ${isOpen?'open':''}">
         ${liquidacionHTML}
@@ -1899,8 +1910,8 @@ function renderFase(fase) {
           <button onclick="descargarRespaldo()" style="width:100%;padding:12px;background:#37474F;color:white;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer">💾 Descargar respaldo</button></div>` : ''}
         ${subsHTML}
         <div class="add-sub-row" style="--fc:${fase.color}">
-          <input class="add-sub-input" id="sub_input_${fase.id}_${ti}" placeholder="+ Agregar paso..." onkeydown="if(event.key==='Enter')addSub('${fase.id}',${ti})">
-          <button class="add-sub-btn" style="background:${fase.color}" onclick="addSub('${fase.id}',${ti})">+</button>
+          <input class="add-sub-input" id="sub_input_${fase.id}_${tiReal}" placeholder="+ Agregar paso..." onkeydown="if(event.key==='Enter')addSub('${fase.id}',${tiReal})">
+          <button class="add-sub-btn" style="background:${fase.color}" onclick="addSub('${fase.id}',${tiReal})">+</button>
         </div>
         ${procHTML}
       </div>
@@ -2017,7 +2028,7 @@ function renderFase(fase) {
     <div class="tabs">
       ${extraTab}
       <button class="tab-btn ${tab==='rutinarias'?'active':''}" onclick="setTab('${fase.id}','rutinarias')" style="${tab==='rutinarias'?`color:${fase.color};border-bottom-color:${fase.color};background:${fase.colorClaro}`:''}">Tareas Rutinarias</button>
-      <button class="tab-btn ${tab==='pendientes'?'active':''}" onclick="setTab('${fase.id}','pendientes')" style="${tab==='pendientes'?`color:${fase.color};border-bottom-color:${fase.color};background:${fase.colorClaro}`:''}">Pendientes (${pendActivos})</button>
+      ${(_acceso!=="disponibilidad"&&_acceso!=="conductor")?`<button class="tab-btn ${tab==='pendientes'?'active':''}" onclick="setTab('${fase.id}','pendientes')" style="${tab==='pendientes'?`color:${fase.color};border-bottom-color:${fase.color};background:${fase.colorClaro}`:''}">Pendientes (${pendActivos})</button>`:""}
 
     </div>
     <div class="items">${tabContent}</div>
@@ -4355,12 +4366,7 @@ function aplicarAcceso() {
         const idx = fase.rutinarias.findIndex(r => r.registroServicio);
         if (idx !== -1) { uiState['acord_operacional_' + idx] = true; }
         render();
-        setTimeout(() => {
-          document.querySelectorAll('.acord-item').forEach(el => {
-            const title = el.querySelector('.acord-title');
-            if (title && !title.textContent.includes('Registro de servicio')) el.style.display = 'none';
-          });
-        }, 50);
+
       }
     }, 150);
 
@@ -4380,12 +4386,7 @@ function aplicarAcceso() {
         const idx = fase.rutinarias.findIndex(r => r.disponibilidadDiaria);
         if (idx !== -1) { uiState['acord_operacional_' + idx] = true; }
         render();
-        setTimeout(() => {
-          document.querySelectorAll('.acord-item').forEach(el => {
-            const t = el.querySelector('.acord-title');
-            if (t && !t.textContent.includes('Disponibilidad')) el.style.display = 'none';
-          });
-        }, 80);
+
       }
     }, 150);
 
