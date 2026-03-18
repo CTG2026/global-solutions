@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-  <meta name="version" content="2026031737">
+  <meta name="version" content="2026031737b">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Panel de Gestión — Global Solutions</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -304,7 +304,7 @@
       <button class="copy-btn" onclick="exportarDatos()" style="background:#37474F;border-color:#546E7A;font-size:11px;padding:8px 14px">⬇ Exportar</button>
       <label class="copy-btn" style="background:#37474F;border-color:#546E7A;font-size:11px;padding:8px 14px;cursor:pointer">⬆ Importar<input type="file" accept=".json" onchange="importarDatos(event)" style="display:none"></label>
     </div>
-    <div class="footer">v37 · Marzo 2026 · Global Solutions SpA</div>
+    <div class="footer">v37b · Marzo 2026 · Global Solutions SpA</div>
   </div>
 
   <!-- Modal dashboard individual -->
@@ -3180,9 +3180,9 @@ function renderDisponibilidad() {
       </div>
       <div>
         <div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">PATENTE</div>
-        <select id="disp_patente" onchange="uiState.disp_form=uiState.disp_form||{};uiState.disp_form.patente=this.value" style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit;background:white;-webkit-appearance:auto">
+        <select id="disp_patente" onchange="uiState.disp_form=uiState.disp_form||{};uiState.disp_form.patente=this.value;uiState.disp_form.fecha=document.getElementById('disp_fecha')?.value||uiState.disp_form.fecha||''" style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit;background:white;-webkit-appearance:auto">
           <option value="">Seleccionar...</option>
-          ${patenteOpts}
+          ${FLOTA.map(p=>`<option value="${p}" ${fd.patente===p?'selected':''}>${p}</option>`).join('')}
         </select>
       </div>
       <div>
@@ -4340,28 +4340,52 @@ function aplicarAcceso() {
   const acceso = sessionRol.acceso;
 
   if (acceso === 'conductor') {
-    // Conductor: Operacional, solo Registro Servicio
+    // Conductor: solo Registro de Servicio
     vistaActual = 'operacional';
     render();
     setTimeout(() => {
       document.querySelectorAll('.filter-btn').forEach(b => b.style.display = 'none');
+      const dash = document.getElementById('dashboard-container');
+      if (dash) dash.style.display = 'none';
+      const abrirBtn = document.querySelector('button[onclick="abrirEnChrome()"]');
+      if (abrirBtn) abrirBtn.parentElement.style.display = 'none';
       const fase = appData.fases.find(f => f.id === 'operacional');
       if (fase) {
+        fase.rutinarias.forEach((r,i) => { uiState['acord_operacional_'+i] = false; });
         const idx = fase.rutinarias.findIndex(r => r.registroServicio);
-        if (idx !== -1) { uiState['acord_operacional_' + idx] = true; render(); }
+        if (idx !== -1) { uiState['acord_operacional_' + idx] = true; }
+        render();
+        setTimeout(() => {
+          document.querySelectorAll('.acord-item').forEach(el => {
+            const title = el.querySelector('.acord-title');
+            if (title && !title.textContent.includes('Registro de servicio')) el.style.display = 'none';
+          });
+        }, 50);
       }
     }, 150);
 
   } else if (acceso === 'disponibilidad') {
-    // Mantenimiento: solo Disponibilidad
+    // Mantenimiento: solo módulo Disponibilidad
     vistaActual = 'operacional';
     render();
     setTimeout(() => {
       document.querySelectorAll('.filter-btn').forEach(b => b.style.display = 'none');
+      const dash = document.getElementById('dashboard-container');
+      if (dash) dash.style.display = 'none';
+      const abrirBtn = document.querySelector('button[onclick="abrirEnChrome()"]');
+      if (abrirBtn && abrirBtn.parentElement) abrirBtn.parentElement.style.display = 'none';
       const fase = appData.fases.find(f => f.id === 'operacional');
       if (fase) {
+        fase.rutinarias.forEach((r,i) => { uiState['acord_operacional_'+i] = false; });
         const idx = fase.rutinarias.findIndex(r => r.disponibilidadDiaria);
-        if (idx !== -1) { uiState['acord_operacional_' + idx] = true; render(); }
+        if (idx !== -1) { uiState['acord_operacional_' + idx] = true; }
+        render();
+        setTimeout(() => {
+          document.querySelectorAll('.acord-item').forEach(el => {
+            const t = el.querySelector('.acord-title');
+            if (t && !t.textContent.includes('Disponibilidad')) el.style.display = 'none';
+          });
+        }, 80);
       }
     }, 150);
 
