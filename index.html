@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-  <meta name="version" content="2026031737f">
+  <meta name="version" content="2026031838">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Panel de Gestión — Global Solutions</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -304,7 +304,7 @@
       <button class="copy-btn" onclick="exportarDatos()" style="background:#37474F;border-color:#546E7A;font-size:11px;padding:8px 14px">⬇ Exportar</button>
       <label class="copy-btn" style="background:#37474F;border-color:#546E7A;font-size:11px;padding:8px 14px;cursor:pointer">⬆ Importar<input type="file" accept=".json" onchange="importarDatos(event)" style="display:none"></label>
     </div>
-    <div class="footer">v37f · Marzo 2026 · Global Solutions SpA</div>
+    <div class="footer">v38b · Marzo 2026 · Global Solutions SpA</div>
   </div>
 
   <!-- Modal dashboard individual -->
@@ -766,14 +766,13 @@ function renderCierreServicios() {
       return `<div style="border:1px solid #dde;border-radius:8px;margin-bottom:6px;overflow:hidden">
         <div onclick="uiState['cs_${s.id}']=!uiState['cs_${s.id}'];render()" style="padding:10px 12px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;background:${isOpen?'#F8F9FA':'white'}">
           <div>
-            <span style="font-size:12px;font-weight:700;color:#455A64">${s.id}</span>
-            <span style="font-size:10px;color:#777;margin-left:6px">${s.fecha}</span>
-            <div style="font-size:11px;color:#555;margin-top:2px">${s.patente} · ${s.conductor||'—'} · ${s.cliente||'—'}</div>
-            <div style="font-size:10px;color:#888">${s.origen||'—'} → ${destinos}</div>
+            ${srvVista(s).replace('<div style="padding:8px 10px;background:white;border:1px solid #e8eaec;border-radius:8px;margin-bottom:4px">', '<div style="margin-bottom:4px">')}
           </div>
           <span style="font-size:10px;color:#aaa">${isOpen?'▲':'▼'}</span>
         </div>
         ${isOpen?`<div style="padding:10px 12px;background:#FAFAFA;border-top:1px solid #eee">
+          ${srvDetalle(s)}
+          <div style="height:1px;background:#eee;margin:10px 0"></div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px">
             <div style="grid-column:1/-1"><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">PRECIO NETO ($)</div>
               <input id="cs_precio_${s.id}" type="number" value="${s.precio||''}" placeholder="ej: 450000" style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:14px;font-weight:700;outline:none;font-family:inherit"></div>
@@ -905,7 +904,7 @@ function renderLiquidacionesV2() {
         </div>
         ${isOpen?`<div style="padding:10px 12px">
           ${liq.ruts&&liq.ruts.length?`<div style="font-size:10px;color:#546E7A;margin-bottom:6px">RUTs: ${liq.ruts.join(', ')}</div>`:''}
-          ${svcsLiq.map(s=>{const guias=(s.guias||[]).map(g=>g.num).filter(Boolean).join(', ')||'—';return `<div style="padding:5px 0;border-bottom:1px solid #f5f5f5;font-size:11px;color:#555"><strong style="color:#333">${s.id}</strong> — ${s.cliente||'—'} — Guías: ${guias} — <strong>$${(s.precio||0).toLocaleString('es-CL')}</strong></div>`;}).join('')}
+          ${svcsLiq.map(s=>srvVista(s)+(s.precio?`<div style="font-size:10px;font-weight:700;color:#2E7D32;text-align:right;margin-top:-6px;margin-bottom:4px">$${(s.precio||0).toLocaleString('es-CL')}</div>`:'') ).join('')}
           <div style="display:flex;gap:5px;margin-top:10px;flex-wrap:wrap">
             ${liq.estado==='creada'?`<button onclick="cambiarEstadoLiq('${liq.id}','enviada')" style="flex:1;padding:8px;background:#E3F2FD;color:#1565C0;border:1px solid #1565C0;border-radius:7px;font-size:10px;font-weight:700;cursor:pointer">📤 Enviada</button>`:''}
             ${liq.estado==='enviada'?`<button onclick="cambiarEstadoLiq('${liq.id}','facturada')" style="flex:1;padding:8px;background:#F3E5F5;color:#6A1B9A;border:1px solid #6A1B9A;border-radius:7px;font-size:10px;font-weight:700;cursor:pointer">🧾 Facturada</button>`:''}
@@ -1085,6 +1084,63 @@ function generarHTMLCotV2(c){
   </div>`;
 }
 
+
+// ── VISTA ESTÁNDAR SERVICIO v37g ─────────────────────────
+// Orden: ID / Cliente / GD (nº guía) / Fecha guía / Origen / Destino / Fecha descarga
+function srvVista(s) {
+  const guias = s.guias || [];
+  const gdNums = guias.map(g=>g.num).filter(Boolean).join(', ') || '—';
+  const gdFechas = guias.map(g=>g.fecha_descarga).filter(Boolean).join(', ') || '—';
+  const gdDestinos = guias.map(g=>g.destino).filter(Boolean).join(' / ') || '—';
+  return `<div style="padding:8px 10px;background:white;border:1px solid #e8eaec;border-radius:8px;margin-bottom:4px">
+    <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:3px">
+      <span style="font-size:12px;font-weight:800;color:#455A64;letter-spacing:1px">${s.id}</span>
+      <span style="font-size:12px;font-weight:700;color:#222">${s.cliente||'—'}</span>
+    </div>
+    <div style="font-size:10px;color:#1565C0;font-weight:700">GD: ${gdNums}</div>
+    <div style="font-size:10px;color:#777;margin-top:1px">${s.fecha} · Descarga: ${gdFechas}</div>
+    <div style="font-size:10px;color:#888;margin-top:1px">${s.origen||'—'} → ${gdDestinos}</div>
+  </div>`;
+}
+
+// Vista EXPANDIDA de un servicio — orden acordado
+function srvDetalle(s) {
+  const guias = s.guias || [];
+  const rows = guias.length
+    ? guias.map((g,i) => `
+      <div style="padding:6px 0;border-bottom:1px solid #f5f5f5">
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          <span style="font-size:10px;font-weight:700;color:#888">GD ${i+1}:</span>
+          <span style="font-size:11px;font-weight:700;color:#1565C0">${g.num||'—'}</span>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-top:3px">
+          <div><span style="font-size:9px;color:#aaa">Fecha guía</span><div style="font-size:11px;color:#333">${s.fecha||'—'}</div></div>
+          <div><span style="font-size:9px;color:#aaa">Fecha descarga</span><div style="font-size:11px;color:#333">${g.fecha_descarga||'—'}</div></div>
+          <div><span style="font-size:9px;color:#aaa">Origen</span><div style="font-size:11px;color:#333">${s.origen||'—'}</div></div>
+          <div><span style="font-size:9px;color:#aaa">Destino</span><div style="font-size:11px;color:#333">${g.destino||'—'}</div></div>
+        </div>
+      </div>`)
+    : `<div style="padding:6px 0;border-bottom:1px solid #f5f5f5">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px">
+          <div><span style="font-size:9px;color:#aaa">Origen</span><div style="font-size:11px;color:#333">${s.origen||'—'}</div></div>
+          <div><span style="font-size:9px;color:#aaa">Destino</span><div style="font-size:11px;color:#333">—</div></div>
+        </div>
+      </div>`;
+  return `<div style="background:#F8F9FA;border-radius:8px;padding:10px 12px;margin-top:6px;border:1px solid #e8eaec">
+    <div style="margin-bottom:8px">
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:2px">
+        <span style="font-size:13px;font-weight:900;color:#455A64;letter-spacing:1px">ID: ${s.id}</span>
+      </div>
+      <div style="font-size:12px;font-weight:700;color:#222"><span style="font-size:9px;font-weight:400;color:#aaa;display:block">Cliente</span>${s.cliente||'—'}</div>
+    </div>
+    ${rows}
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:8px">
+      <div><span style="font-size:9px;color:#aaa">Chofer</span><div style="font-size:11px;color:#333">${s.conductor||'—'}</div></div>
+      <div><span style="font-size:9px;color:#aaa">Patente</span><div style="font-size:11px;color:#333">${s.patente||'—'}</div></div>
+      <div style="grid-column:1/-1"><span style="font-size:9px;color:#aaa">Tipo de equipo</span><div style="font-size:11px;color:#333">${s.tipoEquipo||'—'}</div></div>
+    </div>
+  </div>`;
+}
 function loadData() {
   try { const s = localStorage.getItem('gs_panel_v5'); appData = s ? JSON.parse(s) : JSON.parse(JSON.stringify(DEFAULT_DATA)); } 
   catch(e) { appData = JSON.parse(JSON.stringify(DEFAULT_DATA)); }
@@ -1384,26 +1440,30 @@ async function addServicio() {
   const guias = uiState.srv_guias || [{ num:'', destino:'', fecha_descarga:'' }];
   const servicio = { id, fecha: fechaFinal, anio, mes, patente, conductor, tipoEquipo, cliente, precio: 0, petroleo: 0, adicional: 0, liquidado: false, origen, tag, km, viaticos, peajes, guias };
   appData.servicios.push(servicio);
-  upsertServicioSupabase(servicio);
-  appData.dashboard.ventas_mes = (appData.dashboard.ventas_mes || 0) + precio;
   // Agregar conductor nuevo a la lista si no existe
   if (conductor && !(appData.conductores||[]).includes(conductor)) {
     if (!appData.conductores) appData.conductores = [];
     appData.conductores.push(conductor);
   }
+  // Limpiar formulario inmediatamente y actualizar lista
   uiState.srv_guias = [{ num:'', destino:'', fecha_descarga:'' }];
+  saveData();
+  render(); // render inmediato para mostrar el nuevo servicio en la lista
 
-  // Guardar en Supabase si está conectado
+  // Guardar en Supabase (async, no bloquea el render)
   let guardadoEnDB = false;
   if (supaConectado && supa) {
     try {
-      const { error } = await supa.from('servicios').insert(servicioToRow(servicio));
+      const { error } = await supa.from('servicios').upsert(servicioToRow(servicio), {onConflict:'id'});
       if (!error) guardadoEnDB = true;
     } catch(e) { guardadoEnDB = false; }
+  } else {
+    // Si no hay Supabase, intentar upsert cuando reconecte
+    upsertServicioSupabase(servicio);
   }
 
-  saveData(); render();
   mostrarToastServicio(guardadoEnDB);
+  render(); // segundo render para reflejar estado Supabase
 }
 function delServicio(si) {
   if (!appData.servicios) return;
@@ -1732,8 +1792,10 @@ function renderFase(fase) {
             </div>
             ${badge}
           </div>
-          <div style="font-size:11px;color:#333;margin-top:3px">${s.patente} · ${s.conductor||'—'} · ${s.cliente||'—'}</div>
-          <div style="font-size:11px;color:#777">${s.origen||'—'} → ${destinos}${s.tipoEquipo ? ` · ${s.tipoEquipo}` : ''}</div>
+          <div style="font-size:12px;font-weight:700;color:#222;margin-top:3px">${s.cliente||'—'}</div>
+          <div style="font-size:10px;color:#1565C0;font-weight:600">GD: ${(s.guias||[]).map(g=>g.num).filter(Boolean).join(', ')||'—'}</div>
+          <div style="font-size:10px;color:#777">${s.fecha} · Descarga: ${(s.guias||[]).map(g=>g.fecha_descarga).filter(Boolean).join(', ')||'—'}</div>
+          <div style="font-size:10px;color:#888">${s.origen||'—'} → ${destinos}</div>
           ${s.liquidado ? `
             <div style="font-size:11px;color:#2E7D32;font-weight:700;margin-top:3px">${fmtPeso(s.precio)}</div>
             <div style="display:flex;gap:6px;margin-top:4px;flex-wrap:wrap">
@@ -1769,16 +1831,13 @@ function renderFase(fase) {
       const lista = ultimos3.length ? ultimos3.map((s)=>{
         const idxReal = servicios.indexOf(s);
         const destStr = (s.guias||[]).map(g=>g.destino).filter(Boolean).join(' / ') || s.destino || '—';
-        return `
-        <div style="font-size:11px;padding:6px 0;border-bottom:1px solid #eee;color:#333;line-height:1.6">
-          <div style="display:flex;justify-content:space-between;align-items:flex-start">
-            <div><strong style="color:#455A64">${s.id||'—'}</strong> · ${s.fecha} · <strong>${s.patente}</strong><br>
-            <span style="color:#777">${s.conductor||'—'} · ${s.cliente||'—'}</span><br>
-            <span style="color:#999">${s.origen||'—'} → ${destStr}</span></div>
-            <div style="text-align:right;flex-shrink:0;margin-left:8px">
-              <span onclick="delServicio(${idxReal})" style="color:#bbb;cursor:pointer;font-size:11px">× eliminar</span>
-            </div>
+        const isExpanded = !!uiState['srv_exp_'+s.id];
+        return `<div style="position:relative">
+          <div onclick="uiState['srv_exp_${s.id}']=!uiState['srv_exp_${s.id}'];render()" style="cursor:pointer">
+            ${srvVista(s)}
           </div>
+          ${isExpanded ? srvDetalle(s) : ''}
+          <span onclick="event.stopPropagation();delServicio(${idxReal})" style="position:absolute;top:8px;right:8px;color:#ddd;cursor:pointer;font-size:11px">× eliminar</span>
         </div>`}).join('') : '<div style="font-size:11px;color:#bbb;padding:6px 0;text-align:center">Sin servicios registrados aún</div>';
       // ID automático
       const nextId = 'S' + String(servicios.length + 1).padStart(2,'0');
@@ -3069,12 +3128,16 @@ function renderCierreLiquidacion() {
       <div style="font-size:9px;font-weight:700;color:#546E7A;padding:6px 10px;background:#ECEFF1;letter-spacing:0.5px">SERVICIOS ADJUNTADOS</div>
       ${adjuntados.map(s => {
         const guias = (s.guias||[]).map(g=>g.num).filter(Boolean).join(', ') || '—';
-        return `<div style="padding:7px 10px;border-bottom:1px solid #f5f5f5;display:flex;justify-content:space-between;align-items:center">
-          <div>
-            <div style="font-size:11px;font-weight:700;color:#333">${s.id} — ${s.cliente||'—'}</div>
-            <div style="font-size:9px;color:#777">${s.fecha} · Guías: ${guias} · ${s.patente}</div>
+        const gdFd=(s.guias||[]).map(g=>g.fecha_descarga).filter(Boolean).join(', ')||'—';
+        const gdDst=(s.guias||[]).map(g=>g.destino).filter(Boolean).join(' / ')||'—';
+        return `<div style="padding:7px 10px;border-bottom:1px solid #f5f5f5;display:flex;justify-content:space-between;align-items:flex-start">
+          <div style="flex:1">
+            <div style="font-size:11px;font-weight:800;color:#455A64">${s.id} <span style="color:#222;font-weight:700">${s.cliente||'—'}</span></div>
+            <div style="font-size:10px;color:#1565C0;font-weight:600">GD: ${guias}</div>
+            <div style="font-size:10px;color:#777">${s.fecha} · Descarga: ${gdFd}</div>
+            <div style="font-size:10px;color:#888">${s.origen||'—'} → ${gdDst}</div>
           </div>
-          <div style="display:flex;gap:6px;align-items:center">
+          <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0;margin-left:8px">
             <span style="font-size:11px;font-weight:700;color:#546E7A">$${(s.precio||0).toLocaleString()}</span>
             <button onclick="quitarServicioLiq('${s.id}')" style="background:none;border:none;color:#ccc;cursor:pointer;font-size:14px">×</button>
           </div>
@@ -3958,7 +4021,7 @@ function mostrarToastServicio(exito) {
     color:white;z-index:9999;text-align:center;box-shadow:0 4px 20px rgba(0,0,0,0.3);
     background:${exito?'#2E7D32':'#E65100'};
   `;
-  toast.textContent = exito ? '✅ Servicio guardado correctamente' : '⚠️ Guardado localmente — sin conexión';
+  toast.textContent = exito ? '✅ Servicio guardado y sincronizado' : '💾 Guardado localmente — se sincronizará al reconectar';
   document.body.appendChild(toast);
   setTimeout(() => { toast.style.opacity='0'; toast.style.transition='opacity 0.4s'; setTimeout(()=>toast.remove(),400); }, 3000);
 }
@@ -4432,7 +4495,7 @@ setInterval(async () => {
     await syncDisponibilidadDesdeSupabase();
     render();
   } catch(e) {}
-}, 3 * 60 * 1000);
+}, 1 * 60 * 1000); // 1 minuto
 
 // ── PULL TO REFRESH móvil ───────────────────────────────
 let _ptY = 0;
