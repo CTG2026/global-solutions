@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-  <meta name="version" content="2026031847">
+  <meta name="version" content="2026031849">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Panel de Gestión — Global Solutions</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -304,7 +304,7 @@
       <button class="copy-btn" onclick="exportarDatos()" style="background:#37474F;border-color:#546E7A;font-size:11px;padding:8px 14px">⬇ Exportar</button>
       <label class="copy-btn" style="background:#37474F;border-color:#546E7A;font-size:11px;padding:8px 14px;cursor:pointer">⬆ Importar<input type="file" accept=".json" onchange="importarDatos(event)" style="display:none"></label>
     </div>
-    <div class="footer">v47 · Marzo 2026 · Global Solutions SpA</div>
+    <div class="footer">v49 · Marzo 2026 · Global Solutions SpA</div>
   </div>
 
   <!-- Modal dashboard individual -->
@@ -2053,7 +2053,7 @@ function renderFase(fase) {
           const puntosHTML=puntos.map((p,pi)=>`<div style="background:white;border:1px solid #CFD8DC;border-radius:8px;padding:10px;margin-bottom:8px"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><span style="font-size:10px;font-weight:800;color:#455A64;letter-spacing:1px">PUNTO ${pi+1}</span><div style="display:flex;gap:8px;align-items:center"><select onchange="updPunto(${pi},'tipo',this.value)" style="border:1px solid #dde;border-radius:5px;padding:3px 6px;font-size:10px;outline:none;font-family:inherit;background:white;-webkit-appearance:auto">${TIPOS_PUNTO.map(t=>'<option value="'+t+'" '+(p.tipo===t?'selected':'')+'>'+t.toUpperCase()+'</option>').join('')}</select>${puntos.length>1?'<span onclick="delPunto('+pi+')" style="color:#bbb;cursor:pointer;font-size:16px">×</span>':''}</div></div><div style="display:grid;grid-template-columns:1fr 1fr;gap:5px"><div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">ORIGEN</div><input value="${p.origen}" onchange="updPunto(${pi},'origen',this.value)" placeholder="ej: Santiago" style="width:100%;border:1px solid #dde;border-radius:5px;padding:6px 8px;font-size:12px;outline:none;font-family:inherit"></div><div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">DESTINO FINAL</div><input value="${p.destino}" onchange="updPunto(${pi},'destino',this.value)" placeholder="ej: Marchigue" style="width:100%;border:1px solid #dde;border-radius:5px;padding:6px 8px;font-size:12px;outline:none;font-family:inherit"></div><div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">N° GUÍA</div><input value="${p.guia}" onchange="updPunto(${pi},'guia',this.value)" placeholder="ej: 123456" style="width:100%;border:1px solid #dde;border-radius:5px;padding:6px 8px;font-size:12px;outline:none;font-family:inherit"></div><div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">FECHA GUÍA</div><input value="${p.fecha_guia}" onchange="updPunto(${pi},'fecha_guia',this.value)" type="date" style="width:100%;border:1px solid #dde;border-radius:5px;padding:6px 8px;font-size:12px;outline:none;font-family:inherit"></div><div style="grid-column:1/-1"><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">FECHA DESCARGA</div><input value="${p.fecha_descarga}" onchange="updPunto(${pi},'fecha_descarga',this.value)" type="date" style="width:100%;border:1px solid #dde;border-radius:5px;padding:6px 8px;font-size:12px;outline:none;font-family:inherit"></div></div></div>`).join('');
           const conductoresOpts=conductoresLista.map(cn=>'<option value="'+cn+'" '+(cn===conductorPresel?'selected':'')+'>'+cn+'</option>').join('');
           const ultimos5=(servicios).slice(-5).reverse();
-          const lista=ultimos5.length?ultimos5.map((s)=>{const idxReal=servicios.indexOf(s);const isExpanded=!!uiState['srv_exp_'+s.id];return '<div style="position:relative;background:'+(isExpanded?'#EEF2FF':'white')+';border-radius:8px;border:1px solid '+(isExpanded?'#C7D2FE':'#e8eaec')+';margin-bottom:4px"><div onclick="uiState['srv_exp_'+s.id+'']=!uiState['srv_exp_'+s.id+''];render()" style="cursor:pointer">'+srvVista(s)+'</div>'+(isExpanded?srvDetalle(s):'')+'<span onclick="event.stopPropagation();delServicio('+idxReal+')" style="position:absolute;top:8px;right:8px;color:#ddd;cursor:pointer;font-size:11px">× eliminar</span></div>';}).join(''):'<div style="font-size:11px;color:#bbb;padding:6px 0;text-align:center">Sin servicios registrados aún</div>';
+          const lista=ultimos5.length?ultimos5.map((s)=>{const idxReal=servicios.indexOf(s);const isExpanded=!!uiState['srv_exp_'+s.id];const expandKey='srv_exp_'+s.id;return '<div style="position:relative;background:'+(isExpanded?'#EEF2FF':'white')+';border-radius:8px;border:1px solid '+(isExpanded?'#C7D2FE':'#e8eaec')+';margin-bottom:4px"><div onclick="uiState[\'' +expandKey+ '\']=!uiState[\'' +expandKey+ '\'];render()" style="cursor:pointer">'+srvVista(s)+'</div>'+(isExpanded?srvDetalle(s):'')+'<span onclick="event.stopPropagation();delServicio('+idxReal+')" style="position:absolute;top:8px;right:8px;color:#ddd;cursor:pointer;font-size:11px">× eliminar</span></div>';}).join(''):'<div style="font-size:11px;color:#bbb;padding:6px 0;text-align:center">Sin servicios registrados aún</div>';
           return '<div style="margin-bottom:10px;padding:10px 12px;background:#f4f6f8;border-radius:10px;border:1px solid #dde4e8"><div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:10px"><div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">ID SERVICIO</div><div style="background:#455A64;color:white;border-radius:6px;padding:7px 9px;font-size:14px;font-weight:700;letter-spacing:2px">'+nextId+'</div></div><div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">FECHA SALIDA</div><input id="srv_fecha" type="date" value="'+hoyISO+'" style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit;background:white"></div></div><div style="font-size:10px;font-weight:800;color:#455A64;letter-spacing:1px;margin-bottom:8px;padding-bottom:5px;border-bottom:2px solid #CFD8DC">CONDUCTOR Y EQUIPO</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:10px"><div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">CONDUCTOR</div><select id="srv_conductor" onchange="toggleConductorTercero()" style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit;background:white;-webkit-appearance:auto"><option value="">Seleccionar...</option>'+conductoresOpts+'</select><div style="margin-top:3px"><span onclick="mostrarAgregarConductor()" style="font-size:10px;color:#607D8B;cursor:pointer;text-decoration:underline">+ Agregar nuevo</span></div></div><div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">PATENTE</div><select id="srv_patente" onchange="togglePatenteTercero()" style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit;background:white;-webkit-appearance:auto"><option value="">Seleccionar...</option>'+patenteOpts+'<option value="__tercero__">Tercero</option></select><input id="srv_patente_manual" placeholder="Ingresar patente..." style="display:none;margin-top:4px;width:100%;border:1px solid #FFA726;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit;text-transform:uppercase"><div style="margin-top:3px"><span onclick="mostrarAgregarPatente()" style="font-size:10px;color:#607D8B;cursor:pointer;text-decoration:underline">+ Agregar nueva</span></div></div><div style="grid-column:1/-1"><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">TIPO DE EQUIPO</div><select id="srv_tipo_equipo" style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit;background:white;-webkit-appearance:auto"><option value="">Seleccionar...</option><option value="Camion solo">Camion solo</option><option value="Camion con carro">Camion con carro</option><option value="Rampla">Rampla</option><option value="Camion 3/4">Camion 3/4</option><option value="Camioneta">Camioneta</option></select></div></div><div style="margin-bottom:8px"><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">CLIENTE</div><select id="srv_cliente" onchange="toggleClienteNuevo(this.value)" style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit;background:white;-webkit-appearance:auto"><option value="">Seleccionar cliente...</option>'+clientesActivos.map(cl=>'<option value="'+cl+'">'+cl+'</option>').join('')+'<option value="__nuevo__">+ Cliente no esta en la lista...</option></select><div id="srv_cliente_nuevo_box" style="display:none;margin-top:5px"><input id="srv_cliente_nuevo" placeholder="Escribir nombre del cliente" style="width:100%;border:1px solid #FFE082;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit;background:#FFFDE7"><div style="font-size:9px;color:#F9A825;margin-top:3px">Quedara pendiente de agregar al pipeline.</div></div></div><div style="font-size:10px;font-weight:800;color:#455A64;letter-spacing:1px;margin-bottom:8px;padding-bottom:5px;border-bottom:2px solid #CFD8DC">PUNTOS DE RUTA</div>'+puntosHTML+'<button onclick="addPunto()" style="width:100%;background:white;color:#455A64;border:1px dashed #90A4AE;border-radius:6px;padding:8px;font-size:11px;cursor:pointer;font-weight:700;margin-bottom:12px">+ Agregar punto de ruta</button><div style="margin-bottom:12px"><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">PEAJES ($)</div><input id="srv_peajes" type="number" placeholder="ej: 8000" style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit"></div><button onclick="addServicio()" style="width:100%;background:#455A64;color:white;border:none;border-radius:8px;padding:16px;font-size:15px;cursor:pointer;font-weight:700;min-height:54px;-webkit-tap-highlight-color:transparent;touch-action:manipulation">+ Registrar servicio</button>'+(servicios.length?'<div style="margin-top:12px"><div style="font-size:10px;font-weight:700;color:#607D8B;letter-spacing:1px;margin-bottom:4px">ÚLTIMOS 5 SERVICIOS ('+servicios.length+' en total)</div>'+lista+'</div>':'<div style="margin-top:6px">'+lista+'</div>')+'</div>';
         })(); return '<div style="margin:-4px">'+serviciosBlock+'</div>'; })() : ''}
         ${tarea.cierreServicioTask ? `<div style="margin:-4px">${renderCierreServicios()}</div>` : ''}
@@ -2598,7 +2598,7 @@ function renderPipeline() {
         </div>
       </div>
       </div>
-      ${isOpenPip ? `<div style="padding:10px 12px;border-top:1px solid #eee;background:#FAFAFA" onclick="event.stopPropagation()">
+      ${(isOpenPip||editando) ? `<div style="padding:10px 12px;border-top:1px solid #eee;background:#FAFAFA" onclick="event.stopPropagation()">
         ${editando ? `
           <div style="display:grid;gap:6px">
             <div style="font-size:9px;font-weight:800;color:#607D8B;letter-spacing:1px">DATOS GENERALES</div>
@@ -2618,12 +2618,12 @@ function renderPipeline() {
             <input id="pip_rut_${ci}" value="${c.rut||''}" placeholder="RUT ej: 76.123.456-7" style="border:1px solid #dde;border-radius:6px;padding:6px 9px;font-size:12px;outline:none;font-family:inherit">
             <input id="pip_email_factura_${ci}" value="${c.emailFactura||''}" placeholder="Email facturación" style="border:1px solid #dde;border-radius:6px;padding:6px 9px;font-size:12px;outline:none;font-family:inherit">
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
-              <div><div style="font-size:9px;color:#888;margin-bottom:2px">Tipo cliente</div>
+              <div><div style="font-size:9px;color:#888;margin-bottom:2px">Tipo</div>
                 <select id="pip_tipo_${ci}" style="width:100%;border:1px solid #dde;border-radius:6px;padding:6px 9px;font-size:12px;outline:none;background:white;-webkit-appearance:auto">
                   <option value="directo" ${(c.tipoCliente||'directo')==='directo'?'selected':''}>Directo</option>
                   <option value="broker" ${c.tipoCliente==='broker'?'selected':''}>Broker</option>
                 </select></div>
-              <div><div style="font-size:9px;color:#888;margin-bottom:2px">Pago (días)</div>
+              <div><div style="font-size:9px;color:#888;margin-bottom:2px">Pago</div>
                 <select id="pip_pago_${ci}" style="width:100%;border:1px solid #dde;border-radius:6px;padding:6px 9px;font-size:12px;outline:none;background:white;-webkit-appearance:auto">
                   <option value="30" ${(c.condicionPago||'30')==='30'?'selected':''}>30 días</option>
                   <option value="60" ${c.condicionPago==='60'?'selected':''}>60 días</option>
@@ -2636,7 +2636,7 @@ function renderPipeline() {
               <label for="pip_aprueba_${ci}" style="font-size:11px;color:#E65100;cursor:pointer;font-weight:600">Requiere aprobación antes de facturar</label>
             </div>
             <div style="font-size:9px;font-weight:800;color:#607D8B;letter-spacing:1px;padding-top:6px;border-top:1px solid #eee">NOTAS</div>
-            ${(c.notasMultiples||[]).map((n,ni)=>`<div style="padding:6px 8px;background:#F8F9FA;border-radius:6px;margin-bottom:4px;border-left:2px solid #607D8B;position:relative"><div style="font-size:9px;color:#aaa;margin-bottom:2px">${n.fecha}</div><div style="font-size:11px;color:#333">${n.texto}</div><button onclick="eliminarNotaPipeline(${ci},${ni})" style="position:absolute;top:4px;right:6px;background:none;border:none;color:#ccc;cursor:pointer;font-size:12px">×</button></div>`).join('')}
+            ${(c.notasMultiples||[]).map((n,ni)=>`<div style="padding:5px 8px;background:#F8F9FA;border-radius:6px;margin-bottom:4px;border-left:2px solid #607D8B;display:flex;justify-content:space-between;align-items:flex-start"><div><div style="font-size:9px;color:#aaa">${n.fecha}</div><div style="font-size:11px;color:#333">${n.texto}</div></div><button onclick="eliminarNotaPipeline(${ci},${ni})" style="background:none;border:none;color:#ccc;cursor:pointer;font-size:12px;flex-shrink:0">×</button></div>`).join('')}
             <div style="display:flex;gap:6px">
               <input id="pip_nota_nueva_${ci}" placeholder="Agregar nota..." style="flex:1;border:1px solid #dde;border-radius:6px;padding:6px 9px;font-size:12px;outline:none;font-family:inherit" onkeydown="if(event.key==='Enter')agregarNotaPipeline(${ci})">
               <button onclick="agregarNotaPipeline(${ci})" style="background:#607D8B;color:white;border:none;border-radius:6px;padding:6px 12px;font-size:12px;font-weight:700;cursor:pointer">+ Nota</button>
@@ -2646,10 +2646,17 @@ function renderPipeline() {
               <button onclick="cancelarEditPipeline(${ci})" style="background:#eee;color:#555;border:none;border-radius:6px;padding:8px 12px;font-size:12px;cursor:pointer">Cancelar</button>
             </div>
           </div>
-        ` : `<div style="display:flex;gap:6px">
-          <button onclick="editarPipeline(${ci})" style="flex:1;background:#607D8B;color:white;border:none;border-radius:6px;padding:8px;font-size:11px;font-weight:700;cursor:pointer">✎ Editar ficha</button>
-          <button onclick="delPipeline(${ci})" style="background:none;border:1px solid #eee;border-radius:6px;padding:8px 10px;font-size:12px;color:#ddd;cursor:pointer">×</button>
-        </div>`}
+        ` : `
+          <div style="font-size:10px;color:#777;margin-bottom:6px">
+            ${c.condicionPago?'Pago: '+c.condicionPago+' días · ':''}${c.tipoCliente==='broker'?'Broker':'Cliente directo'}
+            ${c.requiereAprobacion?' · <span style="color:#E65100">aprobación requerida</span>':''}
+          </div>
+          ${(c.notasMultiples||[]).slice(-3).map(n=>`<div style="font-size:10px;color:#455A64;padding:3px 0;border-bottom:1px solid #f5f5f5"><span style="color:#bbb;margin-right:4px">${n.fecha}</span>${n.texto}</div>`).join('')}
+          <div style="display:flex;gap:6px;margin-top:8px">
+            <button onclick="editarPipeline(${ci})" style="flex:1;background:#607D8B;color:white;border:none;border-radius:6px;padding:7px;font-size:11px;font-weight:700;cursor:pointer">✎ Editar ficha</button>
+            <button onclick="delPipeline(${ci})" style="background:none;border:1px solid #eee;border-radius:6px;padding:7px 10px;font-size:12px;color:#ddd;cursor:pointer">×</button>
+          </div>
+        `}
       </div>` : ''}
     </div>`;
   }).join('');
@@ -2758,7 +2765,7 @@ async function guardarPipeline(ci) {
     proximaAccion: document.getElementById(`pip_accion_${ci}`)?.value.trim() || '',
     notas: item.notas || '',
     ultimaGestion: item.ultimaGestion || '',
-    notasMultiples: appData.pipeline[ci]?.notasMultiples || [],
+    notasMultiples: (appData.pipeline[ci]?.notasMultiples) || item.notasMultiples || [],
     rut: document.getElementById(`pip_rut_${ci}`)?.value.trim() || item.rut || '',
     emailFactura: document.getElementById(`pip_email_factura_${ci}`)?.value.trim() || item.emailFactura || '',
     tipoCliente: document.getElementById(`pip_tipo_${ci}`)?.value || item.tipoCliente || 'directo',
