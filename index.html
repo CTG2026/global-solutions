@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-  <meta name="version" content="2026031958">
+  <meta name="version" content="2026031960">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Panel de Gestión — Global Solutions</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -885,6 +885,7 @@ function guardarCierre(id) {
   if(idx===-1)return;
   const d=_leerCamposCierre(id,idx);
   if(!d.precio) { alert('El precio neto es obligatorio para cerrar el servicio.'); return; }
+  if(!confirm(`¿Cerrar definitivamente el servicio ${id}?\nPrecio: $${d.precio.toLocaleString('es-CL')}\nEsta acción marca el servicio como cerrado.`)) return;
   const comisionConductor=Math.round(d.precio*0.10);
   Object.assign(appData.servicios[idx],{...d,comisionConductor,cerrado:true,estado:'cerrado'});
   appData.dashboard.ventas_mes=(appData.servicios||[]).filter(s=>s.cerrado&&s.precio).reduce((a,s)=>a+(s.precio||0),0);
@@ -1622,6 +1623,7 @@ async function delServicio(si) {
   if (!appData.servicios) return;
   const servicio = appData.servicios[si];
   if (!servicio) return;
+  if (!confirm(`¿Eliminar servicio ${servicio.id} — ${servicio.cliente||'sin cliente'}?\nEsta acción no se puede deshacer.`)) return;
   const precio = servicio.precio || 0;
   const id = servicio.id;
   appData.servicios.splice(si, 1);
@@ -2522,12 +2524,9 @@ async function syncServiciosDesdeSupabase() {
   try {
     const { data, error } = await supa.from('servicios').select('*').order('created_at');
     if (error) { console.warn('Error sync servicios:', error); return; }
-    if (!data || data.length === 0) {
-      // Supabase vacío — subir locales
-      const locales = appData.servicios || [];
-      for (const s of locales) { await upsertServicioSupabase(s); }
-    } else {
-      // Supabase manda siempre — ignorar locales al sincronizar
+    // Supabase manda siempre — nunca subir locales, si está vacío queda vacío
+    appData.servicios = [];
+    if (data && data.length > 0) {
       const remotos = data.map(r => ({
         id: r.id, fecha: r.fecha, anio: r.anio, mes: r.mes,
         patente: r.patente, conductor: r.conductor, tipoEquipo: r.tipo_equipo,
@@ -2541,8 +2540,8 @@ async function syncServiciosDesdeSupabase() {
         tag: r.tag||'', liquidacionId: r.liquidacion_id||'',
       }));
       appData.servicios = remotos;
-      saveData(); render();
     }
+    saveData(); render();
   } catch(e) { console.warn('Error sync servicios:', e); }
 }
 
@@ -5074,3 +5073,4 @@ try {
 </script>
 </body>
 </html>
+
