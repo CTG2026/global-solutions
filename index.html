@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-  <meta name="version" content="2026031960">
+  <meta name="version" content="2026031961">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Panel de Gestión — Global Solutions</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -754,10 +754,13 @@ function cerrarRendComb(idx) {
 // ── CIERRE DE SERVICIOS v36 ───────────────────────────────
 function renderCierreServicios() {
   const CF_MES = (appData.config && appData.config.costosFijosMes) || 5080000;
+  const estadoOrden = s => s.cerrado ? 0 : s.precio ? 1 : 2;
   const todosServicios=(appData.servicios||[]).slice().sort((a,b)=>{
+    const eo = estadoOrden(a) - estadoOrden(b);
+    if (eo !== 0) return eo;
     try{const fa=a.fecha.split('-').reverse().join('');const fb=b.fecha.split('-').reverse().join('');return fb.localeCompare(fa);}catch(e){return 0;}
   });
-  const servicios = todosServicios.slice(0,20); // últimos 20
+  const servicios = todosServicios.slice(0,20);
   const sinCerrar = servicios.filter(s=>!s.cerrado).length;
   const cfPorServ = todosServicios.length > 0 ? Math.round(CF_MES / todosServicios.length) : 0;
   return `<div style="padding:2px">
@@ -856,16 +859,17 @@ function renderCierreServicios() {
   </div>`;
 }
 function _leerCamposCierre(id, idx) {
+  const s = appData.servicios[idx];
   return {
     precio: parseInt(document.getElementById('cs_precio_'+id)?.value)||0,
-    km: parseInt(document.getElementById('cs_km_'+id)?.value)||0,
-    tag: document.getElementById('cs_tag_'+id)?.value.trim()||'',
-    oc: document.getElementById('cs_oc_'+id)?.value.trim()||'',
-    peajes: parseInt(document.getElementById('cs_peajes_'+id)?.value)||appData.servicios[idx].peajes||0,
-    viaticos: parseInt(document.getElementById('cs_via_'+id)?.value)||0,
-    adicional: parseInt(document.getElementById('cs_adic_'+id)?.value)||0,
-    litros: parseInt(document.getElementById('cs_litros_'+id)?.value)||0,
-    petroleo: parseInt(document.getElementById('cs_petroleo_'+id)?.value)||0,
+    km: parseInt(document.getElementById('cs_km_'+id)?.value)||s?.km||0,
+    tag: document.getElementById('cs_tag_'+id)?.value.trim()||s?.tag||'',
+    oc: document.getElementById('cs_oc_'+id)?.value.trim()||s?.oc||'',
+    peajes: parseInt(document.getElementById('cs_peajes_'+id)?.value)||s?.peajes||0,
+    viaticos: parseInt(document.getElementById('cs_via_'+id)?.value)||s?.viaticos||0,
+    adicional: parseInt(document.getElementById('cs_adic_'+id)?.value)||s?.adicional||0,
+    litros: parseInt(document.getElementById('cs_litros_'+id)?.value)||s?.litros||0,
+    petroleo: parseInt(document.getElementById('cs_petroleo_'+id)?.value)||s?.petroleo||0,
   };
 }
 
@@ -877,15 +881,17 @@ function guardarBorradorCierre(id) {
   Object.assign(appData.servicios[idx],{...d,comisionConductor,cerrado:false,estado:'borrador'});
   upsertServicioSupabase(appData.servicios[idx]);
   saveData();render();
-  mostrarToastGuardado('💾 Borrador guardado');
+  showToastGeneral('💾 Borrador guardado correctamente','#E65100');
 }
 
 function guardarCierre(id) {
   const idx=appData.servicios.findIndex(s=>s.id===id);
   if(idx===-1)return;
   const d=_leerCamposCierre(id,idx);
-  if(!d.precio) { alert('El precio neto es obligatorio para cerrar el servicio.'); return; }
-  if(!confirm(`¿Cerrar definitivamente el servicio ${id}?\nPrecio: $${d.precio.toLocaleString('es-CL')}\nEsta acción marca el servicio como cerrado.`)) return;
+  if(!d.precio) { alert('⚠️ El precio neto es obligatorio para cerrar el servicio.'); return; }
+  if(!d.km) { if(!confirm('⚠️ Los kilómetros están en 0. ¿Deseas continuar de todas formas?')) return; }
+  if(!d.petroleo && !d.litros) { if(!confirm('⚠️ El combustible está en 0. ¿Deseas continuar de todas formas?')) return; }
+  if(!confirm(`¿Cerrar definitivamente el servicio ${id}?\nPrecio: $${d.precio.toLocaleString('es-CL')}\nEsta acción no se puede deshacer.`)) return;
   const comisionConductor=Math.round(d.precio*0.10);
   Object.assign(appData.servicios[idx],{...d,comisionConductor,cerrado:true,estado:'cerrado'});
   appData.dashboard.ventas_mes=(appData.servicios||[]).filter(s=>s.cerrado&&s.precio).reduce((a,s)=>a+(s.precio||0),0);
@@ -1239,6 +1245,184 @@ function srvDetalle(s) {
     </div>` : ''}
   </div>`;
 }
+function editarServicio(id) {
+  uiState.editando_srv_id = id;
+  // Copiar puntos del servicio a uiState para edición
+  const s = (appData.servicios||[]).find(sv=>sv.id===id);
+  if (!s) return;
+  uiState.edit_srv_puntos = JSON.parse(JSON.stringify(s.puntos||s.guias||[{origen:'',destino:'',tipo:'descarga',guia:'',fecha_guia:'',fecha_descarga:'',kg:'',imagen_url:''}]));
+  // Normalizar puntos al formato nuevo
+  uiState.edit_srv_puntos = uiState.edit_srv_puntos.map(p=>({
+    origen: p.origen||'', destino: p.destino||'', tipo: p.tipo||'descarga',
+    guia: p.guia||p.num||'', fecha_guia: p.fecha_guia||'', fecha_descarga: p.fecha_descarga||'',
+    kg: p.kg||'', imagen_url: p.imagen_url||''
+  }));
+  render();
+}
+function cancelarEditarServicio() {
+  delete uiState.editando_srv_id;
+  delete uiState.edit_srv_puntos;
+  render();
+}
+function updEditPunto(pi, campo, valor) {
+  if (!uiState.edit_srv_puntos) return;
+  uiState.edit_srv_puntos[pi][campo] = valor;
+}
+function addEditPunto() {
+  if (!uiState.edit_srv_puntos) uiState.edit_srv_puntos = [];
+  uiState.edit_srv_puntos.push({origen:'',destino:'',tipo:'descarga',guia:'',fecha_guia:'',fecha_descarga:'',kg:'',imagen_url:''});
+  render();
+}
+function delEditPunto(pi) {
+  if (!uiState.edit_srv_puntos || uiState.edit_srv_puntos.length <= 1) return;
+  uiState.edit_srv_puntos.splice(pi,1);
+  render();
+}
+async function subirImagenEditGuia(event, pi) {
+  const file = event.target.files[0];
+  if (!file || !supaConectado || !supa) return;
+  showToastGeneral('⏳ Subiendo imagen...','#1565C0');
+  try {
+    const ext = file.name.split('.').pop();
+    const nombre = `guia_edit_${Date.now()}_${pi}.${ext}`;
+    const { error } = await supa.storage.from('guias').upload(nombre, file, {upsert:true});
+    if (error) { showToastGeneral('❌ Error al subir imagen','#C62828'); return; }
+    const { data: urlData } = supa.storage.from('guias').getPublicUrl(nombre);
+    if (!uiState.edit_srv_puntos) return;
+    uiState.edit_srv_puntos[pi].imagen_url = urlData.publicUrl;
+    showToastGeneral('✅ Imagen subida','#2E7D32');
+    render();
+  } catch(e) { showToastGeneral('❌ Error: '+e.message,'#C62828'); }
+}
+async function guardarEdicionServicio() {
+  const id = uiState.editando_srv_id;
+  if (!id) return;
+  const idx = (appData.servicios||[]).findIndex(s=>s.id===id);
+  if (idx===-1) return;
+  const s = appData.servicios[idx];
+  const fecha = document.getElementById('edit_srv_fecha')?.value||s.fecha;
+  const conductor = document.getElementById('edit_srv_conductor')?.value||s.conductor;
+  const patenteRaw = document.getElementById('edit_srv_patente')?.value||s.patente;
+  const patente = patenteRaw==='__tercero__'
+    ? (document.getElementById('edit_srv_patente_manual')?.value.trim().toUpperCase()||s.patente)
+    : patenteRaw;
+  const tipoEquipo = document.getElementById('edit_srv_tipo_equipo')?.value||s.tipoEquipo||'';
+  const clienteSelect = document.getElementById('edit_srv_cliente')?.value||s.cliente;
+  const cliente = clienteSelect==='__nuevo__'
+    ? (document.getElementById('edit_srv_cliente_nuevo')?.value.trim()||s.cliente)
+    : clienteSelect;
+  if (!conductor) { alert('⚠️ Debes seleccionar un conductor.'); return; }
+  if (!patente) { alert('⚠️ Debes seleccionar una patente.'); return; }
+  if (!cliente) { alert('⚠️ Debes seleccionar un cliente.'); return; }
+  const puntos = (uiState.edit_srv_puntos||[]);
+  const origen = puntos.length ? puntos[0].origen : s.origen;
+  // Convertir fecha
+  const fechaFinal = fecha ? (()=>{const p=fecha.split('-');return p.length===3&&p[0].length===4?`${p[2]}-${p[1]}-${p[0]}`:fecha;})() : s.fecha;
+  Object.assign(appData.servicios[idx], {fecha:fechaFinal, conductor, patente, tipoEquipo, cliente, origen, puntos, guias:puntos});
+  delete uiState.editando_srv_id;
+  delete uiState.edit_srv_puntos;
+  await upsertServicioSupabase(appData.servicios[idx]);
+  saveData(); render();
+  showToastGeneral('✅ Servicio actualizado','#2E7D32');
+}
+function renderEditarServicio(id) {
+  const s = (appData.servicios||[]).find(sv=>sv.id===id);
+  if (!s) return '';
+  const hoyISO=(()=>{const h=new Date();return h.getFullYear()+'-'+String(h.getMonth()+1).padStart(2,'0')+'-'+String(h.getDate()).padStart(2,'0');})();
+  const fechaISO = s.fecha?(()=>{const p=s.fecha.split('-');return p.length===3&&p[0].length===2?`${p[2]}-${p[1]}-${p[0]}`:s.fecha;})():hoyISO;
+  const conductoresLista = appData.conductores||['Manuel Madrid','Felipe Vidal','Felipe Madariaga','Sebastián Zúñiga','Pablo Riquelme','Tercero'];
+  const patentesLista = appData.patentes||['GKFD84','WR9192','XR8555','GCFF12','BPBL35','XA1114','DSDV36'];
+  const clientesDefault = (window.DEFAULT_DATA||{pipeline:[]}).pipeline.filter(c=>c.etapa==='activo').map(c=>c.cliente);
+  const clientesLocal = (appData.pipeline||[]).filter(c=>c.etapa==='activo').map(c=>c.cliente);
+  const clientesActivos = [...new Set([...clientesDefault,...clientesLocal])].sort();
+  const puntos = uiState.edit_srv_puntos||[];
+  const TIPOS_PUNTO=['carga','descarga','carga y descarga'];
+  const mostrarPatenteManual = s.patente==='TERCERO'||s.patente==='__tercero__';
+  const puntosHTML = puntos.map((p,pi)=>`
+    <div style="background:white;border:1px solid #CFD8DC;border-radius:8px;padding:10px;margin-bottom:8px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <span style="font-size:10px;font-weight:800;color:#455A64">PUNTO ${pi+1}</span>
+        <div style="display:flex;gap:8px;align-items:center">
+          <select onchange="updEditPunto(${pi},'tipo',this.value)" style="border:1px solid #dde;border-radius:5px;padding:3px 6px;font-size:10px;outline:none;font-family:inherit;background:white;-webkit-appearance:auto">
+            ${TIPOS_PUNTO.map(t=>`<option value="${t}" ${p.tipo===t?'selected':''}>${t.toUpperCase()}</option>`).join('')}
+          </select>
+          ${puntos.length>1?`<span onclick="delEditPunto(${pi})" style="color:#bbb;cursor:pointer;font-size:16px">×</span>`:''}
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:5px">
+        <div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">ORIGEN</div>
+          <input value="${p.origen}" onchange="updEditPunto(${pi},'origen',this.value)" placeholder="ej: Santiago" style="width:100%;border:1px solid #dde;border-radius:5px;padding:6px 8px;font-size:12px;outline:none;font-family:inherit"></div>
+        <div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">DESTINO</div>
+          <input value="${p.destino}" onchange="updEditPunto(${pi},'destino',this.value)" placeholder="ej: Marchigue" style="width:100%;border:1px solid #dde;border-radius:5px;padding:6px 8px;font-size:12px;outline:none;font-family:inherit"></div>
+        <div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">N° GUÍA</div>
+          <input value="${p.guia}" onchange="updEditPunto(${pi},'guia',this.value)" placeholder="ej: 123456" style="width:100%;border:1px solid #dde;border-radius:5px;padding:6px 8px;font-size:12px;outline:none;font-family:inherit"></div>
+        <div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">KG TRASLADADOS</div>
+          <input value="${p.kg||''}" onchange="updEditPunto(${pi},'kg',this.value)" type="number" placeholder="ej: 20000" style="width:100%;border:1px solid #dde;border-radius:5px;padding:6px 8px;font-size:12px;outline:none;font-family:inherit"></div>
+        <div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">FECHA GUÍA</div>
+          <input value="${p.fecha_guia}" onchange="updEditPunto(${pi},'fecha_guia',this.value)" type="date" style="width:100%;border:1px solid #dde;border-radius:5px;padding:6px 8px;font-size:12px;outline:none;font-family:inherit"></div>
+        <div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">FECHA DESCARGA</div>
+          <input value="${p.fecha_descarga}" onchange="updEditPunto(${pi},'fecha_descarga',this.value)" type="date" style="width:100%;border:1px solid #dde;border-radius:5px;padding:6px 8px;font-size:12px;outline:none;font-family:inherit"></div>
+        <div style="grid-column:1/-1">
+          <div style="font-size:9px;font-weight:700;color:#888;margin-bottom:4px">📎 IMAGEN GUÍA</div>
+          ${p.imagen_url
+            ? `<div style="position:relative;display:inline-block;width:100%">
+                <img src="${p.imagen_url}" style="width:100%;max-height:120px;object-fit:cover;border-radius:6px;border:1px solid #dde" onclick="verImagenGuia('${p.imagen_url}')">
+                <button onclick="updEditPunto(${pi},'imagen_url','');render()" style="position:absolute;top:4px;right:4px;background:rgba(0,0,0,0.5);color:white;border:none;border-radius:50%;width:22px;height:22px;font-size:12px;cursor:pointer">×</button>
+               </div>`
+            : `<label style="display:flex;align-items:center;gap:6px;background:#f8f9fa;border:1px dashed #ccc;border-radius:6px;padding:8px 10px;cursor:pointer;font-size:11px;color:#607D8B">
+                📷 Adjuntar imagen
+                <input type="file" accept="image/*" capture="environment" onchange="subirImagenEditGuia(event,${pi})" style="display:none">
+               </label>`}
+        </div>
+      </div>
+    </div>`).join('');
+  return `<div style="background:#EDE7F6;border:2px solid #7E57C2;border-radius:10px;padding:12px;margin-bottom:8px">
+    <div style="font-size:10px;font-weight:800;color:#4527A0;letter-spacing:1px;margin-bottom:10px">✎ EDITANDO SERVICIO ${id}</div>
+    <div style="display:grid;gap:8px">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+        <div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">FECHA SALIDA</div>
+          <input id="edit_srv_fecha" type="date" value="${fechaISO}" style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit;background:white"></div>
+        <div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">TIPO EQUIPO</div>
+          <select id="edit_srv_tipo_equipo" style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;background:white;-webkit-appearance:auto">
+            <option value="">Seleccionar...</option>
+            ${['Camion solo','Camion con carro','Rampla','Camion 3/4','Camioneta'].map(t=>`<option value="${t}" ${(s.tipoEquipo||'')===t?'selected':''}>${t}</option>`).join('')}
+          </select></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+        <div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">CONDUCTOR</div>
+          <select id="edit_srv_conductor" style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;background:white;-webkit-appearance:auto">
+            <option value="">Seleccionar...</option>
+            ${conductoresLista.map(c=>`<option value="${c}" ${s.conductor===c?'selected':''}>${c}</option>`).join('')}
+          </select></div>
+        <div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">PATENTE</div>
+          <select id="edit_srv_patente" onchange="(function(v){const m=document.getElementById('edit_srv_patente_manual');if(m)m.style.display=v==='__tercero__'?'block':'none';})(this.value)" style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;background:white;-webkit-appearance:auto">
+            <option value="">Seleccionar...</option>
+            ${patentesLista.map(p=>`<option value="${p}" ${s.patente===p?'selected':''}>${p}</option>`).join('')}
+            <option value="__tercero__" ${s.patente==='TERCERO'?'selected':''}>Tercero</option>
+          </select>
+          <input id="edit_srv_patente_manual" value="${s.patente==='TERCERO'?s.patente:''}" placeholder="Ingresar patente..." style="display:${mostrarPatenteManual?'block':'none'};margin-top:4px;width:100%;border:1px solid #FFA726;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit;text-transform:uppercase"></div>
+      </div>
+      <div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">CLIENTE</div>
+        <select id="edit_srv_cliente" onchange="(function(v){const b=document.getElementById('edit_srv_cliente_nuevo_box');if(b)b.style.display=v==='__nuevo__'?'block':'none';})(this.value)" style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;background:white;-webkit-appearance:auto">
+          <option value="">Seleccionar cliente...</option>
+          ${clientesActivos.map(cl=>`<option value="${cl}" ${s.cliente===cl?'selected':''}>${cl}</option>`).join('')}
+          <option value="__nuevo__">+ Cliente no está en la lista...</option>
+        </select>
+        <div id="edit_srv_cliente_nuevo_box" style="display:none;margin-top:5px">
+          <input id="edit_srv_cliente_nuevo" placeholder="Escribir nombre del cliente" style="width:100%;border:1px solid #FFE082;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit;background:#FFFDE7">
+        </div>
+      </div>
+      <div style="font-size:9px;font-weight:800;color:#455A64;letter-spacing:1px;padding-top:8px;border-top:1px solid #D1C4E9">PUNTOS DE RUTA</div>
+      ${puntosHTML}
+      <button onclick="addEditPunto()" style="width:100%;background:white;color:#455A64;border:1px dashed #90A4AE;border-radius:6px;padding:8px;font-size:11px;cursor:pointer;font-weight:700">+ Agregar punto</button>
+      <div style="display:flex;gap:6px;margin-top:4px">
+        <button onclick="guardarEdicionServicio()" style="flex:1;background:#4527A0;color:white;border:none;border-radius:7px;padding:10px;font-size:12px;font-weight:700;cursor:pointer">✓ Guardar cambios</button>
+        <button onclick="cancelarEditarServicio()" style="background:#eee;color:#555;border:none;border-radius:7px;padding:10px 14px;font-size:12px;cursor:pointer">Cancelar</button>
+      </div>
+    </div>
+  </div>`;
+}
+
 function loadData() {
   try { const s = localStorage.getItem('gs_panel_v5'); appData = s ? JSON.parse(s) : JSON.parse(JSON.stringify(DEFAULT_DATA)); } 
   catch(e) { appData = JSON.parse(JSON.stringify(DEFAULT_DATA)); }
@@ -2186,7 +2370,7 @@ function renderFase(fase) {
           const verTodos=!!uiState.srv_ver_todos;
           const serviciosMes=servicios.filter(s=>s.mes===hoyMes&&s.anio===hoyAnio);
           const ultimos5=verTodos ? serviciosMes.slice().reverse() : servicios.slice(-10).reverse();
-          const lista=ultimos5.length?ultimos5.map((s)=>{const idxReal=servicios.indexOf(s);const isExpanded=!!uiState['srv_exp_'+s.id];const expandKey='srv_exp_'+s.id;return '<div style="position:relative;background:'+(isExpanded?'#EEF2FF':'white')+';border-radius:8px;border:1px solid '+(isExpanded?'#C7D2FE':'#e8eaec')+';margin-bottom:4px"><div onclick="uiState[\'' +expandKey+ '\']=!uiState[\'' +expandKey+ '\'];render()" style="cursor:pointer">'+srvVista(s)+'</div>'+(isExpanded?srvDetalle(s):'')+'<span onclick="event.stopPropagation();delServicio('+idxReal+')" style="position:absolute;top:8px;right:8px;color:#ddd;cursor:pointer;font-size:11px">× eliminar</span></div>';}).join(''):'<div style="font-size:11px;color:#bbb;padding:6px 0;text-align:center">Sin servicios registrados aún</div>';
+          const lista=ultimos5.length?ultimos5.map((s)=>{const idxReal=servicios.indexOf(s);const isExpanded=!!uiState['srv_exp_'+s.id];const expandKey='srv_exp_'+s.id;const isEditing=uiState.editando_srv_id===s.id;return '<div style="border-radius:8px;margin-bottom:4px;border:1px solid '+(isEditing?'#7E57C2':isExpanded?'#C7D2FE':'#e8eaec')+'">'+(isEditing?renderEditarServicio(s.id):('<div onclick="uiState[\'' +expandKey+ '\']=!uiState[\'' +expandKey+ '\'];render()" style="cursor:pointer;background:'+(isExpanded?'#EEF2FF':'white')+';border-radius:8px">'+srvVista(s)+'</div>'+(isExpanded?`<div style="padding:8px 12px;border-top:1px solid #eee;background:#f8f9fa">${srvDetalle(s)}<div style="display:flex;gap:6px;margin-top:8px"><button onclick="event.stopPropagation();editarServicio('${s.id}')" style="flex:1;background:#455A64;color:white;border:none;border-radius:6px;padding:8px;font-size:11px;font-weight:700;cursor:pointer">✎ Editar servicio</button><button onclick="event.stopPropagation();delServicio(${idxReal})" style="background:#FFEBEE;color:#C62828;border:1px solid #FFCDD2;border-radius:6px;padding:8px 12px;font-size:11px;cursor:pointer;font-weight:700">× Eliminar</button></div></div>`:'')))+'</div>';}).join(''):'<div style="font-size:11px;color:#bbb;padding:6px 0;text-align:center">Sin servicios registrados aún</div>';
           return '<div style="margin-bottom:10px;padding:10px 12px;background:#f4f6f8;border-radius:10px;border:1px solid #dde4e8">'
             +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:10px"><div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">ID SERVICIO</div><div style="background:#455A64;color:white;border-radius:6px;padding:7px 9px;font-size:14px;font-weight:700;letter-spacing:2px">'+nextId+'</div></div>'
             +'<div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">FECHA SALIDA</div><input id="srv_fecha" type="date" value="'+sfFecha+'" onchange="if(!uiState.srvForm)uiState.srvForm={};uiState.srvForm.fecha=this.value" style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit;background:white"></div></div>'
@@ -5073,4 +5257,3 @@ try {
 </script>
 </body>
 </html>
-
