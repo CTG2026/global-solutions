@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-  <meta name="version" content="2026031955">
+  <meta name="version" content="2026031956">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Panel de Gestión — Global Solutions</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -1192,17 +1192,22 @@ function srvDetalle(s) {
   const guias = s.guias || [];
   const rows = guias.length
     ? guias.map((g,i) => `
-      <div style="padding:6px 0;border-bottom:1px solid #f5f5f5">
-        <div style="display:flex;gap:6px;flex-wrap:wrap">
-          <span style="font-size:10px;font-weight:700;color:#888">GD ${i+1}:</span>
+      <div style="padding:8px 0;border-bottom:1px solid #f5f5f5">
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:4px">
+          <span style="font-size:10px;font-weight:700;color:#888">PUNTO ${i+1}:</span>
           <span style="font-size:11px;font-weight:700;color:#1565C0">${g.num||'—'}</span>
+          ${g.kg ? `<span style="font-size:10px;font-weight:700;background:#E3F2FD;color:#1565C0;padding:1px 6px;border-radius:8px">${Number(g.kg).toLocaleString('es-CL')} kg</span>` : ''}
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-top:3px">
-          <div><span style="font-size:9px;color:#aaa">Fecha guía</span><div style="font-size:11px;color:#333">${s.fecha||'—'}</div></div>
+          <div><span style="font-size:9px;color:#aaa">Origen</span><div style="font-size:11px;color:#333">${g.origen||s.origen||'—'}</div></div>
+          <div><span style="font-size:9px;color:#aaa">Destino</span><div style="font-size:11px;color:#333">${g.destino||'—'}</div></div>
+          <div><span style="font-size:9px;color:#aaa">Fecha guía</span><div style="font-size:11px;color:#333">${g.fecha_guia||'—'}</div></div>
           <div><span style="font-size:9px;color:#aaa">Fecha descarga</span><div style="font-size:11px;color:#333">${g.fecha_descarga||'—'}</div></div>
-          <div><span style="font-size:9px;color:#aaa">Origen</span><div style="font-size:11px;color:#333">${s.origen||'—'}</div></div>
-          <div><span style="font-size:9px;color:#aaa">Destino final</span><div style="font-size:11px;color:#333">${g.destino||'—'}</div></div>
         </div>
+        ${g.imagen_url ? `<div style="margin-top:6px">
+          <img src="${g.imagen_url}" onclick="verImagenGuia('${g.imagen_url}')" style="width:100%;max-height:140px;object-fit:cover;border-radius:6px;border:1px solid #dde;cursor:pointer" title="Toca para ampliar">
+          <div style="font-size:9px;color:#aaa;margin-top:2px;text-align:center">📎 Guía de despacho — toca para ampliar</div>
+        </div>` : ''}
       </div>`)
     : `<div style="padding:6px 0;border-bottom:1px solid #f5f5f5">
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px">
@@ -1481,7 +1486,7 @@ function mostrarAgregarPatente() {
 
 function addPunto() {
   if (!uiState.srv_puntos) uiState.srv_puntos = [];
-  uiState.srv_puntos.push({ origen:'', destino:'', tipo:'descarga', guia:'', fecha_guia:'', fecha_descarga:'' });
+  uiState.srv_puntos.push({ origen:'', destino:'', tipo:'descarga', guia:'', fecha_guia:'', fecha_descarga:'', kg:'', imagen_url:'' });
   render();
 }
 function delPunto(pi) {
@@ -1492,6 +1497,35 @@ function delPunto(pi) {
 function updPunto(pi, campo, valor) {
   if (!uiState.srv_puntos) return;
   uiState.srv_puntos[pi][campo] = valor;
+}
+
+async function subirImagenGuia(event, pi) {
+  const file = event.target.files[0];
+  if (!file) return;
+  if (!supaConectado || !supa) { alert('Sin conexión a Supabase'); return; }
+  try {
+    showToastGeneral('⏳ Subiendo imagen...', '#1565C0');
+    const ext = file.name.split('.').pop();
+    const nombre = `guia_${Date.now()}_${pi}.${ext}`;
+    const { data, error } = await supa.storage.from('guias').upload(nombre, file, { upsert: true });
+    if (error) { showToastGeneral('❌ Error al subir imagen', '#C62828'); return; }
+    const { data: urlData } = supa.storage.from('guias').getPublicUrl(nombre);
+    if (!uiState.srv_puntos) return;
+    uiState.srv_puntos[pi].imagen_url = urlData.publicUrl;
+    showToastGeneral('✅ Imagen subida', '#2E7D32');
+    render();
+  } catch(e) { showToastGeneral('❌ Error: ' + e.message, '#C62828'); }
+}
+
+function verImagenGuia(url) {
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.85);z-index:99999;display:flex;align-items:center;justify-content:center;cursor:pointer';
+  overlay.onclick = () => overlay.remove();
+  const img = document.createElement('img');
+  img.src = url;
+  img.style.cssText = 'max-width:95%;max-height:90vh;border-radius:8px;box-shadow:0 4px 30px rgba(0,0,0,0.5)';
+  overlay.appendChild(img);
+  document.body.appendChild(overlay);
 }
 function addGuia() {
   if (!uiState.srv_guias) uiState.srv_guias = [{ num:'', destino:'', fecha_descarga:'' }];
@@ -1556,7 +1590,7 @@ async function addServicio() {
   const puntos = (uiState.srv_puntos || []).filter(p => p.guia||p.origen||p.destino);
   const origen = puntos.length ? puntos[0].origen : '';
   const guias = puntos.length
-    ? puntos.map(p => ({ num: p.guia, destino: p.destino, fecha_descarga: p.fecha_descarga, origen: p.origen, tipo: p.tipo, fecha_guia: p.fecha_guia }))
+    ? puntos.map(p => ({ num: p.guia, destino: p.destino, fecha_descarga: p.fecha_descarga, origen: p.origen, tipo: p.tipo, fecha_guia: p.fecha_guia, kg: p.kg||'', imagen_url: p.imagen_url||'' }))
     : [{ num:'', destino:'', fecha_descarga:'' }];
   const tag = '';
   const km = 0;
@@ -1569,7 +1603,7 @@ async function addServicio() {
   }
   // Limpiar formulario completo
   uiState.srv_guias = [{ num:'', destino:'', fecha_descarga:'' }];
-  uiState.srv_puntos = [{ origen:'', destino:'', tipo:'descarga', guia:'', fecha_guia:'', fecha_descarga:'' }];
+  uiState.srv_puntos = [{ origen:'', destino:'', tipo:'descarga', guia:'', fecha_guia:'', fecha_descarga:'', kg:'', imagen_url:'' }];
   uiState.srvForm = {};
   saveData();
   render();
@@ -2083,7 +2117,7 @@ function renderFase(fase) {
           const conductoresLista=appData.conductores;
           const patentesLista=appData.patentes||['GKFD84','WR9192','XR8555','GCFF12','BPBL35','XA1114','DSDV36'];
           const conductorPresel=(sessionRol&&sessionRol.acceso==='conductor'&&sessionConductor)?sessionConductor:'';
-          if(!uiState.srv_puntos||!uiState.srv_puntos.length){uiState.srv_puntos=[{origen:'',destino:'',tipo:'descarga',guia:'',fecha_guia:'',fecha_descarga:''}];}
+          if(!uiState.srv_puntos||!uiState.srv_puntos.length){uiState.srv_puntos=[{origen:'',destino:'',tipo:'descarga',guia:'',fecha_guia:'',fecha_descarga:'',kg:'',imagen_url:''}];}
           const puntos=uiState.srv_puntos;
           if(!uiState.srvForm)uiState.srvForm={};
           const sf=uiState.srvForm;
@@ -2098,7 +2132,44 @@ function renderFase(fase) {
           const mostrarPatenteManual=sfPatente==='__tercero__';
           const mostrarClienteNuevo=sfCliente==='__nuevo__';
           const TIPOS_PUNTO=['carga','descarga','carga y descarga'];
-          const puntosHTML=puntos.map((p,pi)=>`<div style="background:white;border:1px solid #CFD8DC;border-radius:8px;padding:10px;margin-bottom:8px"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><span style="font-size:10px;font-weight:800;color:#455A64;letter-spacing:1px">PUNTO ${pi+1}</span><div style="display:flex;gap:8px;align-items:center"><select onchange="updPunto(${pi},'tipo',this.value)" style="border:1px solid #dde;border-radius:5px;padding:3px 6px;font-size:10px;outline:none;font-family:inherit;background:white;-webkit-appearance:auto">${TIPOS_PUNTO.map(t=>'<option value="'+t+'" '+(p.tipo===t?'selected':'')+'>'+t.toUpperCase()+'</option>').join('')}</select>${puntos.length>1?'<span onclick="delPunto('+pi+')" style="color:#bbb;cursor:pointer;font-size:16px">×</span>':''}</div></div><div style="display:grid;grid-template-columns:1fr 1fr;gap:5px"><div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">ORIGEN</div><input value="${p.origen}" onchange="updPunto(${pi},'origen',this.value)" placeholder="ej: Santiago" style="width:100%;border:1px solid #dde;border-radius:5px;padding:6px 8px;font-size:12px;outline:none;font-family:inherit"></div><div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">DESTINO FINAL</div><input value="${p.destino}" onchange="updPunto(${pi},'destino',this.value)" placeholder="ej: Marchigue" style="width:100%;border:1px solid #dde;border-radius:5px;padding:6px 8px;font-size:12px;outline:none;font-family:inherit"></div><div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">N° GUÍA</div><input value="${p.guia}" onchange="updPunto(${pi},'guia',this.value)" placeholder="ej: 123456" style="width:100%;border:1px solid #dde;border-radius:5px;padding:6px 8px;font-size:12px;outline:none;font-family:inherit"></div><div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">FECHA GUÍA</div><input value="${p.fecha_guia}" onchange="updPunto(${pi},'fecha_guia',this.value)" type="date" style="width:100%;border:1px solid #dde;border-radius:5px;padding:6px 8px;font-size:12px;outline:none;font-family:inherit"></div><div style="grid-column:1/-1"><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">FECHA DESCARGA</div><input value="${p.fecha_descarga}" onchange="updPunto(${pi},'fecha_descarga',this.value)" type="date" style="width:100%;border:1px solid #dde;border-radius:5px;padding:6px 8px;font-size:12px;outline:none;font-family:inherit"></div></div></div>`).join('');
+          const puntosHTML=puntos.map((p,pi)=>`<div style="background:white;border:1px solid #CFD8DC;border-radius:8px;padding:10px;margin-bottom:8px">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+    <span style="font-size:10px;font-weight:800;color:#455A64;letter-spacing:1px">PUNTO ${pi+1}</span>
+    <div style="display:flex;gap:8px;align-items:center">
+      <select onchange="updPunto(${pi},'tipo',this.value)" style="border:1px solid #dde;border-radius:5px;padding:3px 6px;font-size:10px;outline:none;font-family:inherit;background:white;-webkit-appearance:auto">
+        ${TIPOS_PUNTO.map(t=>'<option value="'+t+'" '+(p.tipo===t?'selected':'')+'>'+t.toUpperCase()+'</option>').join('')}
+      </select>
+      ${puntos.length>1?'<span onclick="delPunto('+pi+')" style="color:#bbb;cursor:pointer;font-size:16px">×</span>':''}
+    </div>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:5px">
+    <div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">ORIGEN</div>
+      <input value="${p.origen}" onchange="updPunto(${pi},'origen',this.value)" placeholder="ej: Santiago" style="width:100%;border:1px solid #dde;border-radius:5px;padding:6px 8px;font-size:12px;outline:none;font-family:inherit"></div>
+    <div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">DESTINO FINAL</div>
+      <input value="${p.destino}" onchange="updPunto(${pi},'destino',this.value)" placeholder="ej: Marchigue" style="width:100%;border:1px solid #dde;border-radius:5px;padding:6px 8px;font-size:12px;outline:none;font-family:inherit"></div>
+    <div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">N° GUÍA</div>
+      <input value="${p.guia}" onchange="updPunto(${pi},'guia',this.value)" placeholder="ej: 123456" style="width:100%;border:1px solid #dde;border-radius:5px;padding:6px 8px;font-size:12px;outline:none;font-family:inherit"></div>
+    <div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">KG TRASLADADOS</div>
+      <input value="${p.kg||''}" onchange="updPunto(${pi},'kg',this.value)" type="number" placeholder="ej: 20000" style="width:100%;border:1px solid #dde;border-radius:5px;padding:6px 8px;font-size:12px;outline:none;font-family:inherit"></div>
+    <div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">FECHA GUÍA</div>
+      <input value="${p.fecha_guia}" onchange="updPunto(${pi},'fecha_guia',this.value)" type="date" style="width:100%;border:1px solid #dde;border-radius:5px;padding:6px 8px;font-size:12px;outline:none;font-family:inherit"></div>
+    <div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">FECHA DESCARGA</div>
+      <input value="${p.fecha_descarga}" onchange="updPunto(${pi},'fecha_descarga',this.value)" type="date" style="width:100%;border:1px solid #dde;border-radius:5px;padding:6px 8px;font-size:12px;outline:none;font-family:inherit"></div>
+    <div style="grid-column:1/-1">
+      <div style="font-size:9px;font-weight:700;color:#888;margin-bottom:4px">📎 IMAGEN GUÍA DE DESPACHO</div>
+      ${p.imagen_url
+        ? `<div style="position:relative;display:inline-block">
+            <img src="${p.imagen_url}" style="width:100%;max-height:120px;object-fit:cover;border-radius:6px;border:1px solid #dde" onclick="verImagenGuia('${p.imagen_url}')">
+            <button onclick="updPunto(${pi},'imagen_url','');render()" style="position:absolute;top:4px;right:4px;background:rgba(0,0,0,0.5);color:white;border:none;border-radius:50%;width:22px;height:22px;font-size:12px;cursor:pointer;line-height:1">×</button>
+           </div>`
+        : `<label style="display:flex;align-items:center;gap:6px;background:#f8f9fa;border:1px dashed #ccc;border-radius:6px;padding:8px 10px;cursor:pointer;font-size:11px;color:#607D8B">
+            📷 Toca para adjuntar imagen
+            <input type="file" accept="image/*" capture="environment" onchange="subirImagenGuia(event,${pi})" style="display:none">
+           </label>`
+      }
+    </div>
+  </div>
+</div>`).join('');
           const conductoresOpts=conductoresLista.map(cn=>'<option value="'+cn+'" '+(cn===sfConductor?'selected':'')+'>'+cn+'</option>').join('');
           const ultimos5=(servicios).slice(-5).reverse();
           const lista=ultimos5.length?ultimos5.map((s)=>{const idxReal=servicios.indexOf(s);const isExpanded=!!uiState['srv_exp_'+s.id];const expandKey='srv_exp_'+s.id;return '<div style="position:relative;background:'+(isExpanded?'#EEF2FF':'white')+';border-radius:8px;border:1px solid '+(isExpanded?'#C7D2FE':'#e8eaec')+';margin-bottom:4px"><div onclick="uiState[\'' +expandKey+ '\']=!uiState[\'' +expandKey+ '\'];render()" style="cursor:pointer">'+srvVista(s)+'</div>'+(isExpanded?srvDetalle(s):'')+'<span onclick="event.stopPropagation();delServicio('+idxReal+')" style="position:absolute;top:8px;right:8px;color:#ddd;cursor:pointer;font-size:11px">× eliminar</span></div>';}).join(''):'<div style="font-size:11px;color:#bbb;padding:6px 0;text-align:center">Sin servicios registrados aún</div>';
