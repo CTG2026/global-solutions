@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-  <meta name="version" content="2026031966">
+  <meta name="version" content="2026031967">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Panel de Gestión — Global Solutions</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -646,6 +646,16 @@ const DEFAULT_DATA = {
     ],
   }
 };
+// Forzar versión en URL para romper caché de GitHub Pages
+(function() {
+  const VER = '66';
+  const url = new URL(window.location.href);
+  if (url.searchParams.get('v') !== VER) {
+    url.searchParams.set('v', VER);
+    window.location.replace(url.toString());
+  }
+})();
+
 let appData;
 let uiState = {};
 let vistaActual = "todas";
@@ -5797,3 +5807,4 @@ try {
 </script>
 </body>
 </html>
+
