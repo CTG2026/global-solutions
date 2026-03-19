@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-  <meta name="version" content="2026031953">
+  <meta name="version" content="2026031954">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Panel de Gestión — Global Solutions</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -1236,6 +1236,8 @@ function srvDetalle(s) {
 function loadData() {
   try { const s = localStorage.getItem('gs_panel_v5'); appData = s ? JSON.parse(s) : JSON.parse(JSON.stringify(DEFAULT_DATA)); } 
   catch(e) { appData = JSON.parse(JSON.stringify(DEFAULT_DATA)); }
+  // Limpiar servicios del localStorage — Supabase es la fuente única de verdad
+  appData.servicios = [];
   try {
     const s = localStorage.getItem('gs_panel_ui_v5');
     uiState = s ? JSON.parse(s) : {};
