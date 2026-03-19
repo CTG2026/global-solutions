@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-  <meta name="version" content="2026031962">
+  <meta name="version" content="2026031963">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Panel de Gestión — Global Solutions</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -831,20 +831,32 @@ function renderCierreServicios() {
             <div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">MONTO PETRÓLEO ($)</div>
               <input id="cs_petroleo_${s.id}" type="number" value="${s.petroleo||''}" placeholder="ej: 95000" style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit"></div>
           </div>
+          <!-- CF EDITABLE -->
+          <div style="margin-bottom:8px">
+            <div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">CF PRORRATEADO ($) <span style="font-weight:400;color:#aaa">— por defecto $50.800</span></div>
+            <input id="cs_cf_${s.id}" type="number" value="${s.cfProrrateado||50800}" placeholder="50800"
+              style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit">
+          </div>
           <!-- RESUMEN COSTOS -->
           ${s.precio ? `<div style="background:#F1F8E9;border-radius:8px;padding:8px 10px;margin-bottom:8px">
             <div style="font-size:9px;font-weight:700;color:#2E7D32;margin-bottom:5px">RESUMEN DEL SERVICIO</div>
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:3px;font-size:10px">
               <div style="color:#555">Precio neto</div><div style="text-align:right;font-weight:700;color:#2E7D32">$${(s.precio||0).toLocaleString('es-CL')}</div>
-              <div style="color:#555">Comisión conductor</div><div style="text-align:right;color:#E53935">−$${Math.round((s.precio||0)*0.1).toLocaleString('es-CL')}</div>
+              <div style="color:#555;font-size:9px;color:#888">IVA (19%)</div><div style="text-align:right;font-size:9px;color:#888">$${Math.round((s.precio||0)*0.19).toLocaleString('es-CL')}</div>
+              <div style="color:#555;font-weight:600">Total con IVA</div><div style="text-align:right;font-weight:700;color:#1B5E20">$${Math.round((s.precio||0)*1.19).toLocaleString('es-CL')}</div>
+              <div style="border-top:1px solid #C8E6C9;grid-column:1/-1;margin:3px 0"></div>
+              <div style="color:#777;font-size:9px;font-weight:700;grid-column:1/-1;margin-bottom:2px">COSTOS VARIABLES</div>
+              <div style="color:#555">Comisión conductor (10%)</div><div style="text-align:right;color:#E53935">−$${Math.round((s.precio||0)*0.1).toLocaleString('es-CL')}</div>
               <div style="color:#555">Petróleo</div><div style="text-align:right;color:#E53935">−$${(s.petroleo||0).toLocaleString('es-CL')}</div>
               <div style="color:#555">Peajes</div><div style="text-align:right;color:#E53935">−$${(s.peajes||0).toLocaleString('es-CL')}</div>
               <div style="color:#555">Viáticos</div><div style="text-align:right;color:#E53935">−$${(s.viaticos||0).toLocaleString('es-CL')}</div>
               <div style="color:#555">Adicional</div><div style="text-align:right;color:#E53935">−$${(s.adicional||0).toLocaleString('es-CL')}</div>
-              <div style="color:#555">CF prorrateado</div><div style="text-align:right;color:#E53935">−$${cfPorServ.toLocaleString('es-CL')}</div>
+              ${s.tag?`<div style="color:#555">TAG</div><div style="text-align:right;color:#E53935">−$${(s.tag&&!isNaN(s.tag)?parseInt(s.tag):0).toLocaleString('es-CL')}</div>`:''}
+              <div style="color:#777;font-size:9px;font-weight:700;grid-column:1/-1;margin-top:4px;margin-bottom:2px">COSTOS FIJOS</div>
+              <div style="color:#555">CF prorrateado</div><div style="text-align:right;color:#E53935">−$${(s.cfProrrateado||50800).toLocaleString('es-CL')}</div>
               <div style="border-top:1px solid #C8E6C9;grid-column:1/-1;margin:3px 0"></div>
-              <div style="font-weight:800;color:#1B5E20">RESULTADO</div>
-              <div style="text-align:right;font-weight:900;color:#1B5E20">$${((s.precio||0)-Math.round((s.precio||0)*0.1)-(s.petroleo||0)-(s.peajes||0)-(s.viaticos||0)-(s.adicional||0)-cfPorServ).toLocaleString('es-CL')}</div>
+              <div style="font-weight:800;color:#1B5E20">RESULTADO NETO</div>
+              <div style="text-align:right;font-weight:900;color:#1B5E20">$${((s.precio||0)-Math.round((s.precio||0)*0.1)-(s.petroleo||0)-(s.peajes||0)-(s.viaticos||0)-(s.adicional||0)-(s.cfProrrateado||50800)).toLocaleString('es-CL')}</div>
             </div>
           </div>` : ''}
           <!-- BOTONES -->
@@ -870,6 +882,7 @@ function _leerCamposCierre(id, idx) {
     adicional: parseInt(document.getElementById('cs_adic_'+id)?.value)||s?.adicional||0,
     litros: parseInt(document.getElementById('cs_litros_'+id)?.value)||s?.litros||0,
     petroleo: parseInt(document.getElementById('cs_petroleo_'+id)?.value)||s?.petroleo||0,
+    cfProrrateado: parseInt(document.getElementById('cs_cf_'+id)?.value)||s?.cfProrrateado||50800,
   };
 }
 
@@ -877,11 +890,16 @@ async function guardarBorradorCierre(id) {
   const idx=appData.servicios.findIndex(s=>s.id===id);
   if(idx===-1)return;
   const d=_leerCamposCierre(id,idx);
+  const copiaAntes = JSON.parse(JSON.stringify(appData.servicios[idx]));
   const comisionConductor=d.precio?Math.round(d.precio*0.10):0;
+  registrarAccion(`Borrador servicio ${id}`, () => {
+    const i=appData.servicios.findIndex(s=>s.id===id);
+    if(i!==-1){Object.assign(appData.servicios[i],copiaAntes);upsertServicioSupabase(appData.servicios[i]);}
+  });
   Object.assign(appData.servicios[idx],{
     precio: d.precio, km: d.km, tag: d.tag, oc: d.oc,
     peajes: d.peajes, viaticos: d.viaticos, adicional: d.adicional,
-    litros: d.litros, petroleo: d.petroleo,
+    litros: d.litros, petroleo: d.petroleo, cfProrrateado: d.cfProrrateado,
     comisionConductor, cerrado: false, estado: 'borrador'
   });
   saveData();
@@ -902,7 +920,7 @@ async function guardarCierre(id) {
   Object.assign(appData.servicios[idx],{
     precio: d.precio, km: d.km, tag: d.tag, oc: d.oc,
     peajes: d.peajes, viaticos: d.viaticos, adicional: d.adicional,
-    litros: d.litros, petroleo: d.petroleo,
+    litros: d.litros, petroleo: d.petroleo, cfProrrateado: d.cfProrrateado,
     comisionConductor, cerrado: true, estado: 'cerrado'
   });
   appData.dashboard.ventas_mes=(appData.servicios||[]).filter(s=>s.cerrado&&s.precio).reduce((a,s)=>a+(s.precio||0),0);
@@ -988,30 +1006,58 @@ function renderLiquidacionesV2() {
   `:'';
 
   const ESTADO_COLOR={creada:{bg:'#FFF9C4',text:'#F9A825',label:'⏳ Creada'},enviada:{bg:'#E3F2FD',text:'#1565C0',label:'📤 Enviada'},facturada:{bg:'#F3E5F5',text:'#6A1B9A',label:'🧾 Facturada'},pagada:{bg:'#E8F5E9',text:'#2E7D32',label:'✅ Pagada'}};
-  const histHTML=appData.liquidaciones.length?`
-    <div style="font-size:9px;font-weight:700;color:#888;letter-spacing:0.5px;margin:10px 0 6px">LIQUIDACIONES CREADAS (${appData.liquidaciones.length})</div>
-    ${appData.liquidaciones.slice().reverse().map(liq=>{
+  // Ordenar: pendiente pago primero, luego facturadas, luego pagadas
+  const ordenEstadoLiq = l => l.estado==='creada'?0:l.estado==='enviada'?1:l.estado==='facturada'?2:3;
+  const liqOrdenadas = appData.liquidaciones.slice().sort((a,b)=>ordenEstadoLiq(a)-ordenEstadoLiq(b));
+  const histHTML=liqOrdenadas.length?`
+    <div style="font-size:9px;font-weight:700;color:#888;letter-spacing:0.5px;margin:10px 0 6px">LIQUIDACIONES (${liqOrdenadas.length})</div>
+    ${liqOrdenadas.map(liq=>{
       const isOpen=!!uiState['liq_open_'+liq.id];
       const ec=ESTADO_COLOR[liq.estado]||ESTADO_COLOR.creada;
       const svcsLiq=(liq.serviciosIds||[]).map(id=>servicios.find(s=>s.id===id)).filter(Boolean);
-      return `<div style="border:1px solid #dde;border-radius:8px;margin-bottom:6px;overflow:hidden">
-        <div onclick="uiState['liq_open_${liq.id}']=!uiState['liq_open_${liq.id}'];render()" style="padding:10px 12px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;background:#F8F9FA">
-          <div><div style="font-size:12px;font-weight:700;color:#333">${liq.id}</div>
-            <div style="font-size:9px;color:#888">${liq.fecha} · ${svcsLiq.length} servicio${svcsLiq.length!==1?'s':''}</div></div>
-          <div style="display:flex;gap:6px;align-items:center">
-            <span style="font-size:9px;font-weight:700;padding:2px 8px;border-radius:6px;background:${ec.bg};color:${ec.text}">${ec.label}</span>
-            <span style="font-size:11px;font-weight:700;color:#546E7A">$${(liq.total||0).toLocaleString('es-CL')}</span>
-            <span style="font-size:10px;color:#aaa">${isOpen?'▲':'▼'}</span>
+      const total=liq.total||svcsLiq.reduce((a,s)=>a+(s.precio||0),0);
+      return `<div style="border:1px solid ${isOpen?'#90A4AE':'#dde'};border-radius:8px;margin-bottom:6px;overflow:hidden;background:white">
+        <div onclick="uiState['liq_open_${liq.id}']=!uiState['liq_open_${liq.id}'];render()" style="padding:10px 12px;cursor:pointer;background:${isOpen?'#ECEFF1':'white'}">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
+            <div style="flex:1">
+              <div style="display:flex;align-items:center;gap:6px;margin-bottom:3px;flex-wrap:wrap">
+                <span style="font-size:13px;font-weight:900;color:#37474F;letter-spacing:1px">${liq.id}</span>
+                <span style="font-size:9px;font-weight:700;padding:2px 8px;border-radius:8px;background:${ec.bg};color:${ec.text}">${ec.label}</span>
+              </div>
+              <div style="font-size:10px;color:#888">${liq.fecha} · ${svcsLiq.length} servicio${svcsLiq.length!==1?'s':''}</div>
+              <div style="font-size:11px;color:#546E7A;font-weight:700;margin-top:2px">${svcsLiq[0]?.cliente||'—'}</div>
+            </div>
+            <div style="text-align:right;flex-shrink:0">
+              <div style="font-size:13px;font-weight:900;color:#37474F">$${total.toLocaleString('es-CL')}</div>
+              <div style="font-size:9px;color:#888">neto</div>
+              <span style="font-size:10px;color:#aaa">${isOpen?'▲':'▼'}</span>
+            </div>
           </div>
         </div>
-        ${isOpen?`<div style="padding:10px 12px">
-          ${liq.ruts&&liq.ruts.length?`<div style="font-size:10px;color:#546E7A;margin-bottom:6px">RUTs: ${liq.ruts.join(', ')}</div>`:''}
-          ${svcsLiq.map(s=>srvVista(s)+(s.precio?`<div style="font-size:10px;font-weight:700;color:#2E7D32;text-align:right;margin-top:-6px;margin-bottom:4px">$${(s.precio||0).toLocaleString('es-CL')}</div>`:'') ).join('')}
-          <div style="display:flex;gap:5px;margin-top:10px;flex-wrap:wrap">
-            ${liq.estado==='creada'?`<button onclick="cambiarEstadoLiq('${liq.id}','enviada')" style="flex:1;padding:8px;background:#E3F2FD;color:#1565C0;border:1px solid #1565C0;border-radius:7px;font-size:10px;font-weight:700;cursor:pointer">📤 Enviada</button>`:''}
-            ${liq.estado==='enviada'?`<button onclick="cambiarEstadoLiq('${liq.id}','facturada')" style="flex:1;padding:8px;background:#F3E5F5;color:#6A1B9A;border:1px solid #6A1B9A;border-radius:7px;font-size:10px;font-weight:700;cursor:pointer">🧾 Facturada</button>`:''}
-            ${liq.estado==='facturada'?`<button onclick="cambiarEstadoLiq('${liq.id}','pagada')" style="flex:1;padding:8px;background:#E8F5E9;color:#2E7D32;border:1px solid #2E7D32;border-radius:7px;font-size:10px;font-weight:700;cursor:pointer">✅ Pagada</button>`:''}
-            <button onclick="descargarLiqV2('${liq.id}')" style="padding:8px 12px;background:#ECEFF1;color:#37474F;border:1px solid #CFD8DC;border-radius:7px;font-size:10px;font-weight:700;cursor:pointer">📥 Descargar</button>
+        ${isOpen?`<div style="padding:10px 12px;border-top:1px solid #eee;background:#FAFAFA">
+          ${liq.ruts&&liq.ruts.length?`<div style="font-size:10px;color:#546E7A;background:#E3F2FD;padding:4px 8px;border-radius:5px;margin-bottom:8px">RUTs: ${liq.ruts.join(' · ')}</div>`:''}
+          <div style="margin-bottom:8px">
+            ${svcsLiq.map(s=>`<div style="background:white;border:1px solid #eee;border-radius:7px;padding:8px 10px;margin-bottom:4px">
+              <div style="display:flex;justify-content:space-between;align-items:center">
+                <div>
+                  <span style="font-size:11px;font-weight:800;color:#455A64">${s.id}</span>
+                  <span style="font-size:10px;color:#888;margin-left:6px">${s.fecha||'—'}</span>
+                </div>
+                <span style="font-size:12px;font-weight:700;color:#2E7D32">$${(s.precio||0).toLocaleString('es-CL')}</span>
+              </div>
+              <div style="font-size:10px;color:#1565C0;font-weight:700;margin-top:2px">GD: ${(s.guias||[]).map(g=>g.num||g.guia).filter(Boolean).join(', ')||'—'}</div>
+              <div style="font-size:10px;color:#777;margin-top:1px">${s.origen||'—'} → ${(s.puntos||s.guias||[]).map(g=>g.destino).filter(Boolean).slice(-1)[0]||'—'}</div>
+            </div>`).join('')}
+          </div>
+          <div style="background:#F1F8E9;border-radius:7px;padding:8px 12px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center">
+            <span style="font-size:11px;font-weight:700;color:#2E7D32">Total neto</span>
+            <span style="font-size:14px;font-weight:900;color:#2E7D32">$${total.toLocaleString('es-CL')}</span>
+          </div>
+          <div style="display:flex;gap:5px;flex-wrap:wrap">
+            ${liq.estado==='creada'?`<button onclick="cambiarEstadoLiq('${liq.id}','enviada')" style="flex:1;padding:8px;background:#E3F2FD;color:#1565C0;border:1px solid #1565C0;border-radius:7px;font-size:10px;font-weight:700;cursor:pointer">📤 Marcar enviada</button>`:''}
+            ${liq.estado==='enviada'?`<button onclick="cambiarEstadoLiq('${liq.id}','facturada')" style="flex:1;padding:8px;background:#F3E5F5;color:#6A1B9A;border:1px solid #6A1B9A;border-radius:7px;font-size:10px;font-weight:700;cursor:pointer">🧾 Marcar facturada</button>`:''}
+            ${liq.estado==='facturada'?`<button onclick="cambiarEstadoLiq('${liq.id}','pagada')" style="flex:1;padding:8px;background:#E8F5E9;color:#2E7D32;border:1px solid #2E7D32;border-radius:7px;font-size:10px;font-weight:700;cursor:pointer">✅ Marcar pagada</button>`:''}
+            <button onclick="descargarLiqV2('${liq.id}')" style="padding:8px 14px;background:#0B2545;color:white;border:none;border-radius:7px;font-size:10px;font-weight:700;cursor:pointer">📄 PDF</button>
           </div>
         </div>`:''}
       </div>`;
@@ -1034,7 +1080,106 @@ function toggleRutLiq(rut,checked){if(!uiState.liq_ruts_sel)uiState.liq_ruts_sel
 function agregarRutLiq(){const input=document.getElementById('liq_rut_nuevo');const rut=input?.value.trim();if(!rut)return;const cl=uiState.liq_cliente_sel||'';if(cl){if(!appData.clientesRut)appData.clientesRut={};if(!appData.clientesRut[cl])appData.clientesRut[cl]=[];if(!appData.clientesRut[cl].includes(rut)){appData.clientesRut[cl].push(rut);saveData();}}if(!uiState.liq_ruts_sel)uiState.liq_ruts_sel=[];if(!uiState.liq_ruts_sel.includes(rut))uiState.liq_ruts_sel.push(rut);input.value='';render();}
 function crearLiquidacionV2(){const sel=uiState.liq_sel||[];if(!sel.length)return alert('Selecciona al menos un servicio');const fecha=document.getElementById('liq_fecha_v2')?.value||new Date().toISOString().split('T')[0];const email=document.getElementById('liq_email_v2')?.value||'';const p=fecha.split('-');const fechaStr=`${p[2]}-${p[1]}-${p[0]}`;const ruts=uiState.liq_ruts_sel||[];const servicios=appData.servicios||[];const total=sel.reduce((a,id)=>{const s=servicios.find(sv=>sv.id===id);return a+(s?s.precio||0:0);},0);const id='LIQ-'+String(appData.liquidaciones.length+1).padStart(3,'0');appData.liquidaciones.push({id,fecha:fechaStr,email,serviciosIds:[...sel],total,estado:'creada',nFactura:'',ruts});sel.forEach(sid=>{const s=servicios.find(sv=>sv.id===sid);if(s){s.liquidacionId=id;upsertServicioSupabase(s);}});uiState.liq_sel=[];uiState.liq_ruts_sel=[];saveData();render();alert('✅ '+id+' creada — Total: $'+total.toLocaleString('es-CL'));}
 function cambiarEstadoLiq(liqId,estado){const liq=(appData.liquidaciones||[]).find(l=>l.id===liqId);if(!liq)return;liq.estado=estado;saveData();render();}
-function descargarLiqV2(liqId){const liq=(appData.liquidaciones||[]).find(l=>l.id===liqId);if(!liq)return;const servicios=appData.servicios||[];const svcs=(liq.serviciosIds||[]).map(id=>servicios.find(s=>s.id===id)).filter(Boolean);let txt=`GLOBAL SOLUTIONS SpA\nLIQUIDACIÓN ${liq.id}\nFecha: ${liq.fecha}\n`;if(liq.ruts&&liq.ruts.length)txt+=`RUTs: ${liq.ruts.join(', ')}\n`;txt+=`\nDETALLE:\n${'─'.repeat(50)}\n`;svcs.forEach(s=>{const g=(s.guias||[]).map(g=>g.num).filter(Boolean).join(', ')||'—';txt+=`• ${s.id} | ${s.cliente||'—'} | ${s.fecha} | Guías: ${g} | $${(s.precio||0).toLocaleString('es-CL')}\n`;});txt+=`${'─'.repeat(50)}\nTOTAL: $${(liq.total||0).toLocaleString('es-CL')}\n`;const blob=new Blob([txt],{type:'text/plain;charset=utf-8'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=`${liq.id}.txt`;a.click();URL.revokeObjectURL(url);}
+function descargarLiqV2(liqId) {
+  const liq = (appData.liquidaciones||[]).find(l=>l.id===liqId);
+  if (!liq) return;
+  const servicios = appData.servicios||[];
+  const svcs = (liq.serviciosIds||[]).map(id=>servicios.find(s=>s.id===id)).filter(Boolean);
+  const total = liq.total || svcs.reduce((a,s)=>a+(s.precio||0),0);
+  const iva = Math.round(total * 0.19);
+  const totalConIva = total + iva;
+  const hoy = new Date().toLocaleDateString('es-CL',{day:'2-digit',month:'long',year:'numeric'});
+  const filas = svcs.map((s,i) => {
+    const guias = (s.guias||[]).map(g=>g.num||g.guia).filter(Boolean).join(', ')||'—';
+    const origen = s.puntos?.[0]?.origen || s.origen || '—';
+    const destino = s.puntos?.[s.puntos.length-1]?.destino || '—';
+    return `<tr style="background:${i%2===0?'#f9fafb':'white'}">
+      <td style="padding:8px 10px;border-bottom:1px solid #eee;font-size:11px;font-weight:700;color:#1F4E79">${s.id}</td>
+      <td style="padding:8px 10px;border-bottom:1px solid #eee;font-size:11px">${s.fecha||'—'}</td>
+      <td style="padding:8px 10px;border-bottom:1px solid #eee;font-size:11px">${s.cliente||'—'}</td>
+      <td style="padding:8px 10px;border-bottom:1px solid #eee;font-size:11px;color:#1565C0">${guias}</td>
+      <td style="padding:8px 10px;border-bottom:1px solid #eee;font-size:11px">${origen} → ${destino}</td>
+      <td style="padding:8px 10px;border-bottom:1px solid #eee;font-size:11px;text-align:right;font-weight:700;color:#2E7D32">$${(s.precio||0).toLocaleString('es-CL')}</td>
+    </tr>`;
+  }).join('');
+  const rutsHTML = liq.ruts&&liq.ruts.length ? `<div style="margin-top:8px;font-size:11px;color:#546E7A"><strong>RUT(s):</strong> ${liq.ruts.join(' · ')}</div>` : '';
+  const html = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
+  <title>${liq.id} — Global Solutions SpA</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Segoe UI', Arial, sans-serif; color: #222; background: white; }
+    .page { max-width: 780px; margin: 0 auto; padding: 40px; }
+    @media print { .no-print { display: none !important; } body { padding: 0; } .page { padding: 20px; } }
+  </style></head><body>
+  <div class="page">
+    <!-- ENCABEZADO -->
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:30px;padding-bottom:20px;border-bottom:3px solid #0B2545">
+      <div>
+        <div style="font-size:22px;font-weight:900;color:#0B2545;letter-spacing:1px">GLOBAL SOLUTIONS SpA</div>
+        <div style="font-size:11px;color:#546E7A;margin-top:2px">Transporte Agroindustrial — RM, V, VI, VII Región</div>
+        <div style="font-size:10px;color:#888;margin-top:6px">contacto@globalsolutions.cl · +56 9 8360 0761</div>
+      </div>
+      <div style="text-align:right">
+        <div style="font-size:26px;font-weight:900;color:#0B2545">${liq.id}</div>
+        <div style="font-size:11px;color:#546E7A;margin-top:2px">Fecha emisión: ${hoy}</div>
+        <div style="font-size:11px;color:#546E7A">Fecha servicio: ${liq.fecha}</div>
+      </div>
+    </div>
+    <!-- CLIENTE -->
+    <div style="background:#f4f6f8;border-radius:8px;padding:14px 18px;margin-bottom:24px">
+      <div style="font-size:9px;font-weight:700;color:#888;letter-spacing:1px;margin-bottom:6px">DATOS DEL CLIENTE</div>
+      <div style="font-size:13px;font-weight:700;color:#222">${svcs[0]?.cliente||'—'}</div>
+      ${rutsHTML}
+      ${liq.email?`<div style="font-size:11px;color:#546E7A;margin-top:4px">📧 ${liq.email}</div>`:''}
+    </div>
+    <!-- TABLA SERVICIOS -->
+    <div style="font-size:9px;font-weight:700;color:#888;letter-spacing:1px;margin-bottom:8px">DETALLE DE SERVICIOS</div>
+    <table style="width:100%;border-collapse:collapse;margin-bottom:24px">
+      <thead>
+        <tr style="background:#0B2545;color:white">
+          <th style="padding:10px;text-align:left;font-size:10px;font-weight:700">ID</th>
+          <th style="padding:10px;text-align:left;font-size:10px;font-weight:700">FECHA</th>
+          <th style="padding:10px;text-align:left;font-size:10px;font-weight:700">CLIENTE</th>
+          <th style="padding:10px;text-align:left;font-size:10px;font-weight:700">GUÍA(S)</th>
+          <th style="padding:10px;text-align:left;font-size:10px;font-weight:700">RUTA</th>
+          <th style="padding:10px;text-align:right;font-size:10px;font-weight:700">PRECIO NETO</th>
+        </tr>
+      </thead>
+      <tbody>${filas}</tbody>
+    </table>
+    <!-- TOTALES -->
+    <div style="display:flex;justify-content:flex-end;margin-bottom:30px">
+      <div style="width:280px">
+        <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #eee;font-size:11px">
+          <span style="color:#555">Subtotal neto</span>
+          <span style="font-weight:700">$${total.toLocaleString('es-CL')}</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #eee;font-size:11px">
+          <span style="color:#555">IVA (19%)</span>
+          <span>$${iva.toLocaleString('es-CL')}</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;padding:10px 0;font-size:14px;font-weight:900;color:#0B2545;border-top:2px solid #0B2545;margin-top:4px">
+          <span>TOTAL</span>
+          <span>$${totalConIva.toLocaleString('es-CL')}</span>
+        </div>
+      </div>
+    </div>
+    <!-- PIE -->
+    <div style="border-top:1px solid #eee;padding-top:16px;display:flex;justify-content:space-between;align-items:center">
+      <div style="font-size:10px;color:#aaa">Documento generado el ${hoy}</div>
+      <div style="font-size:10px;color:#aaa">${liq.id} · Global Solutions SpA</div>
+    </div>
+    <!-- BOTÓN IMPRIMIR -->
+    <div class="no-print" style="text-align:center;margin-top:30px">
+      <button onclick="window.print()" style="background:#0B2545;color:white;border:none;border-radius:8px;padding:12px 30px;font-size:13px;font-weight:700;cursor:pointer">🖨️ Imprimir / Guardar PDF</button>
+    </div>
+  </div>
+  <script>setTimeout(()=>window.print(),600);<\/script>
+  </body></html>`;
+  const win = window.open('','_blank');
+  win.document.write(html);
+  win.document.close();
+}
 
 // ── COTIZACIÓN PDF v36 ────────────────────────────────────
 const COT_ITEMS_V36=[
@@ -1794,6 +1939,14 @@ async function addServicio() {
   const viaticos = 0;
   const servicio = { id, fecha: fechaFinal, anio, mes, patente, conductor, tipoEquipo, cliente, precio: 0, petroleo: 0, adicional: 0, liquidado: false, origen, tag, km, viaticos, peajes, guias, puntos };
   appData.servicios.push(servicio);
+  // Registrar para deshacer
+  registrarAccion(`Registrar servicio ${id} — ${cliente}`, () => {
+    const i = appData.servicios.findIndex(s=>s.id===id);
+    if (i!==-1) {
+      appData.servicios.splice(i,1);
+      if (supaConectado && supa) supa.from('servicios').delete().eq('id',id).then(()=>{});
+    }
+  });
   if (conductor && !(appData.conductores||[]).includes(conductor)) {
     if (!appData.conductores) appData.conductores = [];
     appData.conductores.push(conductor);
@@ -1822,6 +1975,11 @@ async function delServicio(si) {
   if (!confirm(`¿Eliminar servicio ${servicio.id} — ${servicio.cliente||'sin cliente'}?\nEsta acción no se puede deshacer.`)) return;
   const precio = servicio.precio || 0;
   const id = servicio.id;
+  const copiaSrv = JSON.parse(JSON.stringify(servicio));
+  registrarAccion(`Eliminar servicio ${id} — ${servicio.cliente||''}`, () => {
+    appData.servicios.splice(si, 0, copiaSrv);
+    if (supaConectado && supa) upsertServicioSupabase(copiaSrv);
+  });
   appData.servicios.splice(si, 1);
   appData.dashboard.ventas_mes = Math.max(0, (appData.dashboard.ventas_mes || 0) - precio);
   saveData(); render();
