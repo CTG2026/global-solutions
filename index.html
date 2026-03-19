@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-  <meta name="version" content="2026031961">
+  <meta name="version" content="2026031962">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Panel de Gestión — Global Solutions</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -873,18 +873,24 @@ function _leerCamposCierre(id, idx) {
   };
 }
 
-function guardarBorradorCierre(id) {
+async function guardarBorradorCierre(id) {
   const idx=appData.servicios.findIndex(s=>s.id===id);
   if(idx===-1)return;
   const d=_leerCamposCierre(id,idx);
   const comisionConductor=d.precio?Math.round(d.precio*0.10):0;
-  Object.assign(appData.servicios[idx],{...d,comisionConductor,cerrado:false,estado:'borrador'});
-  upsertServicioSupabase(appData.servicios[idx]);
-  saveData();render();
+  Object.assign(appData.servicios[idx],{
+    precio: d.precio, km: d.km, tag: d.tag, oc: d.oc,
+    peajes: d.peajes, viaticos: d.viaticos, adicional: d.adicional,
+    litros: d.litros, petroleo: d.petroleo,
+    comisionConductor, cerrado: false, estado: 'borrador'
+  });
+  saveData();
+  await upsertServicioSupabase(appData.servicios[idx]);
   showToastGeneral('💾 Borrador guardado correctamente','#E65100');
+  render();
 }
 
-function guardarCierre(id) {
+async function guardarCierre(id) {
   const idx=appData.servicios.findIndex(s=>s.id===id);
   if(idx===-1)return;
   const d=_leerCamposCierre(id,idx);
@@ -893,12 +899,18 @@ function guardarCierre(id) {
   if(!d.petroleo && !d.litros) { if(!confirm('⚠️ El combustible está en 0. ¿Deseas continuar de todas formas?')) return; }
   if(!confirm(`¿Cerrar definitivamente el servicio ${id}?\nPrecio: $${d.precio.toLocaleString('es-CL')}\nEsta acción no se puede deshacer.`)) return;
   const comisionConductor=Math.round(d.precio*0.10);
-  Object.assign(appData.servicios[idx],{...d,comisionConductor,cerrado:true,estado:'cerrado'});
+  Object.assign(appData.servicios[idx],{
+    precio: d.precio, km: d.km, tag: d.tag, oc: d.oc,
+    peajes: d.peajes, viaticos: d.viaticos, adicional: d.adicional,
+    litros: d.litros, petroleo: d.petroleo,
+    comisionConductor, cerrado: true, estado: 'cerrado'
+  });
   appData.dashboard.ventas_mes=(appData.servicios||[]).filter(s=>s.cerrado&&s.precio).reduce((a,s)=>a+(s.precio||0),0);
   uiState['cs_'+id]=false;
-  upsertServicioSupabase(appData.servicios[idx]);
-  saveData();render();
-  mostrarToastServicio(supaConectado);
+  saveData();
+  await upsertServicioSupabase(appData.servicios[idx]);
+  showToastGeneral('✅ Servicio cerrado correctamente','#2E7D32');
+  render();
 }
 
 // ── LIQUIDACIONES v36 (por servicio o grupo + múltiples RUT) ──
