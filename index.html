@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-  <meta name="version" content="2026031957">
+  <meta name="version" content="2026031958">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Panel de Gestión — Global Solutions</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -5050,12 +5050,27 @@ document.addEventListener('touchend', async e => {
   }
 }, {passive:true});
 
-// Desregistrar cualquier Service Worker anterior
+// Desregistrar Service Workers y forzar recarga limpia
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.getRegistrations().then(regs => {
     regs.forEach(reg => reg.unregister());
   });
 }
+// Limpiar caché del navegador para forzar versión más reciente
+if ('caches' in window) {
+  caches.keys().then(keys => keys.forEach(k => caches.delete(k)));
+}
+// Limpiar localStorage de servicios al arrancar — Supabase es la única fuente
+try {
+  const raw = localStorage.getItem('gs_panel_v5');
+  if (raw) {
+    const parsed = JSON.parse(raw);
+    if (parsed.servicios && parsed.servicios.length > 0) {
+      parsed.servicios = [];
+      localStorage.setItem('gs_panel_v5', JSON.stringify(parsed));
+    }
+  }
+} catch(e) {}
 </script>
 </body>
 </html>
