@@ -1,4 +1,4 @@
-const VERSION = '2026031401';
+const VERSION = '2026031968';
 const CACHE = `gs-cache-${VERSION}`;
 
 self.addEventListener('install', e => {
