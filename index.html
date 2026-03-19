@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-  <meta name="version" content="2026031965">
+  <meta name="version" content="2026031966">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Panel de Gestión — Global Solutions</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -1908,9 +1908,46 @@ function renderEditarServicio(id) {
   </div>`;
 }
 
+const ESTRUCTURA_VERSION = '65'; // Incrementar cuando cambie la estructura del panel
+
 function loadData() {
-  try { const s = localStorage.getItem('gs_panel_v5'); appData = s ? JSON.parse(s) : JSON.parse(JSON.stringify(DEFAULT_DATA)); } 
-  catch(e) { appData = JSON.parse(JSON.stringify(DEFAULT_DATA)); }
+  // Si la versión estructural cambió, limpiar la estructura pero preservar datos
+  const versionGuardada = localStorage.getItem('gs_estructura_ver');
+  if (versionGuardada !== ESTRUCTURA_VERSION) {
+    // Preservar datos importantes antes de limpiar
+    let datosAPreservar = {};
+    try {
+      const viejos = JSON.parse(localStorage.getItem('gs_panel_v5')||'{}');
+      datosAPreservar = {
+        pipeline: viejos.pipeline || [],
+        liquidaciones: viejos.liquidaciones || [],
+        rendiciones: viejos.rendiciones || [],
+        conductores: viejos.conductores || [],
+        patentes: viejos.patentes || [],
+        clientesRut: viejos.clientesRut || {},
+        cotizaciones: viejos.cotizaciones || [],
+        rendimientoComb: viejos.rendimientoComb || [],
+        dashboard: viejos.dashboard || {},
+      };
+    } catch(e) {}
+    // Resetear estructura completa
+    appData = JSON.parse(JSON.stringify(DEFAULT_DATA));
+    // Restaurar datos preservados
+    if (datosAPreservar.pipeline?.length) appData.pipeline = datosAPreservar.pipeline;
+    if (datosAPreservar.liquidaciones?.length) appData.liquidaciones = datosAPreservar.liquidaciones;
+    if (datosAPreservar.rendiciones?.length) appData.rendiciones = datosAPreservar.rendiciones;
+    if (datosAPreservar.conductores?.length) appData.conductores = datosAPreservar.conductores;
+    if (datosAPreservar.patentes?.length) appData.patentes = datosAPreservar.patentes;
+    if (Object.keys(datosAPreservar.clientesRut||{}).length) appData.clientesRut = datosAPreservar.clientesRut;
+    if (datosAPreservar.cotizaciones?.length) appData.cotizaciones = datosAPreservar.cotizaciones;
+    if (datosAPreservar.rendimientoComb?.length) appData.rendimientoComb = datosAPreservar.rendimientoComb;
+    // Guardar nueva versión
+    localStorage.setItem('gs_estructura_ver', ESTRUCTURA_VERSION);
+    localStorage.setItem('gs_panel_ui_v5', '{}');
+  } else {
+    try { const s = localStorage.getItem('gs_panel_v5'); appData = s ? JSON.parse(s) : JSON.parse(JSON.stringify(DEFAULT_DATA)); } 
+    catch(e) { appData = JSON.parse(JSON.stringify(DEFAULT_DATA)); }
+  }
   // Limpiar servicios del localStorage — Supabase es la fuente única de verdad
   appData.servicios = [];
   try {
