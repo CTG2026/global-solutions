@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-  <meta name="version" content="2026031954">
+  <meta name="version" content="2026031955">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Panel de Gestión — Global Solutions</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -1540,8 +1540,12 @@ async function addServicio() {
     : clienteSelect;
   const peajesVal = document.getElementById('srv_peajes')?.value || uiState.srvForm?.peajes || '';
   const peajes = parseInt(peajesVal);
-  if (peajes === undefined || peajes === null || isNaN(peajes)) { alert('Ingresa los peajes — escribe 0 si no hay.'); return; }
-  if (!patente && !cliente) return;
+  // Validaciones obligatorias
+  if (!fechaRaw) { alert('⚠️ Debes ingresar la fecha del servicio.'); return; }
+  if (!conductor) { alert('⚠️ Debes seleccionar un conductor.'); return; }
+  if (!patente) { alert('⚠️ Debes seleccionar una patente.'); return; }
+  if (!cliente) { alert('⚠️ Debes seleccionar un cliente.'); return; }
+  if (peajes === undefined || peajes === null || isNaN(peajes)) { alert('⚠️ Ingresa los peajes — escribe 0 si no hay.'); return; }
   if (!appData.servicios) appData.servicios = [];
   const hoy = new Date();
   const fechaFinal = fecha || `${String(hoy.getDate()).padStart(2,'0')}-${String(hoy.getMonth()+1).padStart(2,'0')}-${hoy.getFullYear()}`;
