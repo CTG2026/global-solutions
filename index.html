@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-  <meta name="version" content="2026031952">
+  <meta name="version" content="2026031953">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Panel de Gestión — Global Solutions</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -1262,6 +1262,16 @@ function loadData() {
   if (!appData.dashboard) appData.dashboard = JSON.parse(JSON.stringify(DEFAULT_DATA.dashboard));
   // Costos fijos y PE — valores fijos, no se sobreescriben por localStorage
   appData.dashboard.gasto_meta = 5080000;
+  // Corregir nombres de conductores incorrectos en localStorage
+  if (appData.conductores) {
+    appData.conductores = appData.conductores.map(c => {
+      if (c === 'Manuel Madariaga') return 'Felipe Madariaga';
+      if (c === 'Sebastian Zuñiga') return 'Sebastián Zúñiga';
+      return c;
+    });
+    // Eliminar duplicados
+    appData.conductores = [...new Set(appData.conductores)];
+  }
   if (appData.dashboard.gasto_real === undefined) appData.dashboard.gasto_real = 0;
   // PE siempre calculado desde costos fijos con margen 25%
   appData.dashboard.meta_pe = Math.round(appData.dashboard.gasto_meta / 0.25);
@@ -1557,25 +1567,29 @@ async function addServicio() {
   uiState.srvForm = {};
   saveData();
   render();
-
-  let guardadoEnDB = false;
+  // Sincronizar con Supabase inmediatamente
   if (supaConectado && supa) {
     try {
       const { error } = await supa.from('servicios').upsert(servicioToRow(servicio), {onConflict:'id'});
-      if (!error) guardadoEnDB = true;
-    } catch(e) { guardadoEnDB = false; }
+      mostrarToastServicio(!error);
+    } catch(e) { mostrarToastServicio(false); }
   } else {
-    upsertServicioSupabase(servicio);
+    mostrarToastServicio(false);
   }
-  mostrarToastServicio(guardadoEnDB);
   render();
 }
-function delServicio(si) {
+async function delServicio(si) {
   if (!appData.servicios) return;
-  const precio = appData.servicios[si]?.precio || 0;
+  const servicio = appData.servicios[si];
+  if (!servicio) return;
+  const precio = servicio.precio || 0;
+  const id = servicio.id;
   appData.servicios.splice(si, 1);
   appData.dashboard.ventas_mes = Math.max(0, (appData.dashboard.ventas_mes || 0) - precio);
   saveData(); render();
+  if (supaConectado && supa && id) {
+    try { await supa.from('servicios').delete().eq('id', id); } catch(e) {}
+  }
 }
 function addSub(faseId, ti) {
   const input = document.getElementById(`sub_input_${faseId}_${ti}`);
@@ -2236,9 +2250,15 @@ function renderFase(fase) {
 
 // ── HELPERS SERVICIOS SUPABASE ─────────────────────────────
 function servicioToRow(s) {
+  // Convertir fecha de dd-mm-yyyy a yyyy-mm-dd para Supabase
+  const fechaISO = s.fecha ? (() => {
+    const p = s.fecha.split('-');
+    if (p.length === 3 && p[0].length === 2) return p[2]+'-'+p[1]+'-'+p[0];
+    return s.fecha;
+  })() : null;
   return {
     id: s.id,
-    fecha: s.fecha,
+    fecha: fechaISO,
     anio: s.anio,
     mes: s.mes,
     patente: s.patente || '',
@@ -2414,12 +2434,15 @@ async function syncServiciosDesdeSupabase() {
     const { data, error } = await supa.from('servicios').select('*').order('created_at');
     if (error) { console.warn('Error sync servicios:', error); return; }
     if (!data || data.length === 0) {
+      // Supabase vacío — subir locales
       const locales = appData.servicios || [];
       for (const s of locales) { await upsertServicioSupabase(s); }
     } else {
+      // Subir servicios locales que no están en Supabase
       const idsRemoto = new Set(data.map(r => r.id));
       const localesNuevos = (appData.servicios||[]).filter(s => !idsRemoto.has(s.id));
       for (const s of localesNuevos) { await upsertServicioSupabase(s); }
+      // Supabase manda — reemplazar localStorage con datos remotos
       const remotos = data.map(r => ({
         id: r.id, fecha: r.fecha, anio: r.anio, mes: r.mes,
         patente: r.patente, conductor: r.conductor, tipoEquipo: r.tipo_equipo,
