@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-  <meta name="version" content="2026031950">
+  <meta name="version" content="2026031952">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Panel de Gestión — Global Solutions</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -301,6 +301,7 @@
     <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center;padding:16px 0 8px;">
       <button class="copy-btn" id="copyBtn" onclick="copiarResumen()" style="background:#1F4E79;border-color:#2E75B6;font-size:11px;padding:8px 14px">📋 Copiar resumen</button>
       <button class="copy-btn" onclick="saveData();showSaveToast()" style="background:#6abf69;border-color:#4caf50;font-size:11px;padding:8px 14px">💾 Guardar</button>
+      <button class="copy-btn" onclick="forzarSyncCompleto()" id="btn-sync" style="background:#1565C0;border-color:#1976D2;font-size:11px;padding:8px 14px">↑ Sync DB</button>
       <button class="copy-btn" onclick="exportarDatos()" style="background:#37474F;border-color:#546E7A;font-size:11px;padding:8px 14px">⬇ Exportar</button>
       <label class="copy-btn" style="background:#37474F;border-color:#546E7A;font-size:11px;padding:8px 14px;cursor:pointer">⬆ Importar<input type="file" accept=".json" onchange="importarDatos(event)" style="display:none"></label>
     </div>
@@ -1518,20 +1519,20 @@ function updGuia(gi, campo, valor) {
 }
 
 async function addServicio() {
-  const fechaRaw = document.getElementById('srv_fecha')?.value.trim();
-  // Convertir yyyy-mm-dd a dd-mm-yyyy para consistencia interna
+  const fechaRaw = document.getElementById('srv_fecha')?.value.trim() || uiState.srvForm?.fecha || '';
   const fecha = fechaRaw ? (() => { const p=fechaRaw.split('-'); return p.length===3 ? `${p[2]}-${p[1]}-${p[0]}` : fechaRaw; })() : null;
-  const patenteRaw = document.getElementById('srv_patente')?.value.trim();
+  const patenteRaw = document.getElementById('srv_patente')?.value.trim() || uiState.srvForm?.patente || '';
   const patente = patenteRaw === '__tercero__'
-    ? (document.getElementById('srv_patente_manual')?.value.trim().toUpperCase() || 'TERCERO')
+    ? (document.getElementById('srv_patente_manual')?.value.trim().toUpperCase() || uiState.srvForm?.patenteManual || 'TERCERO')
     : patenteRaw;
-  const conductor = document.getElementById('srv_conductor')?.value.trim();
-  const tipoEquipo = document.getElementById('srv_tipo_equipo')?.value.trim() || '';
-  const clienteSelect = document.getElementById('srv_cliente')?.value.trim();
+  const conductor = document.getElementById('srv_conductor')?.value.trim() || uiState.srvForm?.conductor || '';
+  const tipoEquipo = document.getElementById('srv_tipo_equipo')?.value.trim() || uiState.srvForm?.tipoEquipo || '';
+  const clienteSelect = document.getElementById('srv_cliente')?.value.trim() || uiState.srvForm?.cliente || '';
   const cliente = clienteSelect === '__nuevo__'
-    ? (document.getElementById('srv_cliente_nuevo')?.value.trim() || '')
+    ? (document.getElementById('srv_cliente_nuevo')?.value.trim() || uiState.srvForm?.clienteNuevo || '')
     : clienteSelect;
-  const peajes = parseInt(document.getElementById('srv_peajes')?.value);
+  const peajesVal = document.getElementById('srv_peajes')?.value || uiState.srvForm?.peajes || '';
+  const peajes = parseInt(peajesVal);
   if (peajes === undefined || peajes === null || isNaN(peajes)) { alert('Ingresa los peajes — escribe 0 si no hay.'); return; }
   if (!patente && !cliente) return;
   if (!appData.servicios) appData.servicios = [];
@@ -1541,10 +1542,8 @@ async function addServicio() {
   const anio = partesFecha[2] || hoy.getFullYear().toString();
   const mes = partesFecha[1] || String(hoy.getMonth()+1).padStart(2,'0');
   const id = generarIdServicio(appData.servicios, fechaFinal);
-  // Usar puntos de ruta (nuevo sistema) con fallback a guias antiguo
   const puntos = (uiState.srv_puntos || []).filter(p => p.guia||p.origen||p.destino);
   const origen = puntos.length ? puntos[0].origen : '';
-  // Convertir puntos a guias para compatibilidad con el resto del sistema
   const guias = puntos.length
     ? puntos.map(p => ({ num: p.guia, destino: p.destino, fecha_descarga: p.fecha_descarga, origen: p.origen, tipo: p.tipo, fecha_guia: p.fecha_guia }))
     : [{ num:'', destino:'', fecha_descarga:'' }];
@@ -1553,18 +1552,17 @@ async function addServicio() {
   const viaticos = 0;
   const servicio = { id, fecha: fechaFinal, anio, mes, patente, conductor, tipoEquipo, cliente, precio: 0, petroleo: 0, adicional: 0, liquidado: false, origen, tag, km, viaticos, peajes, guias, puntos };
   appData.servicios.push(servicio);
-  // Agregar conductor nuevo a la lista si no existe
   if (conductor && !(appData.conductores||[]).includes(conductor)) {
     if (!appData.conductores) appData.conductores = [];
     appData.conductores.push(conductor);
   }
-  // Limpiar formulario inmediatamente y actualizar lista
+  // Limpiar formulario completo
   uiState.srv_guias = [{ num:'', destino:'', fecha_descarga:'' }];
   uiState.srv_puntos = [{ origen:'', destino:'', tipo:'descarga', guia:'', fecha_guia:'', fecha_descarga:'' }];
+  uiState.srvForm = {};
   saveData();
-  render(); // render inmediato para mostrar el nuevo servicio en la lista
+  render();
 
-  // Guardar en Supabase (async, no bloquea el render)
   let guardadoEnDB = false;
   if (supaConectado && supa) {
     try {
@@ -1572,12 +1570,10 @@ async function addServicio() {
       if (!error) guardadoEnDB = true;
     } catch(e) { guardadoEnDB = false; }
   } else {
-    // Si no hay Supabase, intentar upsert cuando reconecte
     upsertServicioSupabase(servicio);
   }
-
   mostrarToastServicio(guardadoEnDB);
-  render(); // segundo render para reflejar estado Supabase
+  render();
 }
 function delServicio(si) {
   if (!appData.servicios) return;
@@ -1940,6 +1936,20 @@ function renderFase(fase) {
 
       const conductorPresel = (sessionRol && sessionRol.acceso==='conductor' && sessionConductor) ? sessionConductor : '';
 
+      // Persistencia del formulario en uiState.srvForm
+      if (!uiState.srvForm) uiState.srvForm = {};
+      const sf = uiState.srvForm;
+      const sfFecha = sf.fecha || hoyISO;
+      const sfConductor = sf.conductor || conductorPresel || '';
+      const sfPatente = sf.patente || '';
+      const sfPatenteManual = sf.patenteManual || '';
+      const sfTipoEquipo = sf.tipoEquipo || '';
+      const sfCliente = sf.cliente || '';
+      const sfClienteNuevo = sf.clienteNuevo || '';
+      const sfPeajes = sf.peajes || '';
+      const mostrarPatenteManual = sfPatente === '__tercero__';
+      const mostrarClienteNuevo = sfCliente === '__nuevo__';
+
       return `<div style="margin-bottom:10px;padding:10px 12px;background:#f4f6f8;border-radius:10px;border:1px solid #dde4e8">
 
         <!-- ID + FECHA -->
@@ -1947,36 +1957,42 @@ function renderFase(fase) {
           <div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">ID SERVICIO</div>
             <div style="background:#455A64;color:white;border-radius:6px;padding:7px 9px;font-size:14px;font-weight:700;letter-spacing:2px">${nextId}</div></div>
           <div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">FECHA SALIDA</div>
-            <input id="srv_fecha" type="date" value="${hoyISO}" style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit;background:white"></div>
+            <input id="srv_fecha" type="date" value="${sfFecha}"
+              onchange="if(!uiState.srvForm)uiState.srvForm={};uiState.srvForm.fecha=this.value"
+              style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit;background:white"></div>
         </div>
 
-        <!-- CONDUCTOR / EQUIPO primero -->
+        <!-- CONDUCTOR / EQUIPO -->
         <div style="font-size:10px;font-weight:800;color:#455A64;letter-spacing:1px;margin-bottom:8px;padding-bottom:5px;border-bottom:2px solid #CFD8DC">CONDUCTOR Y EQUIPO</div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:10px">
           <div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">CONDUCTOR</div>
-            <select id="srv_conductor" onchange="toggleConductorTercero()" style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit;background:white;-webkit-appearance:auto">
+            <select id="srv_conductor"
+              onchange="if(!uiState.srvForm)uiState.srvForm={};uiState.srvForm.conductor=this.value;toggleConductorTercero()"
+              style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit;background:white;-webkit-appearance:auto">
               <option value="">Seleccionar...</option>
-              ${conductoresLista.map(cn=>`<option value="${cn}" ${cn===conductorPresel?'selected':''}>${cn}</option>`).join('')}
+              ${conductoresLista.map(cn=>`<option value="${cn}" ${cn===sfConductor?'selected':''}>${cn}</option>`).join('')}
             </select>
             <div style="margin-top:3px"><span onclick="mostrarAgregarConductor()" style="font-size:10px;color:#607D8B;cursor:pointer;text-decoration:underline">+ Agregar nuevo</span></div>
           </div>
           <div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">PATENTE</div>
-            <select id="srv_patente" onchange="togglePatenteTercero()" style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit;background:white;-webkit-appearance:auto">
+            <select id="srv_patente"
+              onchange="if(!uiState.srvForm)uiState.srvForm={};uiState.srvForm.patente=this.value;togglePatenteTercero()"
+              style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit;background:white;-webkit-appearance:auto">
               <option value="">Seleccionar...</option>
-              ${patenteOpts}
-              <option value="__tercero__">Tercero</option>
+              ${patentesLista.filter(p=>p!=='TERCERO').map(p=>`<option value="${p}" ${p===sfPatente?'selected':''}>${p}</option>`).join('')}
+              <option value="__tercero__" ${sfPatente==='__tercero__'?'selected':''}>Tercero</option>
             </select>
-            <input id="srv_patente_manual" placeholder="Ingresar patente..." style="display:none;margin-top:4px;width:100%;border:1px solid #FFA726;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit;text-transform:uppercase">
+            <input id="srv_patente_manual" value="${sfPatenteManual}" placeholder="Ingresar patente..."
+              style="display:${mostrarPatenteManual?'block':'none'};margin-top:4px;width:100%;border:1px solid #FFA726;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit;text-transform:uppercase"
+              oninput="if(!uiState.srvForm)uiState.srvForm={};uiState.srvForm.patenteManual=this.value.toUpperCase()">
             <div style="margin-top:3px"><span onclick="mostrarAgregarPatente()" style="font-size:10px;color:#607D8B;cursor:pointer;text-decoration:underline">+ Agregar nueva</span></div>
           </div>
           <div style="grid-column:1/-1"><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">TIPO DE EQUIPO</div>
-            <select id="srv_tipo_equipo" style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit;background:white;-webkit-appearance:auto">
+            <select id="srv_tipo_equipo"
+              onchange="if(!uiState.srvForm)uiState.srvForm={};uiState.srvForm.tipoEquipo=this.value"
+              style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit;background:white;-webkit-appearance:auto">
               <option value="">Seleccionar...</option>
-              <option value="Camion solo">Camion solo</option>
-              <option value="Camion con carro">Camion con carro</option>
-              <option value="Rampla">Rampla</option>
-              <option value="Camion 3/4">Camion 3/4</option>
-              <option value="Camioneta">Camioneta</option>
+              ${['Camion solo','Camion con carro','Rampla','Camion 3/4','Camioneta'].map(t=>`<option value="${t}" ${sfTipoEquipo===t?'selected':''}>${t}</option>`).join('')}
             </select>
           </div>
         </div>
@@ -1984,14 +2000,18 @@ function renderFase(fase) {
         <!-- CLIENTE -->
         <div style="margin-bottom:8px">
           <div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">CLIENTE</div>
-          <select id="srv_cliente" onchange="toggleClienteNuevo(this.value)" style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit;background:white;-webkit-appearance:auto">
+          <select id="srv_cliente"
+            onchange="if(!uiState.srvForm)uiState.srvForm={};uiState.srvForm.cliente=this.value;toggleClienteNuevo(this.value)"
+            style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit;background:white;-webkit-appearance:auto">
             <option value="">Seleccionar cliente...</option>
-            ${clientesActivos.map(cl=>`<option value="${cl}">${cl}</option>`).join('')}
-            <option value="__nuevo__">+ Cliente no esta en la lista...</option>
+            ${clientesActivos.map(cl=>`<option value="${cl}" ${sfCliente===cl?'selected':''}>${cl}</option>`).join('')}
+            <option value="__nuevo__" ${sfCliente==='__nuevo__'?'selected':''}>+ Cliente no está en la lista...</option>
           </select>
-          <div id="srv_cliente_nuevo_box" style="display:none;margin-top:5px">
-            <input id="srv_cliente_nuevo" placeholder="Escribir nombre del cliente" style="width:100%;border:1px solid #FFE082;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit;background:#FFFDE7">
-            <div style="font-size:9px;color:#F9A825;margin-top:3px">Quedara pendiente de agregar al pipeline.</div>
+          <div id="srv_cliente_nuevo_box" style="display:${mostrarClienteNuevo?'block':'none'};margin-top:5px">
+            <input id="srv_cliente_nuevo" value="${sfClienteNuevo}" placeholder="Escribir nombre del cliente"
+              oninput="if(!uiState.srvForm)uiState.srvForm={};uiState.srvForm.clienteNuevo=this.value"
+              style="width:100%;border:1px solid #FFE082;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit;background:#FFFDE7">
+            <div style="font-size:9px;color:#F9A825;margin-top:3px">Quedará pendiente de agregar al pipeline.</div>
           </div>
         </div>
 
@@ -2003,7 +2023,9 @@ function renderFase(fase) {
         <!-- PEAJES -->
         <div style="margin-bottom:12px">
           <div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">PEAJES ($)</div>
-          <input id="srv_peajes" type="number" placeholder="ej: 8000" style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit">
+          <input id="srv_peajes" type="number" value="${sfPeajes}" placeholder="ej: 8000"
+            oninput="if(!uiState.srvForm)uiState.srvForm={};uiState.srvForm.peajes=this.value"
+            style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit">
         </div>
         <button onclick="addServicio()" style="width:100%;background:#455A64;color:white;border:none;border-radius:8px;padding:16px;font-size:15px;cursor:pointer;font-weight:700;min-height:54px;-webkit-tap-highlight-color:transparent;touch-action:manipulation">+ Registrar servicio</button>
         ${servicios.length ? `<div style="margin-top:12px"><div style="font-size:10px;font-weight:700;color:#607D8B;letter-spacing:1px;margin-bottom:4px">ÚLTIMOS 5 SERVICIOS (${servicios.length} en total)</div>${lista}</div>` : `<div style="margin-top:6px">${lista}</div>`}
@@ -2045,16 +2067,42 @@ function renderFase(fase) {
           if(!appData.conductores.includes('Tercero')){appData.conductores.push('Tercero');saveData();}
           const conductoresLista=appData.conductores;
           const patentesLista=appData.patentes||['GKFD84','WR9192','XR8555','GCFF12','BPBL35','XA1114','DSDV36'];
-          const patenteOpts=patentesLista.filter(p=>p!=='TERCERO').map(p=>'<option value="'+p+'">'+p+'</option>').join('');
           const conductorPresel=(sessionRol&&sessionRol.acceso==='conductor'&&sessionConductor)?sessionConductor:'';
           if(!uiState.srv_puntos||!uiState.srv_puntos.length){uiState.srv_puntos=[{origen:'',destino:'',tipo:'descarga',guia:'',fecha_guia:'',fecha_descarga:''}];}
           const puntos=uiState.srv_puntos;
+          if(!uiState.srvForm)uiState.srvForm={};
+          const sf=uiState.srvForm;
+          const sfFecha=sf.fecha||hoyISO;
+          const sfConductor=sf.conductor||conductorPresel||'';
+          const sfPatente=sf.patente||'';
+          const sfPatenteManual=sf.patenteManual||'';
+          const sfTipoEquipo=sf.tipoEquipo||'';
+          const sfCliente=sf.cliente||'';
+          const sfClienteNuevo=sf.clienteNuevo||'';
+          const sfPeajes=sf.peajes||'';
+          const mostrarPatenteManual=sfPatente==='__tercero__';
+          const mostrarClienteNuevo=sfCliente==='__nuevo__';
           const TIPOS_PUNTO=['carga','descarga','carga y descarga'];
           const puntosHTML=puntos.map((p,pi)=>`<div style="background:white;border:1px solid #CFD8DC;border-radius:8px;padding:10px;margin-bottom:8px"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><span style="font-size:10px;font-weight:800;color:#455A64;letter-spacing:1px">PUNTO ${pi+1}</span><div style="display:flex;gap:8px;align-items:center"><select onchange="updPunto(${pi},'tipo',this.value)" style="border:1px solid #dde;border-radius:5px;padding:3px 6px;font-size:10px;outline:none;font-family:inherit;background:white;-webkit-appearance:auto">${TIPOS_PUNTO.map(t=>'<option value="'+t+'" '+(p.tipo===t?'selected':'')+'>'+t.toUpperCase()+'</option>').join('')}</select>${puntos.length>1?'<span onclick="delPunto('+pi+')" style="color:#bbb;cursor:pointer;font-size:16px">×</span>':''}</div></div><div style="display:grid;grid-template-columns:1fr 1fr;gap:5px"><div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">ORIGEN</div><input value="${p.origen}" onchange="updPunto(${pi},'origen',this.value)" placeholder="ej: Santiago" style="width:100%;border:1px solid #dde;border-radius:5px;padding:6px 8px;font-size:12px;outline:none;font-family:inherit"></div><div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">DESTINO FINAL</div><input value="${p.destino}" onchange="updPunto(${pi},'destino',this.value)" placeholder="ej: Marchigue" style="width:100%;border:1px solid #dde;border-radius:5px;padding:6px 8px;font-size:12px;outline:none;font-family:inherit"></div><div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">N° GUÍA</div><input value="${p.guia}" onchange="updPunto(${pi},'guia',this.value)" placeholder="ej: 123456" style="width:100%;border:1px solid #dde;border-radius:5px;padding:6px 8px;font-size:12px;outline:none;font-family:inherit"></div><div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">FECHA GUÍA</div><input value="${p.fecha_guia}" onchange="updPunto(${pi},'fecha_guia',this.value)" type="date" style="width:100%;border:1px solid #dde;border-radius:5px;padding:6px 8px;font-size:12px;outline:none;font-family:inherit"></div><div style="grid-column:1/-1"><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">FECHA DESCARGA</div><input value="${p.fecha_descarga}" onchange="updPunto(${pi},'fecha_descarga',this.value)" type="date" style="width:100%;border:1px solid #dde;border-radius:5px;padding:6px 8px;font-size:12px;outline:none;font-family:inherit"></div></div></div>`).join('');
-          const conductoresOpts=conductoresLista.map(cn=>'<option value="'+cn+'" '+(cn===conductorPresel?'selected':'')+'>'+cn+'</option>').join('');
+          const conductoresOpts=conductoresLista.map(cn=>'<option value="'+cn+'" '+(cn===sfConductor?'selected':'')+'>'+cn+'</option>').join('');
           const ultimos5=(servicios).slice(-5).reverse();
           const lista=ultimos5.length?ultimos5.map((s)=>{const idxReal=servicios.indexOf(s);const isExpanded=!!uiState['srv_exp_'+s.id];const expandKey='srv_exp_'+s.id;return '<div style="position:relative;background:'+(isExpanded?'#EEF2FF':'white')+';border-radius:8px;border:1px solid '+(isExpanded?'#C7D2FE':'#e8eaec')+';margin-bottom:4px"><div onclick="uiState[\'' +expandKey+ '\']=!uiState[\'' +expandKey+ '\'];render()" style="cursor:pointer">'+srvVista(s)+'</div>'+(isExpanded?srvDetalle(s):'')+'<span onclick="event.stopPropagation();delServicio('+idxReal+')" style="position:absolute;top:8px;right:8px;color:#ddd;cursor:pointer;font-size:11px">× eliminar</span></div>';}).join(''):'<div style="font-size:11px;color:#bbb;padding:6px 0;text-align:center">Sin servicios registrados aún</div>';
-          return '<div style="margin-bottom:10px;padding:10px 12px;background:#f4f6f8;border-radius:10px;border:1px solid #dde4e8"><div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:10px"><div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">ID SERVICIO</div><div style="background:#455A64;color:white;border-radius:6px;padding:7px 9px;font-size:14px;font-weight:700;letter-spacing:2px">'+nextId+'</div></div><div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">FECHA SALIDA</div><input id="srv_fecha" type="date" value="'+hoyISO+'" style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit;background:white"></div></div><div style="font-size:10px;font-weight:800;color:#455A64;letter-spacing:1px;margin-bottom:8px;padding-bottom:5px;border-bottom:2px solid #CFD8DC">CONDUCTOR Y EQUIPO</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:10px"><div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">CONDUCTOR</div><select id="srv_conductor" onchange="toggleConductorTercero()" style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit;background:white;-webkit-appearance:auto"><option value="">Seleccionar...</option>'+conductoresOpts+'</select><div style="margin-top:3px"><span onclick="mostrarAgregarConductor()" style="font-size:10px;color:#607D8B;cursor:pointer;text-decoration:underline">+ Agregar nuevo</span></div></div><div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">PATENTE</div><select id="srv_patente" onchange="togglePatenteTercero()" style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit;background:white;-webkit-appearance:auto"><option value="">Seleccionar...</option>'+patenteOpts+'<option value="__tercero__">Tercero</option></select><input id="srv_patente_manual" placeholder="Ingresar patente..." style="display:none;margin-top:4px;width:100%;border:1px solid #FFA726;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit;text-transform:uppercase"><div style="margin-top:3px"><span onclick="mostrarAgregarPatente()" style="font-size:10px;color:#607D8B;cursor:pointer;text-decoration:underline">+ Agregar nueva</span></div></div><div style="grid-column:1/-1"><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">TIPO DE EQUIPO</div><select id="srv_tipo_equipo" style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit;background:white;-webkit-appearance:auto"><option value="">Seleccionar...</option><option value="Camion solo">Camion solo</option><option value="Camion con carro">Camion con carro</option><option value="Rampla">Rampla</option><option value="Camion 3/4">Camion 3/4</option><option value="Camioneta">Camioneta</option></select></div></div><div style="margin-bottom:8px"><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">CLIENTE</div><select id="srv_cliente" onchange="toggleClienteNuevo(this.value)" style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit;background:white;-webkit-appearance:auto"><option value="">Seleccionar cliente...</option>'+clientesActivos.map(cl=>'<option value="'+cl+'">'+cl+'</option>').join('')+'<option value="__nuevo__">+ Cliente no esta en la lista...</option></select><div id="srv_cliente_nuevo_box" style="display:none;margin-top:5px"><input id="srv_cliente_nuevo" placeholder="Escribir nombre del cliente" style="width:100%;border:1px solid #FFE082;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit;background:#FFFDE7"><div style="font-size:9px;color:#F9A825;margin-top:3px">Quedara pendiente de agregar al pipeline.</div></div></div><div style="font-size:10px;font-weight:800;color:#455A64;letter-spacing:1px;margin-bottom:8px;padding-bottom:5px;border-bottom:2px solid #CFD8DC">PUNTOS DE RUTA</div>'+puntosHTML+'<button onclick="addPunto()" style="width:100%;background:white;color:#455A64;border:1px dashed #90A4AE;border-radius:6px;padding:8px;font-size:11px;cursor:pointer;font-weight:700;margin-bottom:12px">+ Agregar punto de ruta</button><div style="margin-bottom:12px"><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">PEAJES ($)</div><input id="srv_peajes" type="number" placeholder="ej: 8000" style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit"></div><button onclick="addServicio()" style="width:100%;background:#455A64;color:white;border:none;border-radius:8px;padding:16px;font-size:15px;cursor:pointer;font-weight:700;min-height:54px;-webkit-tap-highlight-color:transparent;touch-action:manipulation">+ Registrar servicio</button>'+(servicios.length?'<div style="margin-top:12px"><div style="font-size:10px;font-weight:700;color:#607D8B;letter-spacing:1px;margin-bottom:4px">ÚLTIMOS 5 SERVICIOS ('+servicios.length+' en total)</div>'+lista+'</div>':'<div style="margin-top:6px">'+lista+'</div>')+'</div>';
+          return '<div style="margin-bottom:10px;padding:10px 12px;background:#f4f6f8;border-radius:10px;border:1px solid #dde4e8">'
+            +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:10px"><div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">ID SERVICIO</div><div style="background:#455A64;color:white;border-radius:6px;padding:7px 9px;font-size:14px;font-weight:700;letter-spacing:2px">'+nextId+'</div></div>'
+            +'<div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">FECHA SALIDA</div><input id="srv_fecha" type="date" value="'+sfFecha+'" onchange="if(!uiState.srvForm)uiState.srvForm={};uiState.srvForm.fecha=this.value" style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit;background:white"></div></div>'
+            +'<div style="font-size:10px;font-weight:800;color:#455A64;letter-spacing:1px;margin-bottom:8px;padding-bottom:5px;border-bottom:2px solid #CFD8DC">CONDUCTOR Y EQUIPO</div>'
+            +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:10px">'
+            +'<div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">CONDUCTOR</div><select id="srv_conductor" onchange="if(!uiState.srvForm)uiState.srvForm={};uiState.srvForm.conductor=this.value;toggleConductorTercero()" style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit;background:white;-webkit-appearance:auto"><option value="">Seleccionar...</option>'+conductoresOpts+'</select><div style="margin-top:3px"><span onclick="mostrarAgregarConductor()" style="font-size:10px;color:#607D8B;cursor:pointer;text-decoration:underline">+ Agregar nuevo</span></div></div>'
+            +'<div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">PATENTE</div><select id="srv_patente" onchange="if(!uiState.srvForm)uiState.srvForm={};uiState.srvForm.patente=this.value;togglePatenteTercero()" style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit;background:white;-webkit-appearance:auto"><option value="">Seleccionar...</option>'+patentesLista.filter(p=>p!=='TERCERO').map(p=>'<option value="'+p+'" '+(p===sfPatente?'selected':'')+'>'+p+'</option>').join('')+'<option value="__tercero__" '+(sfPatente==='__tercero__'?'selected':'')+'>Tercero</option></select><input id="srv_patente_manual" value="'+sfPatenteManual+'" placeholder="Ingresar patente..." oninput="if(!uiState.srvForm)uiState.srvForm={};uiState.srvForm.patenteManual=this.value.toUpperCase()" style="display:'+(mostrarPatenteManual?'block':'none')+';margin-top:4px;width:100%;border:1px solid #FFA726;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit;text-transform:uppercase"><div style="margin-top:3px"><span onclick="mostrarAgregarPatente()" style="font-size:10px;color:#607D8B;cursor:pointer;text-decoration:underline">+ Agregar nueva</span></div></div>'
+            +'<div style="grid-column:1/-1"><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">TIPO DE EQUIPO</div><select id="srv_tipo_equipo" onchange="if(!uiState.srvForm)uiState.srvForm={};uiState.srvForm.tipoEquipo=this.value" style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit;background:white;-webkit-appearance:auto"><option value="">Seleccionar...</option>'+['Camion solo','Camion con carro','Rampla','Camion 3/4','Camioneta'].map(t=>'<option value="'+t+'" '+(sfTipoEquipo===t?'selected':'')+'>'+t+'</option>').join('')+'</select></div></div>'
+            +'<div style="margin-bottom:8px"><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">CLIENTE</div><select id="srv_cliente" onchange="if(!uiState.srvForm)uiState.srvForm={};uiState.srvForm.cliente=this.value;toggleClienteNuevo(this.value)" style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit;background:white;-webkit-appearance:auto"><option value="">Seleccionar cliente...</option>'+clientesActivos.map(cl=>'<option value="'+cl+'" '+(sfCliente===cl?'selected':'')+'>'+cl+'</option>').join('')+'<option value="__nuevo__" '+(sfCliente==='__nuevo__'?'selected':'')+'>+ Cliente no está en la lista...</option></select><div id="srv_cliente_nuevo_box" style="display:'+(mostrarClienteNuevo?'block':'none')+';margin-top:5px"><input id="srv_cliente_nuevo" value="'+sfClienteNuevo+'" placeholder="Escribir nombre del cliente" oninput="if(!uiState.srvForm)uiState.srvForm={};uiState.srvForm.clienteNuevo=this.value" style="width:100%;border:1px solid #FFE082;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit;background:#FFFDE7"><div style="font-size:9px;color:#F9A825;margin-top:3px">Quedará pendiente de agregar al pipeline.</div></div></div>'
+            +'<div style="font-size:10px;font-weight:800;color:#455A64;letter-spacing:1px;margin-bottom:8px;padding-bottom:5px;border-bottom:2px solid #CFD8DC">PUNTOS DE RUTA</div>'
+            +puntosHTML
+            +'<button onclick="addPunto()" style="width:100%;background:white;color:#455A64;border:1px dashed #90A4AE;border-radius:6px;padding:8px;font-size:11px;cursor:pointer;font-weight:700;margin-bottom:12px">+ Agregar punto de ruta</button>'
+            +'<div style="margin-bottom:12px"><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">PEAJES ($)</div><input id="srv_peajes" type="number" value="'+sfPeajes+'" placeholder="ej: 8000" oninput="if(!uiState.srvForm)uiState.srvForm={};uiState.srvForm.peajes=this.value" style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit"></div>'
+            +'<button onclick="addServicio()" style="width:100%;background:#455A64;color:white;border:none;border-radius:8px;padding:16px;font-size:15px;cursor:pointer;font-weight:700;min-height:54px;-webkit-tap-highlight-color:transparent;touch-action:manipulation">+ Registrar servicio</button>'
+            +(servicios.length?'<div style="margin-top:12px"><div style="font-size:10px;font-weight:700;color:#607D8B;letter-spacing:1px;margin-bottom:4px">ÚLTIMOS 5 SERVICIOS ('+servicios.length+' en total)</div>'+lista+'</div>':'<div style="margin-top:6px">'+lista+'</div>')
+            +'</div>';
         })(); return '<div style="margin:-4px">'+serviciosBlock+'</div>'; })() : ''}
         ${tarea.cierreServicioTask ? `<div style="margin:-4px">${renderCierreServicios()}</div>` : ''}
         ${tarea.liquidacionTask ? `<div style="margin:-4px">${renderLiquidacionesV2()}</div>` : ''}
@@ -2218,6 +2266,8 @@ function servicioToRow(s) {
     costo_total: s.costoTotal || 0,
     margen: s.margen || 0,
     rendimiento: s.rendimiento || 0,
+    tag: s.tag || '',
+    liquidacion_id: s.liquidacionId || '',
   };
 }
 
@@ -2246,6 +2296,8 @@ function rowToServicio(r) {
     costoTotal: r.costo_total,
     margen: r.margen,
     rendimiento: r.rendimiento,
+    tag: r.tag || '',
+    liquidacionId: r.liquidacion_id || '',
   };
 }
 
@@ -2384,19 +2436,12 @@ async function syncServiciosDesdeSupabase() {
     const { data, error } = await supa.from('servicios').select('*').order('created_at');
     if (error) { console.warn('Error sync servicios:', error); return; }
     if (!data || data.length === 0) {
-      // Primera vez — migrar servicios locales a Supabase
       const locales = appData.servicios || [];
-      for (const s of locales) {
-        await upsertServicioSupabase(s);
-      }
+      for (const s of locales) { await upsertServicioSupabase(s); }
     } else {
-      // Merge: supabase manda, pero agregar locales que no estén
       const idsRemoto = new Set(data.map(r => r.id));
       const localesNuevos = (appData.servicios||[]).filter(s => !idsRemoto.has(s.id));
-      for (const s of localesNuevos) {
-        await upsertServicioSupabase(s);
-      }
-      // Actualizar appData con datos remotos + locales nuevos
+      for (const s of localesNuevos) { await upsertServicioSupabase(s); }
       const remotos = data.map(r => ({
         id: r.id, fecha: r.fecha, anio: r.anio, mes: r.mes,
         patente: r.patente, conductor: r.conductor, tipoEquipo: r.tipo_equipo,
@@ -2406,7 +2451,8 @@ async function syncServiciosDesdeSupabase() {
         petroleo: r.petroleo||0, adicional: r.adicional||0,
         viaticos: r.viaticos||0, cobro: r.cobro||'pendiente',
         liquidado: r.liquidado||false, costoTotal: r.costo_total||0,
-        margen: r.margen||0, rendimiento: r.rendimiento||0
+        margen: r.margen||0, rendimiento: r.rendimiento||0,
+        tag: r.tag||'', liquidacionId: r.liquidacion_id||'',
       }));
       appData.servicios = [...remotos, ...localesNuevos];
       saveData(); render();
@@ -4421,6 +4467,34 @@ function showSaveToast() {
   el.classList.add('show');
   setTimeout(()=>el.classList.remove('show'), 2000);
 }
+
+async function forzarSyncCompleto() {
+  const btn = document.getElementById('btn-sync');
+  if (!supaConectado || !supa) {
+    showToastGeneral('⚠️ Sin conexión a Supabase', '#E65100');
+    return;
+  }
+  if (btn) btn.textContent = '⏳ Sync...';
+  try {
+    const { data: remotos } = await supa.from('servicios').select('id');
+    const idsRemoto = new Set((remotos||[]).map(r => r.id));
+    const localesNuevos = (appData.servicios||[]).filter(s => !idsRemoto.has(s.id));
+    let subidos = 0;
+    for (const s of localesNuevos) {
+      await upsertServicioSupabase(s);
+      subidos++;
+    }
+    // Forzar re-upsert de los últimos 10 por si hubo errores silenciosos previos
+    const ultimos = (appData.servicios||[]).slice(-10);
+    for (const s of ultimos) { await upsertServicioSupabase(s); }
+    await syncServiciosDesdeSupabase();
+    showToastGeneral(subidos > 0 ? `✅ ${subidos} servicio(s) sincronizado(s)` : '✅ Todo sincronizado con DB', '#2E7D32');
+  } catch(e) {
+    showToastGeneral('❌ Error sync: ' + (e.message||e), '#C62828');
+  }
+  if (btn) btn.textContent = '↑ Sync DB';
+}
+
 function exportarDatos() {
   const blob = new Blob([JSON.stringify(appData, null, 2)], {type: 'application/json'});
   const url = URL.createObjectURL(blob);
@@ -4870,6 +4944,13 @@ loadData(); iniciarLogin(); initSupabase();
 // ── AUTO-REFRESCO v37: cada 3 minutos ──────────────────
 setInterval(async () => {
   if (!supaConectado || !supa) return;
+  // No interrumpir si el usuario está llenando un formulario activo
+  const formulariosActivos = [
+    'srv_fecha', 'srv_conductor', 'srv_patente', 'srv_cliente',
+    'pip_new_cliente', 'disp_fecha', 'liq_fecha_v2'
+  ];
+  const hayFormAbierto = formulariosActivos.some(id => document.getElementById(id) !== null);
+  if (hayFormAbierto) return;
   try {
     await syncServiciosDesdeSupabase();
     await syncDisponibilidadDesdeSupabase();
@@ -4883,6 +4964,8 @@ document.addEventListener('touchstart', e => { _ptY = e.touches[0].clientY; }, {
 document.addEventListener('touchend', async e => {
   const dy = e.changedTouches[0].clientY - _ptY;
   if (dy > 80 && window.scrollY === 0 && supaConectado) {
+    const formulariosActivos = ['srv_fecha','srv_conductor','srv_patente','srv_cliente','pip_new_cliente','disp_fecha','liq_fecha_v2'];
+    if (formulariosActivos.some(id => document.getElementById(id) !== null)) return;
     const el = document.getElementById('save-indicator');
     if (el) { el.textContent = '↻ Actualizando...'; el.classList.add('show'); }
     await syncServiciosDesdeSupabase();
