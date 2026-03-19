@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-  <meta name="version" content="2026031963">
+  <meta name="version" content="2026031965">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Panel de Gestión — Global Solutions</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -446,6 +446,7 @@ const DEFAULT_DATA = {
       rutinarias: [
         { titulo: "Cierre de Servicios", proc: "Completar información faltante del servicio ejecutado: precio, Km, tag y datos pendientes. Etapa previa a liquidar.", subtareas: [], cierreServicioTask: true, done: false },
         { titulo: "Liquidaciones", proc: "Gestionar liquidaciones por servicio o por grupo. Seleccionar servicios, agrupar por cliente (puede tener múltiples RUT), generar y enviar liquidación.", subtareas: [], liquidacionTask: true, done: false },
+        { titulo: "Rendición de Gastos", proc: "Registrar y gestionar rendiciones de gastos del equipo. Cada rendición agrupa uno o más gastos con su categoría, monto y equipo asociado.", subtareas: [], rendicionTask: true, done: false },
         { titulo: "Facturación y cobro", proc: "Por cada servicio completado: emitir factura al cliente. Evaluar si aplica factoring para anticipo. Registrar en el sistema de cobranza con fecha de vencimiento. Confirmar pago y liquidar comisión del conductor.", subtareas: ["Emitir factura por servicio completado","Evaluar y gestionar factoring si aplica","Confirmar pago y registrar cobro efectivo","Liquidar comisión conductor"] },
         { titulo: "Control de caja y presupuesto", proc: "Cada día descargar cartola bancaria y categorizar movimientos. Actualizar el flujo de caja. Contrastar ingresos y gastos vs presupuesto mensual. Revisar si la proyección de la semana cubre el punto de equilibrio.", subtareas: ["Descargar y categorizar cartola bancaria","Actualizar flujo de caja real","Contrastar vs presupuesto mensual","Revisar proyección de ingresos próxima semana"] },
         { titulo: "Cuentas por cobrar", proc: "Revisar lista de facturas emitidas: cuáles están pagadas, cuáles pendientes, cuáles vencidas. Gestionar cobro directo de las vencidas. Actualizar registro de factoring activo.", subtareas: ["Cargar estado de cobranza del día","Gestionar cobros vencidos","Actualizar registro de factoring activo"] },
@@ -931,6 +932,258 @@ async function guardarCierre(id) {
   render();
 }
 
+// ── RENDICIÓN DE GASTOS ──────────────────────────────────
+const CATEGORIAS_GASTO = ['Combustible','Peaje','Viático','Mantención','Repuesto','Lavado','Estacionamiento','Otro'];
+const ESTADO_RENDICION = {
+  borrador: {bg:'#F5F5F5',text:'#757575',label:'📝 Borrador'},
+  enviada:  {bg:'#E3F2FD',text:'#1565C0',label:'📤 Enviada'},
+  aprobada: {bg:'#E8F5E9',text:'#2E7D32',label:'✅ Aprobada'},
+};
+
+function nextRendicionId() {
+  if (!appData.rendiciones) appData.rendiciones = [];
+  return 'REN-' + String(appData.rendiciones.length + 1).padStart(3,'0');
+}
+
+function agregarLineaRendicion() {
+  if (!uiState.ren_lineas) uiState.ren_lineas = [];
+  uiState.ren_lineas.push({fecha:'',categoria:'Combustible',descripcion:'',patente:'',monto:''});
+  render();
+}
+function eliminarLineaRendicion(li) {
+  if (!uiState.ren_lineas || uiState.ren_lineas.length <= 1) return;
+  uiState.ren_lineas.splice(li,1);
+  render();
+}
+function updLineaRen(li, campo, valor) {
+  if (!uiState.ren_lineas) return;
+  uiState.ren_lineas[li][campo] = valor;
+}
+
+function crearRendicion() {
+  const responsable = document.getElementById('ren_responsable')?.value.trim();
+  const descripcion = document.getElementById('ren_descripcion')?.value.trim();
+  const fecha = document.getElementById('ren_fecha')?.value || new Date().toISOString().split('T')[0];
+  if (!responsable) { alert('⚠️ Ingresa el nombre del responsable.'); return; }
+  if (!uiState.ren_lineas || !uiState.ren_lineas.some(l=>l.monto)) { alert('⚠️ Agrega al menos una línea de gasto con monto.'); return; }
+  if (!appData.rendiciones) appData.rendiciones = [];
+  const p = fecha.split('-');
+  const fechaStr = p.length===3&&p[0].length===4 ? `${p[2]}-${p[1]}-${p[0]}` : fecha;
+  const lineas = uiState.ren_lineas.filter(l=>l.monto||l.descripcion).map(l=>({...l, monto: parseInt(l.monto)||0}));
+  const total = lineas.reduce((a,l)=>a+(l.monto||0),0);
+  const id = nextRendicionId();
+  appData.rendiciones.push({ id, fecha: fechaStr, responsable, descripcion: descripcion||'', lineas, total, estado:'borrador', observaciones:'' });
+  uiState.ren_lineas = [{fecha:'',categoria:'Combustible',descripcion:'',patente:'',monto:''}];
+  uiState.ren_form_open = false;
+  registrarAccion(`Crear rendición ${id}`, () => {
+    appData.rendiciones = appData.rendiciones.filter(r=>r.id!==id);
+  });
+  saveData(); render();
+  showToastGeneral('✅ '+id+' creada — Total: $'+total.toLocaleString('es-CL'),'#2E7D32');
+}
+
+function guardarObsRendicion(id) {
+  const ren = (appData.rendiciones||[]).find(r=>r.id===id);
+  if (!ren) return;
+  ren.observaciones = document.getElementById('ren_obs_'+id)?.value||'';
+  saveData();
+  showToastGeneral('💾 Observaciones guardadas','#607D8B');
+}
+
+function cambiarEstadoRendicion(id, estado) {
+  const ren = (appData.rendiciones||[]).find(r=>r.id===id);
+  if (!ren) return;
+  ren.estado = estado;
+  saveData(); render();
+}
+
+function eliminarRendicion(id) {
+  if (!confirm(`¿Eliminar rendición ${id}? Esta acción no se puede deshacer.`)) return;
+  appData.rendiciones = (appData.rendiciones||[]).filter(r=>r.id!==id);
+  saveData(); render();
+  showToastGeneral('Rendición eliminada','#607D8B');
+}
+
+function pdfRendicion(id) {
+  const ren = (appData.rendiciones||[]).find(r=>r.id===id);
+  if (!ren) return;
+  const hoy = new Date().toLocaleDateString('es-CL',{day:'2-digit',month:'long',year:'numeric'});
+  const filas = ren.lineas.map((l,i)=>`
+    <tr style="background:${i%2===0?'#f9fafb':'white'}">
+      <td style="padding:8px 10px;border-bottom:1px solid #eee;font-size:11px">${l.fecha||'—'}</td>
+      <td style="padding:8px 10px;border-bottom:1px solid #eee;font-size:11px;font-weight:600">${l.categoria||'—'}</td>
+      <td style="padding:8px 10px;border-bottom:1px solid #eee;font-size:11px">${l.descripcion||'—'}</td>
+      <td style="padding:8px 10px;border-bottom:1px solid #eee;font-size:11px;color:#455A64">${l.patente||'—'}</td>
+      <td style="padding:8px 10px;border-bottom:1px solid #eee;font-size:11px;text-align:right;font-weight:700;color:#C62828">$${(l.monto||0).toLocaleString('es-CL')}</td>
+    </tr>`).join('');
+  const obsHTML = ren.observaciones ? `<div style="background:#FFFDE7;border:1px solid #FFF176;border-radius:8px;padding:12px 16px;margin-bottom:24px"><div style="font-size:9px;font-weight:700;color:#888;letter-spacing:1px;margin-bottom:4px">OBSERVACIONES</div><div style="font-size:11px;color:#555">${ren.observaciones}</div></div>` : '';
+  const html = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>${ren.id} — Global Solutions SpA</title>
+  <style>* {box-sizing:border-box;margin:0;padding:0;} body {font-family:'Segoe UI',Arial,sans-serif;color:#222;background:white;} .page {max-width:860px;margin:0 auto;padding:40px;} table {border-collapse:collapse;width:100%;} @media print {.no-print{display:none!important} .page{padding:20px}}</style>
+  </head><body><div class="page">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:24px;padding-bottom:16px;border-bottom:3px solid #0B2545">
+      <div>
+        <div style="font-size:20px;font-weight:900;color:#0B2545;letter-spacing:1px">GLOBAL SOLUTIONS SpA</div>
+        <div style="font-size:11px;color:#546E7A;margin-top:2px;font-weight:600">Transporte de Carga por Carretera</div>
+        <div style="font-size:10px;color:#888;margin-top:4px">global.solutions.spa@gmail.com</div>
+        <div style="font-size:10px;color:#888;margin-top:2px">+56 9 68484711 · +56 9 8360 0761</div>
+      </div>
+      <div style="text-align:right">
+        <div style="font-size:24px;font-weight:900;color:#0B2545">${ren.id}</div>
+        <div style="font-size:11px;color:#546E7A;margin-top:2px;font-weight:600">RENDICIÓN DE GASTOS</div>
+        <div style="font-size:10px;color:#546E7A;margin-top:4px">Fecha emisión: ${hoy}</div>
+        <div style="font-size:10px;color:#546E7A">Período: ${ren.fecha}</div>
+      </div>
+    </div>
+    <div style="background:#f4f6f8;border-radius:8px;padding:12px 16px;margin-bottom:20px">
+      <div style="font-size:9px;font-weight:700;color:#888;letter-spacing:1px;margin-bottom:4px">RESPONSABLE</div>
+      <div style="font-size:14px;font-weight:700;color:#222">${ren.responsable}</div>
+      ${ren.descripcion?`<div style="font-size:11px;color:#546E7A;margin-top:4px">${ren.descripcion}</div>`:''}
+    </div>
+    <div style="font-size:9px;font-weight:700;color:#888;letter-spacing:1px;margin-bottom:6px">DETALLE DE GASTOS</div>
+    <table style="margin-bottom:20px">
+      <thead><tr style="background:#0B2545;color:white">
+        <th style="padding:8px;text-align:left;font-size:10px">FECHA</th>
+        <th style="padding:8px;text-align:left;font-size:10px">CATEGORÍA</th>
+        <th style="padding:8px;text-align:left;font-size:10px">DESCRIPCIÓN</th>
+        <th style="padding:8px;text-align:left;font-size:10px">PATENTE/EQUIPO</th>
+        <th style="padding:8px;text-align:right;font-size:10px">MONTO</th>
+      </tr></thead>
+      <tbody>${filas}</tbody>
+    </table>
+    <div style="display:flex;justify-content:flex-end;margin-bottom:24px">
+      <div style="width:280px;border:1px solid #eee;border-radius:8px;overflow:hidden">
+        <div style="display:flex;justify-content:space-between;padding:12px 14px;font-size:15px;font-weight:900;color:white;background:#C62828">
+          <span>TOTAL RENDICIÓN</span>
+          <span>$${(ren.total||0).toLocaleString('es-CL')}</span>
+        </div>
+      </div>
+    </div>
+    ${obsHTML}
+    <div style="border-top:1px solid #eee;padding-top:12px;display:flex;justify-content:space-between">
+      <div style="font-size:9px;color:#aaa">Generado el ${hoy}</div>
+      <div style="font-size:9px;color:#aaa">${ren.id} · Global Solutions SpA</div>
+    </div>
+    <div class="no-print" style="text-align:center;margin-top:24px">
+      <button onclick="window.print()" style="background:#0B2545;color:white;border:none;border-radius:8px;padding:12px 30px;font-size:13px;font-weight:700;cursor:pointer">🖨️ Imprimir / Guardar PDF</button>
+    </div>
+  </div><script>setTimeout(()=>window.print(),600);<\/script></body></html>`;
+  const win = window.open('','_blank');
+  win.document.write(html);
+  win.document.close();
+}
+
+function renderRendiciones() {
+  if (!appData.rendiciones) appData.rendiciones = [];
+  const patentesLista = appData.patentes||['GKFD84','WR9192','XR8555','GCFF12','BPBL35','XA1114','DSDV36'];
+  const hoyISO = (()=>{const h=new Date();return h.getFullYear()+'-'+String(h.getMonth()+1).padStart(2,'0')+'-'+String(h.getDate()).padStart(2,'0');})();
+  if (!uiState.ren_lineas||!uiState.ren_lineas.length) uiState.ren_lineas=[{fecha:'',categoria:'Combustible',descripcion:'',patente:'',monto:''}];
+
+  const formHTML = uiState.ren_form_open ? `
+    <div style="background:#f4f6f8;border:1px solid #CFD8DC;border-radius:10px;padding:12px;margin-bottom:12px">
+      <div style="font-size:10px;font-weight:800;color:#546E7A;letter-spacing:1px;margin-bottom:10px">NUEVA RENDICIÓN — ${nextRendicionId()}</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px">
+        <div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">FECHA</div>
+          <input id="ren_fecha" type="date" value="${hoyISO}" style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit;background:white"></div>
+        <div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">RESPONSABLE</div>
+          <input id="ren_responsable" placeholder="Nombre del responsable" style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit"></div>
+      </div>
+      <div style="margin-bottom:10px"><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">DESCRIPCIÓN GENERAL</div>
+        <input id="ren_descripcion" placeholder="ej: Gastos semana del 18 al 22 de marzo" style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit"></div>
+      <div style="font-size:9px;font-weight:800;color:#546E7A;letter-spacing:1px;margin-bottom:6px;padding-bottom:4px;border-bottom:1px solid #CFD8DC">LÍNEAS DE GASTO</div>
+      ${uiState.ren_lineas.map((l,li)=>`
+        <div style="background:white;border:1px solid #dde;border-radius:8px;padding:10px;margin-bottom:6px">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+            <span style="font-size:10px;font-weight:700;color:#546E7A">GASTO ${li+1}</span>
+            ${uiState.ren_lineas.length>1?`<span onclick="eliminarLineaRendicion(${li})" style="color:#bbb;cursor:pointer;font-size:16px">×</span>`:''}
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:5px">
+            <div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">FECHA</div>
+              <input type="date" value="${l.fecha}" onchange="updLineaRen(${li},'fecha',this.value)" style="width:100%;border:1px solid #dde;border-radius:5px;padding:6px 8px;font-size:12px;outline:none;font-family:inherit;background:white"></div>
+            <div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">CATEGORÍA</div>
+              <select onchange="updLineaRen(${li},'categoria',this.value)" style="width:100%;border:1px solid #dde;border-radius:5px;padding:6px 8px;font-size:12px;outline:none;font-family:inherit;background:white;-webkit-appearance:auto">
+                ${CATEGORIAS_GASTO.map(c=>`<option value="${c}" ${l.categoria===c?'selected':''}>${c}</option>`).join('')}
+              </select></div>
+            <div style="grid-column:1/-1"><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">DESCRIPCIÓN</div>
+              <input value="${l.descripcion}" onchange="updLineaRen(${li},'descripcion',this.value)" placeholder="ej: Carga combustible GKFD84 en Copec Rancagua" style="width:100%;border:1px solid #dde;border-radius:5px;padding:6px 8px;font-size:12px;outline:none;font-family:inherit"></div>
+            <div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">PATENTE/EQUIPO</div>
+              <select onchange="updLineaRen(${li},'patente',this.value)" style="width:100%;border:1px solid #dde;border-radius:5px;padding:6px 8px;font-size:12px;outline:none;font-family:inherit;background:white;-webkit-appearance:auto">
+                <option value="">— Sin equipo —</option>
+                ${patentesLista.map(p=>`<option value="${p}" ${l.patente===p?'selected':''}>${p}</option>`).join('')}
+              </select></div>
+            <div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">MONTO ($)</div>
+              <input type="number" value="${l.monto}" onchange="updLineaRen(${li},'monto',this.value)" placeholder="ej: 45000" style="width:100%;border:1px solid #dde;border-radius:5px;padding:6px 8px;font-size:12px;outline:none;font-family:inherit"></div>
+          </div>
+        </div>`).join('')}
+      <button onclick="agregarLineaRendicion()" style="width:100%;background:white;color:#546E7A;border:1px dashed #90A4AE;border-radius:7px;padding:9px;font-size:11px;cursor:pointer;font-weight:700;margin-bottom:10px">+ Agregar línea de gasto</button>
+      <div style="display:flex;gap:6px">
+        <button onclick="crearRendicion()" style="flex:1;background:#546E7A;color:white;border:none;border-radius:7px;padding:10px;font-size:12px;font-weight:700;cursor:pointer">💾 Guardar rendición</button>
+        <button onclick="uiState.ren_form_open=false;render()" style="background:#eee;color:#555;border:none;border-radius:7px;padding:10px 14px;font-size:12px;cursor:pointer">Cancelar</button>
+      </div>
+    </div>` :
+    `<button onclick="uiState.ren_form_open=true;render()" style="width:100%;background:white;border:1.5px dashed #90A4AE;border-radius:8px;padding:10px;font-size:12px;color:#546E7A;cursor:pointer;font-weight:700;margin-bottom:10px">+ Nueva rendición</button>`;
+
+  const listaHTML = appData.rendiciones.length ? appData.rendiciones.slice().reverse().map(ren=>{
+    const isOpen = !!uiState['ren_open_'+ren.id];
+    const ec = ESTADO_RENDICION[ren.estado]||ESTADO_RENDICION.borrador;
+    return `<div style="border:1px solid ${isOpen?'#90A4AE':'#dde'};border-radius:8px;margin-bottom:6px;overflow:hidden;background:white">
+      <div onclick="uiState['ren_open_${ren.id}']=!uiState['ren_open_${ren.id}'];render()" style="padding:10px 12px;cursor:pointer;background:${isOpen?'#ECEFF1':'white'}">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
+          <div style="flex:1">
+            <div style="display:flex;align-items:center;gap:6px;margin-bottom:3px;flex-wrap:wrap">
+              <span style="font-size:13px;font-weight:900;color:#37474F">${ren.id}</span>
+              <span style="font-size:9px;font-weight:700;padding:2px 8px;border-radius:8px;background:${ec.bg};color:${ec.text}">${ec.label}</span>
+            </div>
+            <div style="font-size:10px;color:#888">${ren.fecha} · ${ren.responsable}</div>
+            ${ren.descripcion?`<div style="font-size:10px;color:#546E7A;margin-top:2px">${ren.descripcion}</div>`:''}
+          </div>
+          <div style="text-align:right;flex-shrink:0">
+            <div style="font-size:13px;font-weight:900;color:#C62828">$${(ren.total||0).toLocaleString('es-CL')}</div>
+            <div style="font-size:9px;color:#888">${ren.lineas?.length||0} gasto(s)</div>
+            <span style="font-size:10px;color:#aaa">${isOpen?'▲':'▼'}</span>
+          </div>
+        </div>
+      </div>
+      ${isOpen?`<div style="padding:10px 12px;border-top:1px solid #eee;background:#FAFAFA" onclick="event.stopPropagation()">
+        <div style="margin-bottom:8px">
+          ${(ren.lineas||[]).map(l=>`<div style="background:white;border:1px solid #eee;border-radius:7px;padding:8px 10px;margin-bottom:4px;display:flex;justify-content:space-between;align-items:flex-start">
+            <div style="flex:1">
+              <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:2px">
+                <span style="font-size:10px;font-weight:700;background:#ECEFF1;color:#546E7A;padding:1px 6px;border-radius:5px">${l.categoria}</span>
+                ${l.patente?`<span style="font-size:10px;color:#1565C0;font-weight:600">${l.patente}</span>`:''}
+                <span style="font-size:10px;color:#888">${l.fecha||'—'}</span>
+              </div>
+              <div style="font-size:11px;color:#333">${l.descripcion||'—'}</div>
+            </div>
+            <span style="font-size:12px;font-weight:700;color:#C62828;flex-shrink:0;margin-left:8px">$${(l.monto||0).toLocaleString('es-CL')}</span>
+          </div>`).join('')}
+        </div>
+        <div style="background:#FFEBEE;border-radius:7px;padding:8px 12px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center">
+          <span style="font-size:11px;font-weight:700;color:#C62828">Total rendición</span>
+          <span style="font-size:14px;font-weight:900;color:#C62828">$${(ren.total||0).toLocaleString('es-CL')}</span>
+        </div>
+        <div style="margin-bottom:8px">
+          <div style="font-size:9px;font-weight:700;color:#888;margin-bottom:3px">OBSERVACIONES</div>
+          <textarea id="ren_obs_${ren.id}" rows="2" placeholder="Agregar observaciones..."
+            style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:11px;outline:none;font-family:inherit;resize:vertical">${ren.observaciones||''}</textarea>
+        </div>
+        <div style="display:flex;gap:5px;flex-wrap:wrap">
+          ${ren.estado==='borrador'?`<button onclick="cambiarEstadoRendicion('${ren.id}','enviada')" style="flex:1;padding:8px;background:#E3F2FD;color:#1565C0;border:1px solid #1565C0;border-radius:7px;font-size:10px;font-weight:700;cursor:pointer">📤 Marcar enviada</button>`:''}
+          ${ren.estado==='enviada'?`<button onclick="cambiarEstadoRendicion('${ren.id}','aprobada')" style="flex:1;padding:8px;background:#E8F5E9;color:#2E7D32;border:1px solid #2E7D32;border-radius:7px;font-size:10px;font-weight:700;cursor:pointer">✅ Aprobar</button>`:''}
+          <button onclick="guardarObsRendicion('${ren.id}')" style="padding:8px 12px;background:#607D8B;color:white;border:none;border-radius:7px;font-size:10px;font-weight:700;cursor:pointer">💾 Obs.</button>
+          <button onclick="pdfRendicion('${ren.id}')" style="padding:8px 14px;background:#0B2545;color:white;border:none;border-radius:7px;font-size:10px;font-weight:700;cursor:pointer">📄 PDF</button>
+          <button onclick="eliminarRendicion('${ren.id}')" style="padding:8px 10px;background:#FFEBEE;color:#C62828;border:1px solid #FFCDD2;border-radius:7px;font-size:10px;cursor:pointer">×</button>
+        </div>
+      </div>`:''}
+    </div>`;
+  }).join('') : '<div style="text-align:center;color:#aaa;font-size:11px;padding:12px">Sin rendiciones creadas aún</div>';
+
+  return `<div style="padding:2px">
+    <div style="font-size:10px;font-weight:700;color:#546E7A;letter-spacing:0.5px;margin-bottom:8px">RENDICIONES DE GASTOS (${appData.rendiciones.length})</div>
+    ${formHTML}
+    ${listaHTML}
+  </div>`;
+}
+
 // ── LIQUIDACIONES v36 (por servicio o grupo + múltiples RUT) ──
 function renderLiquidacionesV2() {
   if(!appData.liquidaciones) appData.liquidaciones=[];
@@ -1034,29 +1287,74 @@ function renderLiquidacionesV2() {
             </div>
           </div>
         </div>
-        ${isOpen?`<div style="padding:10px 12px;border-top:1px solid #eee;background:#FAFAFA">
+        ${isOpen?`<div style="padding:10px 12px;border-top:1px solid #eee;background:#FAFAFA" onclick="event.stopPropagation()">
           ${liq.ruts&&liq.ruts.length?`<div style="font-size:10px;color:#546E7A;background:#E3F2FD;padding:4px 8px;border-radius:5px;margin-bottom:8px">RUTs: ${liq.ruts.join(' · ')}</div>`:''}
+          <!-- DESGLOSE COMPLETO POR SERVICIO -->
           <div style="margin-bottom:8px">
-            ${svcsLiq.map(s=>`<div style="background:white;border:1px solid #eee;border-radius:7px;padding:8px 10px;margin-bottom:4px">
-              <div style="display:flex;justify-content:space-between;align-items:center">
-                <div>
-                  <span style="font-size:11px;font-weight:800;color:#455A64">${s.id}</span>
-                  <span style="font-size:10px;color:#888;margin-left:6px">${s.fecha||'—'}</span>
+            ${svcsLiq.map(s=>{
+              const guias=(s.guias||[]).map(g=>g.num||g.guia).filter(Boolean).join(', ')||'—';
+              const fechaGuia=(s.guias||s.puntos||[]).map(g=>g.fecha_guia).filter(Boolean)[0]||'—';
+              const fechaDesc=(s.guias||s.puntos||[]).map(g=>g.fecha_descarga).filter(Boolean)[0]||'—';
+              const destino=(s.puntos||s.guias||[]).map(g=>g.destino).filter(Boolean).slice(-1)[0]||'—';
+              const comision=Math.round((s.precio||0)*0.1);
+              const resultado=(s.precio||0)-comision-(s.petroleo||0)-(s.peajes||0)-(s.viaticos||0)-(s.adicional||0)-(s.cfProrrateado||50800);
+              return `<div style="background:white;border:1px solid #CFD8DC;border-radius:8px;padding:10px;margin-bottom:6px">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+                  <span style="font-size:12px;font-weight:900;color:#455A64">${s.id}</span>
+                  <span style="font-size:12px;font-weight:700;color:#2E7D32">$${(s.precio||0).toLocaleString('es-CL')}</span>
                 </div>
-                <span style="font-size:12px;font-weight:700;color:#2E7D32">$${(s.precio||0).toLocaleString('es-CL')}</span>
-              </div>
-              <div style="font-size:10px;color:#1565C0;font-weight:700;margin-top:2px">GD: ${(s.guias||[]).map(g=>g.num||g.guia).filter(Boolean).join(', ')||'—'}</div>
-              <div style="font-size:10px;color:#777;margin-top:1px">${s.origen||'—'} → ${(s.puntos||s.guias||[]).map(g=>g.destino).filter(Boolean).slice(-1)[0]||'—'}</div>
-            </div>`).join('')}
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:3px;font-size:10px;margin-bottom:6px">
+                  <div style="color:#888">Cliente</div><div style="font-weight:600">${s.cliente||'—'}</div>
+                  <div style="color:#888">N° Guía</div><div style="color:#1565C0;font-weight:700">${guias}</div>
+                  <div style="color:#888">Fecha guía</div><div>${fechaGuia}</div>
+                  <div style="color:#888">Fecha descarga</div><div>${fechaDesc}</div>
+                  <div style="color:#888">Origen</div><div>${s.origen||'—'}</div>
+                  <div style="color:#888">Destino</div><div>${destino}</div>
+                  ${s.conductor?`<div style="color:#888">Conductor</div><div>${s.conductor}</div>`:''}
+                  ${s.patente?`<div style="color:#888">Patente</div><div>${s.patente}</div>`:''}
+                </div>
+                <div style="border-top:1px solid #eee;padding-top:6px">
+                  <div style="font-size:9px;font-weight:700;color:#888;margin-bottom:4px">COSTOS</div>
+                  <div style="display:grid;grid-template-columns:1fr 1fr;gap:2px;font-size:10px">
+                    <div style="color:#555">Comisión conductor</div><div style="text-align:right;color:#E53935">−$${comision.toLocaleString('es-CL')}</div>
+                    ${s.petroleo?`<div style="color:#555">Petróleo</div><div style="text-align:right;color:#E53935">−$${(s.petroleo||0).toLocaleString('es-CL')}</div>`:''}
+                    ${s.peajes?`<div style="color:#555">Peajes</div><div style="text-align:right;color:#E53935">−$${(s.peajes||0).toLocaleString('es-CL')}</div>`:''}
+                    ${s.viaticos?`<div style="color:#555">Viáticos</div><div style="text-align:right;color:#E53935">−$${(s.viaticos||0).toLocaleString('es-CL')}</div>`:''}
+                    ${s.adicional?`<div style="color:#555">Adicional</div><div style="text-align:right;color:#E53935">−$${(s.adicional||0).toLocaleString('es-CL')}</div>`:''}
+                    ${s.tag&&!isNaN(parseInt(s.tag))?`<div style="color:#555">TAG</div><div style="text-align:right;color:#E53935">−$${parseInt(s.tag).toLocaleString('es-CL')}</div>`:''}
+                    <div style="color:#555">CF prorrateado</div><div style="text-align:right;color:#E53935">−$${(s.cfProrrateado||50800).toLocaleString('es-CL')}</div>
+                    <div style="border-top:1px solid #eee;grid-column:1/-1;margin:2px 0"></div>
+                    <div style="font-weight:700;color:#1B5E20">Resultado</div><div style="text-align:right;font-weight:700;color:#1B5E20">$${resultado.toLocaleString('es-CL')}</div>
+                  </div>
+                </div>
+              </div>`;
+            }).join('')}
           </div>
-          <div style="background:#F1F8E9;border-radius:7px;padding:8px 12px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center">
-            <span style="font-size:11px;font-weight:700;color:#2E7D32">Total neto</span>
-            <span style="font-size:14px;font-weight:900;color:#2E7D32">$${total.toLocaleString('es-CL')}</span>
+          <!-- TOTAL CONSOLIDADO -->
+          <div style="background:#E8F5E9;border-radius:7px;padding:10px 12px;margin-bottom:8px">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+              <span style="font-size:11px;font-weight:700;color:#2E7D32">Total neto</span>
+              <span style="font-size:14px;font-weight:900;color:#2E7D32">$${total.toLocaleString('es-CL')}</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;font-size:10px;color:#388E3C">
+              <span>IVA 19%</span><span>$${Math.round(total*0.19).toLocaleString('es-CL')}</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;font-size:12px;font-weight:900;color:#1B5E20;margin-top:4px;border-top:1px solid #A5D6A7;padding-top:4px">
+              <span>Total con IVA</span><span>$${Math.round(total*1.19).toLocaleString('es-CL')}</span>
+            </div>
           </div>
-          <div style="display:flex;gap:5px;flex-wrap:wrap">
+          <!-- OBSERVACIONES -->
+          <div style="margin-bottom:8px">
+            <div style="font-size:9px;font-weight:700;color:#888;margin-bottom:3px">OBSERVACIONES</div>
+            <textarea id="liq_obs_${liq.id}" placeholder="Agregar observaciones..." rows="2"
+              style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:11px;outline:none;font-family:inherit;resize:vertical">${liq.observaciones||''}</textarea>
+          </div>
+          <!-- BOTONES -->
+          <div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:6px">
             ${liq.estado==='creada'?`<button onclick="cambiarEstadoLiq('${liq.id}','enviada')" style="flex:1;padding:8px;background:#E3F2FD;color:#1565C0;border:1px solid #1565C0;border-radius:7px;font-size:10px;font-weight:700;cursor:pointer">📤 Marcar enviada</button>`:''}
             ${liq.estado==='enviada'?`<button onclick="cambiarEstadoLiq('${liq.id}','facturada')" style="flex:1;padding:8px;background:#F3E5F5;color:#6A1B9A;border:1px solid #6A1B9A;border-radius:7px;font-size:10px;font-weight:700;cursor:pointer">🧾 Marcar facturada</button>`:''}
             ${liq.estado==='facturada'?`<button onclick="cambiarEstadoLiq('${liq.id}','pagada')" style="flex:1;padding:8px;background:#E8F5E9;color:#2E7D32;border:1px solid #2E7D32;border-radius:7px;font-size:10px;font-weight:700;cursor:pointer">✅ Marcar pagada</button>`:''}
+            <button onclick="guardarObsLiq('${liq.id}')" style="padding:8px 12px;background:#607D8B;color:white;border:none;border-radius:7px;font-size:10px;font-weight:700;cursor:pointer">💾 Guardar obs.</button>
             <button onclick="descargarLiqV2('${liq.id}')" style="padding:8px 14px;background:#0B2545;color:white;border:none;border-radius:7px;font-size:10px;font-weight:700;cursor:pointer">📄 PDF</button>
           </div>
         </div>`:''}
@@ -1080,6 +1378,14 @@ function toggleRutLiq(rut,checked){if(!uiState.liq_ruts_sel)uiState.liq_ruts_sel
 function agregarRutLiq(){const input=document.getElementById('liq_rut_nuevo');const rut=input?.value.trim();if(!rut)return;const cl=uiState.liq_cliente_sel||'';if(cl){if(!appData.clientesRut)appData.clientesRut={};if(!appData.clientesRut[cl])appData.clientesRut[cl]=[];if(!appData.clientesRut[cl].includes(rut)){appData.clientesRut[cl].push(rut);saveData();}}if(!uiState.liq_ruts_sel)uiState.liq_ruts_sel=[];if(!uiState.liq_ruts_sel.includes(rut))uiState.liq_ruts_sel.push(rut);input.value='';render();}
 function crearLiquidacionV2(){const sel=uiState.liq_sel||[];if(!sel.length)return alert('Selecciona al menos un servicio');const fecha=document.getElementById('liq_fecha_v2')?.value||new Date().toISOString().split('T')[0];const email=document.getElementById('liq_email_v2')?.value||'';const p=fecha.split('-');const fechaStr=`${p[2]}-${p[1]}-${p[0]}`;const ruts=uiState.liq_ruts_sel||[];const servicios=appData.servicios||[];const total=sel.reduce((a,id)=>{const s=servicios.find(sv=>sv.id===id);return a+(s?s.precio||0:0);},0);const id='LIQ-'+String(appData.liquidaciones.length+1).padStart(3,'0');appData.liquidaciones.push({id,fecha:fechaStr,email,serviciosIds:[...sel],total,estado:'creada',nFactura:'',ruts});sel.forEach(sid=>{const s=servicios.find(sv=>sv.id===sid);if(s){s.liquidacionId=id;upsertServicioSupabase(s);}});uiState.liq_sel=[];uiState.liq_ruts_sel=[];saveData();render();alert('✅ '+id+' creada — Total: $'+total.toLocaleString('es-CL'));}
 function cambiarEstadoLiq(liqId,estado){const liq=(appData.liquidaciones||[]).find(l=>l.id===liqId);if(!liq)return;liq.estado=estado;saveData();render();}
+function guardarObsLiq(liqId) {
+  const liq = (appData.liquidaciones||[]).find(l=>l.id===liqId);
+  if (!liq) return;
+  const obs = document.getElementById('liq_obs_'+liqId)?.value||'';
+  liq.observaciones = obs;
+  saveData();
+  showToastGeneral('💾 Observaciones guardadas','#607D8B');
+}
 function descargarLiqV2(liqId) {
   const liq = (appData.liquidaciones||[]).find(l=>l.id===liqId);
   if (!liq) return;
@@ -1089,88 +1395,110 @@ function descargarLiqV2(liqId) {
   const iva = Math.round(total * 0.19);
   const totalConIva = total + iva;
   const hoy = new Date().toLocaleDateString('es-CL',{day:'2-digit',month:'long',year:'numeric'});
+  // Datos cliente desde pipeline
+  const clienteNombre = svcs[0]?.cliente||'—';
+  const pipCliente = (appData.pipeline||[]).find(p=>p.cliente===clienteNombre);
+  const clienteRut = (liq.ruts&&liq.ruts.length) ? liq.ruts.join(' · ') : (pipCliente?.rut||'');
   const filas = svcs.map((s,i) => {
-    const guias = (s.guias||[]).map(g=>g.num||g.guia).filter(Boolean).join(', ')||'—';
-    const origen = s.puntos?.[0]?.origen || s.origen || '—';
-    const destino = s.puntos?.[s.puntos.length-1]?.destino || '—';
+    const puntos = s.puntos||s.guias||[];
+    const guias = puntos.map(g=>g.num||g.guia).filter(Boolean).join(', ')||'—';
+    const fechaGuia = puntos.map(g=>g.fecha_guia).filter(Boolean)[0]||'—';
+    const fechaDesc = puntos.map(g=>g.fecha_descarga).filter(Boolean)[0]||'—';
+    const origen = puntos[0]?.origen || s.origen || '—';
+    const destino = puntos[puntos.length-1]?.destino || '—';
+    const puntosDetalle = puntos.length>1 ? puntos.map((p,pi)=>`P${pi+1}: ${p.origen||'—'}→${p.destino||'—'}${p.num||p.guia?' (GD:'+( p.num||p.guia)+')':''}`).join(' | ') : '';
+    const adicional = s.adicional||0;
     return `<tr style="background:${i%2===0?'#f9fafb':'white'}">
       <td style="padding:8px 10px;border-bottom:1px solid #eee;font-size:11px;font-weight:700;color:#1F4E79">${s.id}</td>
-      <td style="padding:8px 10px;border-bottom:1px solid #eee;font-size:11px">${s.fecha||'—'}</td>
-      <td style="padding:8px 10px;border-bottom:1px solid #eee;font-size:11px">${s.cliente||'—'}</td>
+      <td style="padding:8px 10px;border-bottom:1px solid #eee;font-size:11px;font-weight:600">${s.cliente||'—'}</td>
       <td style="padding:8px 10px;border-bottom:1px solid #eee;font-size:11px;color:#1565C0">${guias}</td>
-      <td style="padding:8px 10px;border-bottom:1px solid #eee;font-size:11px">${origen} → ${destino}</td>
+      <td style="padding:8px 10px;border-bottom:1px solid #eee;font-size:10px">${fechaGuia}</td>
+      <td style="padding:8px 10px;border-bottom:1px solid #eee;font-size:10px">${fechaDesc}</td>
+      <td style="padding:8px 10px;border-bottom:1px solid #eee;font-size:10px">${origen}</td>
+      <td style="padding:8px 10px;border-bottom:1px solid #eee;font-size:10px">${destino}</td>
+      <td style="padding:8px 10px;border-bottom:1px solid #eee;font-size:10px">${puntosDetalle||'—'}</td>
+      <td style="padding:8px 10px;border-bottom:1px solid #eee;font-size:11px;text-align:right">${adicional?'$'+adicional.toLocaleString('es-CL'):'—'}</td>
       <td style="padding:8px 10px;border-bottom:1px solid #eee;font-size:11px;text-align:right;font-weight:700;color:#2E7D32">$${(s.precio||0).toLocaleString('es-CL')}</td>
     </tr>`;
   }).join('');
-  const rutsHTML = liq.ruts&&liq.ruts.length ? `<div style="margin-top:8px;font-size:11px;color:#546E7A"><strong>RUT(s):</strong> ${liq.ruts.join(' · ')}</div>` : '';
+  const rutsHTML = clienteRut ? `<div style="margin-top:4px;font-size:11px;color:#546E7A"><strong>RUT:</strong> ${clienteRut}</div>` : '';
+  const obsHTML = liq.observaciones ? `<div style="background:#FFFDE7;border:1px solid #FFF176;border-radius:8px;padding:12px 16px;margin-bottom:24px"><div style="font-size:9px;font-weight:700;color:#888;letter-spacing:1px;margin-bottom:4px">OBSERVACIONES</div><div style="font-size:11px;color:#555">${liq.observaciones}</div></div>` : '';
   const html = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
   <title>${liq.id} — Global Solutions SpA</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: 'Segoe UI', Arial, sans-serif; color: #222; background: white; }
-    .page { max-width: 780px; margin: 0 auto; padding: 40px; }
-    @media print { .no-print { display: none !important; } body { padding: 0; } .page { padding: 20px; } }
+    body { font-family: 'Segoe UI', Arial, sans-serif; color: #222; background: white; font-size:12px; }
+    .page { max-width: 900px; margin: 0 auto; padding: 40px; }
+    table { border-collapse: collapse; width: 100%; }
+    th, td { font-size: 10px; }
+    @media print { .no-print { display: none !important; } body { padding: 0; } .page { padding: 15px; } }
   </style></head><body>
   <div class="page">
     <!-- ENCABEZADO -->
-    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:30px;padding-bottom:20px;border-bottom:3px solid #0B2545">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:24px;padding-bottom:16px;border-bottom:3px solid #0B2545">
       <div>
-        <div style="font-size:22px;font-weight:900;color:#0B2545;letter-spacing:1px">GLOBAL SOLUTIONS SpA</div>
-        <div style="font-size:11px;color:#546E7A;margin-top:2px">Transporte Agroindustrial — RM, V, VI, VII Región</div>
-        <div style="font-size:10px;color:#888;margin-top:6px">contacto@globalsolutions.cl · +56 9 8360 0761</div>
+        <div style="font-size:20px;font-weight:900;color:#0B2545;letter-spacing:1px">GLOBAL SOLUTIONS SpA</div>
+        <div style="font-size:11px;color:#546E7A;margin-top:2px;font-weight:600">Transporte de Carga por Carretera</div>
+        <div style="font-size:10px;color:#888;margin-top:4px">global.solutions.spa@gmail.com</div>
+        <div style="font-size:10px;color:#888;margin-top:2px">+56 9 68484711 · +56 9 8360 0761</div>
       </div>
       <div style="text-align:right">
-        <div style="font-size:26px;font-weight:900;color:#0B2545">${liq.id}</div>
-        <div style="font-size:11px;color:#546E7A;margin-top:2px">Fecha emisión: ${hoy}</div>
-        <div style="font-size:11px;color:#546E7A">Fecha servicio: ${liq.fecha}</div>
+        <div style="font-size:24px;font-weight:900;color:#0B2545">${liq.id}</div>
+        <div style="font-size:10px;color:#546E7A;margin-top:4px">Fecha emisión: ${hoy}</div>
+        <div style="font-size:10px;color:#546E7A">Período: ${liq.fecha}</div>
       </div>
     </div>
     <!-- CLIENTE -->
-    <div style="background:#f4f6f8;border-radius:8px;padding:14px 18px;margin-bottom:24px">
-      <div style="font-size:9px;font-weight:700;color:#888;letter-spacing:1px;margin-bottom:6px">DATOS DEL CLIENTE</div>
-      <div style="font-size:13px;font-weight:700;color:#222">${svcs[0]?.cliente||'—'}</div>
+    <div style="background:#f4f6f8;border-radius:8px;padding:12px 16px;margin-bottom:20px">
+      <div style="font-size:9px;font-weight:700;color:#888;letter-spacing:1px;margin-bottom:4px">CLIENTE</div>
+      <div style="font-size:13px;font-weight:700;color:#222">${clienteNombre}</div>
       ${rutsHTML}
-      ${liq.email?`<div style="font-size:11px;color:#546E7A;margin-top:4px">📧 ${liq.email}</div>`:''}
+      ${liq.email?`<div style="font-size:10px;color:#546E7A;margin-top:3px">📧 ${liq.email}</div>`:''}
     </div>
     <!-- TABLA SERVICIOS -->
-    <div style="font-size:9px;font-weight:700;color:#888;letter-spacing:1px;margin-bottom:8px">DETALLE DE SERVICIOS</div>
-    <table style="width:100%;border-collapse:collapse;margin-bottom:24px">
+    <div style="font-size:9px;font-weight:700;color:#888;letter-spacing:1px;margin-bottom:6px">DETALLE DE SERVICIOS</div>
+    <table style="margin-bottom:20px">
       <thead>
         <tr style="background:#0B2545;color:white">
-          <th style="padding:10px;text-align:left;font-size:10px;font-weight:700">ID</th>
-          <th style="padding:10px;text-align:left;font-size:10px;font-weight:700">FECHA</th>
-          <th style="padding:10px;text-align:left;font-size:10px;font-weight:700">CLIENTE</th>
-          <th style="padding:10px;text-align:left;font-size:10px;font-weight:700">GUÍA(S)</th>
-          <th style="padding:10px;text-align:left;font-size:10px;font-weight:700">RUTA</th>
-          <th style="padding:10px;text-align:right;font-size:10px;font-weight:700">PRECIO NETO</th>
+          <th style="padding:8px;text-align:left">ID</th>
+          <th style="padding:8px;text-align:left">CLIENTE</th>
+          <th style="padding:8px;text-align:left">N° GUÍA</th>
+          <th style="padding:8px;text-align:left">FECHA GUÍA</th>
+          <th style="padding:8px;text-align:left">FECHA DESC.</th>
+          <th style="padding:8px;text-align:left">ORIGEN</th>
+          <th style="padding:8px;text-align:left">DESTINO</th>
+          <th style="padding:8px;text-align:left">PUNTOS</th>
+          <th style="padding:8px;text-align:right">ADICIONAL</th>
+          <th style="padding:8px;text-align:right">MONTO NETO</th>
         </tr>
       </thead>
       <tbody>${filas}</tbody>
     </table>
     <!-- TOTALES -->
-    <div style="display:flex;justify-content:flex-end;margin-bottom:30px">
-      <div style="width:280px">
-        <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #eee;font-size:11px">
+    <div style="display:flex;justify-content:flex-end;margin-bottom:24px">
+      <div style="width:300px;border:1px solid #eee;border-radius:8px;overflow:hidden">
+        <div style="display:flex;justify-content:space-between;padding:8px 14px;border-bottom:1px solid #eee;font-size:12px">
           <span style="color:#555">Subtotal neto</span>
           <span style="font-weight:700">$${total.toLocaleString('es-CL')}</span>
         </div>
-        <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #eee;font-size:11px">
+        <div style="display:flex;justify-content:space-between;padding:8px 14px;border-bottom:1px solid #eee;font-size:12px">
           <span style="color:#555">IVA (19%)</span>
           <span>$${iva.toLocaleString('es-CL')}</span>
         </div>
-        <div style="display:flex;justify-content:space-between;padding:10px 0;font-size:14px;font-weight:900;color:#0B2545;border-top:2px solid #0B2545;margin-top:4px">
+        <div style="display:flex;justify-content:space-between;padding:12px 14px;font-size:15px;font-weight:900;color:white;background:#0B2545">
           <span>TOTAL</span>
           <span>$${totalConIva.toLocaleString('es-CL')}</span>
         </div>
       </div>
     </div>
+    ${obsHTML}
     <!-- PIE -->
-    <div style="border-top:1px solid #eee;padding-top:16px;display:flex;justify-content:space-between;align-items:center">
-      <div style="font-size:10px;color:#aaa">Documento generado el ${hoy}</div>
-      <div style="font-size:10px;color:#aaa">${liq.id} · Global Solutions SpA</div>
+    <div style="border-top:1px solid #eee;padding-top:12px;display:flex;justify-content:space-between;align-items:center">
+      <div style="font-size:9px;color:#aaa">Documento generado el ${hoy}</div>
+      <div style="font-size:9px;color:#aaa">${liq.id} · Global Solutions SpA · global.solutions.spa@gmail.com</div>
     </div>
     <!-- BOTÓN IMPRIMIR -->
-    <div class="no-print" style="text-align:center;margin-top:30px">
+    <div class="no-print" style="text-align:center;margin-top:24px">
       <button onclick="window.print()" style="background:#0B2545;color:white;border:none;border-radius:8px;padding:12px 30px;font-size:13px;font-weight:700;cursor:pointer">🖨️ Imprimir / Guardar PDF</button>
     </div>
   </div>
@@ -1657,6 +1985,10 @@ function loadData() {
       const _iCs=_finF.rutinarias.findIndex(r=>r.cierreServicioTask);
       _finF.rutinarias.splice(_iCs+1,0,{titulo:'Liquidaciones',proc:'Gestionar liquidaciones por servicio o grupo con múltiples RUT.',subtareas:[],liquidacionTask:true,done:false});
     }
+    if (!_finF.rutinarias.some(r=>r.rendicionTask)) {
+      const _iLq=_finF.rutinarias.findIndex(r=>r.liquidacionTask);
+      _finF.rutinarias.splice(_iLq+1,0,{titulo:'Rendición de Gastos',proc:'Registrar y gestionar rendiciones de gastos del equipo.',subtareas:[],rendicionTask:true,done:false});
+    }
     _finF.rutinarias=_finF.rutinarias.filter(r=>!r.liquidacionServicios&&!r.cierreLiquidacion);
   }
   // Cotización PDF en Comercial
@@ -1763,7 +2095,7 @@ function delTarea(faseId, ti) {
   if (!fase) return;
   const tarea = fase.rutinarias[ti];
   // Proteger tareas del sistema
-  if (tarea && (tarea.registroServicio || tarea.liquidacionServicios || tarea.disponibilidadDiaria || tarea.pipelineTask || tarea.respaldoTask || tarea.rendimientoCombTask || tarea.cierreServicioTask || tarea.liquidacionTask || tarea.cotizacionTask)) {
+  if (tarea && (tarea.registroServicio || tarea.liquidacionServicios || tarea.disponibilidadDiaria || tarea.pipelineTask || tarea.respaldoTask || tarea.rendimientoCombTask || tarea.cierreServicioTask || tarea.liquidacionTask || tarea.cotizacionTask || tarea.rendicionTask)) {
     alert('Esta tarea es del sistema y no puede eliminarse.');
     return;
   }
@@ -2445,7 +2777,7 @@ function renderFase(fase) {
       </div>`;
     })() : '';
 
-    const _flag = tarea.registroServicio?'registroServicio':tarea.disponibilidadDiaria?'disponibilidadDiaria':tarea.rendimientoCombTask?'rendimientoCombTask':tarea.liquidacionTask?'liquidacionTask':tarea.cierreServicioTask?'cierreServicioTask':tarea.cotizacionTask?'cotizacionTask':tarea.pipelineTask?'pipelineTask':tarea.respaldoTask?'respaldoTask':'';
+    const _flag = tarea.registroServicio?'registroServicio':tarea.disponibilidadDiaria?'disponibilidadDiaria':tarea.rendimientoCombTask?'rendimientoCombTask':tarea.liquidacionTask?'liquidacionTask':tarea.cierreServicioTask?'cierreServicioTask':tarea.cotizacionTask?'cotizacionTask':tarea.pipelineTask?'pipelineTask':tarea.respaldoTask?'respaldoTask':tarea.rendicionTask?'rendicionTask':'';
     return `<div class="acord-item" data-flag="${_flag}" style="${isDone?'opacity:0.6':''}">
       <div class="acord-header ${isOpen?'open':''}" style="${isDone?'background:#f5f5f5':''}">
         <span class="acord-arrow" onclick="toggleAcord('${fase.id}',${tiReal})" style="padding:4px 6px 4px 0;cursor:pointer">▶</span>
@@ -2455,13 +2787,13 @@ function renderFase(fase) {
         }
         <span onclick="toggleTareaDone('${fase.id}',${tiReal})" title="${isDone?'Reactivar':'Tachar tarea'}" style="cursor:pointer;font-size:14px;color:${isDone?fase.color:'#ccc'};padding:0 4px">${isDone?'✓':'○'}</span>
         <span onclick="editTareaTitulo('${fase.id}',${tiReal})" title="Editar nombre" style="cursor:pointer;font-size:12px;color:#bbb;padding:0 4px">✎</span>
-        ${!tarea.registroServicio&&!tarea.liquidacionServicios&&!tarea.disponibilidadDiaria&&!tarea.pipelineTask&&!tarea.respaldoTask&&!tarea.rendimientoCombTask&&!tarea.cierreServicioTask&&!tarea.liquidacionTask&&!tarea.cotizacionTask?`
+        ${!tarea.registroServicio&&!tarea.liquidacionServicios&&!tarea.disponibilidadDiaria&&!tarea.pipelineTask&&!tarea.respaldoTask&&!tarea.rendimientoCombTask&&!tarea.cierreServicioTask&&!tarea.liquidacionTask&&!tarea.cotizacionTask&&!tarea.rendicionTask?`
       <span onclick="moverTarea('${fase.id}',${tiReal},-1)" title="Subir" style="cursor:pointer;font-size:10px;color:#ddd;padding:0 2px">▲</span>
       <span onclick="moverTarea('${fase.id}',${tiReal},1)" title="Bajar" style="cursor:pointer;font-size:10px;color:#ddd;padding:0 2px">▼</span>
       ${modoEdicion ? `
         <span onclick="moverTarea('${fase.id}',${tiReal},-1)" title="Subir" style="cursor:pointer;font-size:12px;color:#90A4AE;padding:0 3px">↑</span>
         <span onclick="moverTarea('${fase.id}',${tiReal},1)" title="Bajar" style="cursor:pointer;font-size:12px;color:#90A4AE;padding:0 3px">↓</span>
-        ${!tarea.registroServicio && !tarea.liquidacionServicios && !tarea.disponibilidadDiaria && !tarea.pipelineTask && !tarea.respaldoTask && !tarea.rendimientoCombTask && !tarea.cierreServicioTask && !tarea.liquidacionTask && !tarea.cotizacionTask ? `<span onclick="delTarea('${fase.id}',${tiReal})" title="Eliminar tarea" style="cursor:pointer;font-size:16px;color:#E53935;padding:0 4px">×</span>` : ''}
+        ${!tarea.registroServicio && !tarea.liquidacionServicios && !tarea.disponibilidadDiaria && !tarea.pipelineTask && !tarea.respaldoTask && !tarea.rendimientoCombTask && !tarea.cierreServicioTask && !tarea.liquidacionTask && !tarea.cotizacionTask && !tarea.rendicionTask ? `<span onclick="delTarea('${fase.id}',${tiReal})" title="Eliminar tarea" style="cursor:pointer;font-size:16px;color:#E53935;padding:0 4px">×</span>` : ''}
       ` : ''}
     `:''}
         <span class="acord-count" onclick="toggleAcord('${fase.id}',${tiReal})">${tarea.subtareas.length}</span>
@@ -2564,6 +2896,7 @@ function renderFase(fase) {
         ${tarea.cotizacionTask ? `<div style="margin:-4px">${renderCotizacionPDF()}</div>` : ''}
         ${tarea.disponibilidadDiaria ? `<div style="margin:-4px">${renderDisponibilidad()}</div>` : ''}
         ${tarea.pipelineTask ? `<div style="margin-bottom:8px">${renderPipeline()}</div>` : ''}
+        ${tarea.rendicionTask ? `<div style="margin:-4px">${renderRendiciones()}</div>` : ''}
         ${tarea.respaldoTask ? `<div style="padding:8px 0">
           <button onclick="descargarRespaldo()" style="width:100%;padding:12px;background:#37474F;color:white;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer">💾 Descargar respaldo</button></div>` : ''}
         ${subsHTML}
