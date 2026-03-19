@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-  <meta name="version" content="2026031849">
+  <meta name="version" content="2026031950">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Panel de Gestión — Global Solutions</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -2329,10 +2329,18 @@ async function syncPipelineDesdeSupabase() {
         id: r.id,
         cliente: r.cliente,
         contacto: r.contacto || '',
+        contactos: r.contactos || [],
+        categoria: r.categoria || '',
         etapa: r.etapa || 'prospecto',
         ultimaGestion: r.ultima_gestion || '',
         proximaAccion: r.proxima_accion || '',
         notas: r.notas || '',
+        notasMultiples: r.notas_multiples || [],
+        rut: r.rut || '',
+        emailFactura: r.email_factura || '',
+        tipoCliente: r.tipo_cliente || 'directo',
+        condicionPago: r.condicion_pago || '30',
+        requiereAprobacion: r.requiere_aprobacion || false,
       }));
       saveData(); render();
     }
@@ -2344,10 +2352,18 @@ async function guardarPipelineSupabase(item) {
   const row = {
     cliente: item.cliente,
     contacto: item.contacto || '',
+    contactos: item.contactos || [],
+    categoria: item.categoria || '',
     etapa: item.etapa || 'prospecto',
     ultima_gestion: item.ultimaGestion || '',
     proxima_accion: item.proximaAccion || '',
     notas: item.notas || '',
+    notas_multiples: item.notasMultiples || [],
+    rut: item.rut || '',
+    email_factura: item.emailFactura || '',
+    tipo_cliente: item.tipoCliente || 'directo',
+    condicion_pago: item.condicionPago || '30',
+    requiere_aprobacion: item.requiereAprobacion || false,
   };
   if (item.id && item.id.includes('-')) {
     await supa.from('pipeline').update(row).eq('id', item.id);
@@ -2667,40 +2683,45 @@ function renderPipeline() {
     return `<span style="font-size:10px;font-weight:700;background:${ETAPA_COLORES[e]};color:white;padding:2px 8px;border-radius:10px;margin-right:4px">${ETAPA_LABELS[e]} ${n}</span>`;
   }).join('');
 
+  const pn = uiState.pipNew || {};
   const addForm = uiState['pip_add']
     ? `<div style="background:#f8f9fa;border:1px solid #dde;border-radius:8px;padding:12px;margin-top:8px">
         <div style="font-size:9px;font-weight:800;color:#888;letter-spacing:1px;margin-bottom:8px">NUEVO CLIENTE</div>
         <div style="display:grid;gap:6px">
-          <input id="pip_new_cliente" placeholder="Cliente *" style="border:1px solid #dde;border-radius:6px;padding:6px 9px;font-size:12px;outline:none;font-family:inherit">
-          <input id="pip_new_contacto" placeholder="Contacto" style="border:1px solid #dde;border-radius:6px;padding:6px 9px;font-size:12px;outline:none;font-family:inherit">
-          <select id="pip_new_etapa" style="border:1px solid #dde;border-radius:6px;padding:6px 9px;font-size:12px;outline:none;background:white">
-            ${ETAPAS_PIPELINE.map(e=>`<option value="${e}">${ETAPA_LABELS[e]}</option>`).join('')}
+          <input id="pip_new_cliente" placeholder="Cliente *" value="${pn.cliente||''}" oninput="if(!uiState.pipNew)uiState.pipNew={};uiState.pipNew.cliente=this.value" style="border:1px solid #dde;border-radius:6px;padding:6px 9px;font-size:12px;outline:none;font-family:inherit">
+          <input id="pip_new_contacto" placeholder="Contacto" value="${pn.contacto||''}" oninput="if(!uiState.pipNew)uiState.pipNew={};uiState.pipNew.contacto=this.value" style="border:1px solid #dde;border-radius:6px;padding:6px 9px;font-size:12px;outline:none;font-family:inherit">
+          <select id="pip_new_etapa" onchange="if(!uiState.pipNew)uiState.pipNew={};uiState.pipNew.etapa=this.value" style="border:1px solid #dde;border-radius:6px;padding:6px 9px;font-size:12px;outline:none;background:white">
+            ${ETAPAS_PIPELINE.map(e=>`<option value="${e}" ${(pn.etapa||'prospecto')===e?'selected':''}>${ETAPA_LABELS[e]}</option>`).join('')}
           </select>
-          <input id="pip_new_accion" placeholder="Próxima acción" style="border:1px solid #dde;border-radius:6px;padding:6px 9px;font-size:12px;outline:none;font-family:inherit">
-          <input id="pip_new_notas" placeholder="Notas" style="border:1px solid #dde;border-radius:6px;padding:6px 9px;font-size:12px;outline:none;font-family:inherit">
+          <select id="pip_new_cat" onchange="if(!uiState.pipNew)uiState.pipNew={};uiState.pipNew.cat=this.value" style="border:1px solid #dde;border-radius:6px;padding:6px 9px;font-size:12px;outline:none;background:white">
+            <option value="">Categoría (opcional)</option>
+            ${['Agrícola','Agroindustrial','Broker','Construcción','Logística','Minería','Retail','Proveedor Agrícola','Otro'].map(cat=>`<option value="${cat}" ${(pn.cat||'')===(cat)?'selected':''}>${cat}</option>`).join('')}
+          </select>
+          <input id="pip_new_accion" placeholder="Próxima acción" value="${pn.accion||''}" oninput="if(!uiState.pipNew)uiState.pipNew={};uiState.pipNew.accion=this.value" style="border:1px solid #dde;border-radius:6px;padding:6px 9px;font-size:12px;outline:none;font-family:inherit">
+          <input id="pip_new_notas" placeholder="Notas" value="${pn.notas||''}" oninput="if(!uiState.pipNew)uiState.pipNew={};uiState.pipNew.notas=this.value" style="border:1px solid #dde;border-radius:6px;padding:6px 9px;font-size:12px;outline:none;font-family:inherit">
           <div style="font-size:9px;font-weight:800;color:#607D8B;letter-spacing:1px;margin-top:4px;padding-top:6px;border-top:1px solid #eee">DATOS DE FACTURACIÓN</div>
-          <input id="pip_new_rut" placeholder="RUT ej: 76.123.456-7" style="border:1px solid #dde;border-radius:6px;padding:6px 9px;font-size:12px;outline:none;font-family:inherit">
-          <input id="pip_new_email_factura" placeholder="Email facturación" style="border:1px solid #dde;border-radius:6px;padding:6px 9px;font-size:12px;outline:none;font-family:inherit">
+          <input id="pip_new_rut" placeholder="RUT ej: 76.123.456-7" value="${pn.rut||''}" oninput="if(!uiState.pipNew)uiState.pipNew={};uiState.pipNew.rut=this.value" style="border:1px solid #dde;border-radius:6px;padding:6px 9px;font-size:12px;outline:none;font-family:inherit">
+          <input id="pip_new_email_factura" placeholder="Email facturación" value="${pn.email||''}" oninput="if(!uiState.pipNew)uiState.pipNew={};uiState.pipNew.email=this.value" style="border:1px solid #dde;border-radius:6px;padding:6px 9px;font-size:12px;outline:none;font-family:inherit">
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
             <div>
               <div style="font-size:9px;color:#888;margin-bottom:2px">Tipo cliente</div>
-              <select id="pip_new_tipo" style="width:100%;border:1px solid #dde;border-radius:6px;padding:6px 9px;font-size:12px;outline:none;background:white;-webkit-appearance:auto">
-                <option value="directo">Directo</option>
-                <option value="broker">Broker</option>
+              <select id="pip_new_tipo" onchange="if(!uiState.pipNew)uiState.pipNew={};uiState.pipNew.tipo=this.value" style="width:100%;border:1px solid #dde;border-radius:6px;padding:6px 9px;font-size:12px;outline:none;background:white;-webkit-appearance:auto">
+                <option value="directo" ${(pn.tipo||'directo')==='directo'?'selected':''}>Directo</option>
+                <option value="broker" ${pn.tipo==='broker'?'selected':''}>Broker</option>
               </select>
             </div>
             <div>
               <div style="font-size:9px;color:#888;margin-bottom:2px">Pago (días)</div>
-              <select id="pip_new_pago" style="width:100%;border:1px solid #dde;border-radius:6px;padding:6px 9px;font-size:12px;outline:none;background:white;-webkit-appearance:auto">
-                <option value="30">30 días</option>
-                <option value="60">60 días</option>
-                <option value="90">90 días</option>
-                <option value="contado">Contado</option>
+              <select id="pip_new_pago" onchange="if(!uiState.pipNew)uiState.pipNew={};uiState.pipNew.pago=this.value" style="width:100%;border:1px solid #dde;border-radius:6px;padding:6px 9px;font-size:12px;outline:none;background:white;-webkit-appearance:auto">
+                <option value="30" ${(pn.pago||'30')==='30'?'selected':''}>30 días</option>
+                <option value="60" ${pn.pago==='60'?'selected':''}>60 días</option>
+                <option value="90" ${pn.pago==='90'?'selected':''}>90 días</option>
+                <option value="contado" ${pn.pago==='contado'?'selected':''}>Contado</option>
               </select>
             </div>
           </div>
           <div style="display:flex;align-items:center;gap:8px;padding:6px 8px;background:#FFF3E0;border-radius:6px">
-            <input type="checkbox" id="pip_new_aprueba" style="cursor:pointer">
+            <input type="checkbox" id="pip_new_aprueba" ${pn.aprueba?'checked':''} onchange="if(!uiState.pipNew)uiState.pipNew={};uiState.pipNew.aprueba=this.checked" style="cursor:pointer">
             <label for="pip_new_aprueba" style="font-size:11px;color:#E65100;cursor:pointer;font-weight:600">Requiere aprobación antes de facturar</label>
           </div>
         </div>
@@ -2728,7 +2749,7 @@ function editarPipeline(ci) {
   render();
 }
 function cancelarEditPipeline(ci) { delete uiState[`pip_edit_${ci}`]; render(); }
-function cancelarAddPipeline() { delete uiState['pip_add']; render(); }
+function cancelarAddPipeline() { delete uiState['pip_add']; delete uiState.pipNew; render(); }
 async function agregarNotaPipeline(ci) {
   const input = document.getElementById('pip_nota_nueva_' + ci);
   if (!input || !input.value.trim()) return;
@@ -2741,6 +2762,7 @@ async function agregarNotaPipeline(ci) {
   input.value = '';
   saveData();
   render();
+  showToastGeneral('✅ Nota guardada');
 }
 
 function eliminarNotaPipeline(ci, ni) {
@@ -2755,6 +2777,7 @@ function eliminarNotaPipeline(ci, ni) {
 async function guardarPipeline(ci) {
   if (!appData.pipeline) appData.pipeline = [];
   const item = appData.pipeline[ci];
+  const notasExistentes = item.notasMultiples || [];
   appData.pipeline[ci] = {
     id: item.id || '',
     cliente: document.getElementById(`pip_cliente_${ci}`)?.value.trim() || item.cliente,
@@ -2765,7 +2788,7 @@ async function guardarPipeline(ci) {
     proximaAccion: document.getElementById(`pip_accion_${ci}`)?.value.trim() || '',
     notas: item.notas || '',
     ultimaGestion: item.ultimaGestion || '',
-    notasMultiples: (appData.pipeline[ci]?.notasMultiples) || item.notasMultiples || [],
+    notasMultiples: notasExistentes,
     rut: document.getElementById(`pip_rut_${ci}`)?.value.trim() || item.rut || '',
     emailFactura: document.getElementById(`pip_email_factura_${ci}`)?.value.trim() || item.emailFactura || '',
     tipoCliente: document.getElementById(`pip_tipo_${ci}`)?.value || item.tipoCliente || 'directo',
@@ -2775,6 +2798,7 @@ async function guardarPipeline(ci) {
   delete uiState[`pip_edit_${ci}`];
   await guardarPipelineSupabase(appData.pipeline[ci]);
   saveData(); render();
+  showToastGeneral('✅ Cliente guardado correctamente');
 }
 async function agregarPipeline() {
   const cliente = document.getElementById('pip_new_cliente')?.value.trim();
@@ -2782,25 +2806,30 @@ async function agregarPipeline() {
   if (!appData.pipeline) appData.pipeline = [];
   const hoy = new Date();
   const mes = hoy.toLocaleDateString('es-CL',{month:'short',year:'numeric'});
+  const pn = uiState.pipNew || {};
   const nuevo = {
     id: '',
     cliente,
     contacto: document.getElementById('pip_new_contacto')?.value.trim() || '',
-    etapa: document.getElementById('pip_new_etapa')?.value || 'prospecto',
-    proximaAccion: document.getElementById('pip_new_accion')?.value.trim() || '',
-    notas: document.getElementById('pip_new_notas')?.value.trim() || '',
+    contactos: [],
+    categoria: document.getElementById('pip_new_cat')?.value || pn.cat || '',
+    etapa: document.getElementById('pip_new_etapa')?.value || pn.etapa || 'prospecto',
+    proximaAccion: document.getElementById('pip_new_accion')?.value.trim() || pn.accion || '',
+    notas: document.getElementById('pip_new_notas')?.value.trim() || pn.notas || '',
     ultimaGestion: mes,
     notasMultiples: [],
-    rut: document.getElementById('pip_new_rut')?.value.trim() || '',
-    emailFactura: document.getElementById('pip_new_email_factura')?.value.trim() || '',
-    tipoCliente: document.getElementById('pip_new_tipo')?.value || 'directo',
-    condicionPago: document.getElementById('pip_new_pago')?.value || '30',
-    requiereAprobacion: document.getElementById('pip_new_aprueba')?.checked || false,
+    rut: document.getElementById('pip_new_rut')?.value.trim() || pn.rut || '',
+    emailFactura: document.getElementById('pip_new_email_factura')?.value.trim() || pn.email || '',
+    tipoCliente: document.getElementById('pip_new_tipo')?.value || pn.tipo || 'directo',
+    condicionPago: document.getElementById('pip_new_pago')?.value || pn.pago || '30',
+    requiereAprobacion: document.getElementById('pip_new_aprueba')?.checked || pn.aprueba || false,
   };
   appData.pipeline.push(nuevo);
   await guardarPipelineSupabase(nuevo);
   delete uiState['pip_add'];
+  delete uiState.pipNew;
   saveData(); render();
+  showToastGeneral('✅ Cliente agregado al pipeline');
 }
 function addContactoPip(ci) {
   if (!appData.pipeline[ci].contactos) appData.pipeline[ci].contactos=[];
@@ -4366,6 +4395,22 @@ function mostrarToastServicio(exito) {
     background:${exito?'#2E7D32':'#E65100'};
   `;
   toast.textContent = exito ? '✅ Servicio guardado y sincronizado' : '💾 Guardado localmente — se sincronizará al reconectar';
+  document.body.appendChild(toast);
+  setTimeout(() => { toast.style.opacity='0'; toast.style.transition='opacity 0.4s'; setTimeout(()=>toast.remove(),400); }, 3000);
+}
+
+function showToastGeneral(msg, color) {
+  const existing = document.getElementById('toast-general');
+  if (existing) existing.remove();
+  const toast = document.createElement('div');
+  toast.id = 'toast-general';
+  toast.style.cssText = `
+    position:fixed;bottom:30px;left:50%;transform:translateX(-50%);
+    padding:12px 22px;border-radius:10px;font-size:13px;font-weight:700;
+    color:white;z-index:9999;text-align:center;box-shadow:0 4px 20px rgba(0,0,0,0.25);
+    background:${color||'#2E7D32'};
+  `;
+  toast.textContent = msg;
   document.body.appendChild(toast);
   setTimeout(() => { toast.style.opacity='0'; toast.style.transition='opacity 0.4s'; setTimeout(()=>toast.remove(),400); }, 3000);
 }
