@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-  <meta name="version" content="2026031956">
+  <meta name="version" content="2026031957">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Panel de Gestión — Global Solutions</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -2077,7 +2077,15 @@ function renderFase(fase) {
             style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit">
         </div>
         <button onclick="addServicio()" style="width:100%;background:#455A64;color:white;border:none;border-radius:8px;padding:16px;font-size:15px;cursor:pointer;font-weight:700;min-height:54px;-webkit-tap-highlight-color:transparent;touch-action:manipulation">+ Registrar servicio</button>
-        ${servicios.length ? `<div style="margin-top:12px"><div style="font-size:10px;font-weight:700;color:#607D8B;letter-spacing:1px;margin-bottom:4px">ÚLTIMOS 5 SERVICIOS (${servicios.length} en total)</div>${lista}</div>` : `<div style="margin-top:6px">${lista}</div>`}
+        ${servicios.length ? `<div style="margin-top:12px">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+    <div style="font-size:10px;font-weight:700;color:#607D8B;letter-spacing:1px">ÚLTIMOS 10 SERVICIOS (${servicios.length} en total)</div>
+    <button onclick="uiState.srv_ver_todos=!uiState.srv_ver_todos;render()" style="font-size:10px;background:#ECEFF1;border:none;border-radius:6px;padding:3px 8px;color:#455A64;cursor:pointer;font-weight:700">
+      ${uiState.srv_ver_todos ? '▲ Menos' : '📋 Ver todos del mes'}
+    </button>
+  </div>
+  ${lista}
+</div>` : `<div style="margin-top:6px">${lista}</div>`}
       </div>`;
     })() : '';
 
@@ -2171,7 +2179,11 @@ function renderFase(fase) {
   </div>
 </div>`).join('');
           const conductoresOpts=conductoresLista.map(cn=>'<option value="'+cn+'" '+(cn===sfConductor?'selected':'')+'>'+cn+'</option>').join('');
-          const ultimos5=(servicios).slice(-5).reverse();
+          const hoyMes=(()=>{const h=new Date();return String(h.getMonth()+1).padStart(2,'0');})();
+          const hoyAnio=new Date().getFullYear().toString();
+          const verTodos=!!uiState.srv_ver_todos;
+          const serviciosMes=servicios.filter(s=>s.mes===hoyMes&&s.anio===hoyAnio);
+          const ultimos5=verTodos ? serviciosMes.slice().reverse() : servicios.slice(-10).reverse();
           const lista=ultimos5.length?ultimos5.map((s)=>{const idxReal=servicios.indexOf(s);const isExpanded=!!uiState['srv_exp_'+s.id];const expandKey='srv_exp_'+s.id;return '<div style="position:relative;background:'+(isExpanded?'#EEF2FF':'white')+';border-radius:8px;border:1px solid '+(isExpanded?'#C7D2FE':'#e8eaec')+';margin-bottom:4px"><div onclick="uiState[\'' +expandKey+ '\']=!uiState[\'' +expandKey+ '\'];render()" style="cursor:pointer">'+srvVista(s)+'</div>'+(isExpanded?srvDetalle(s):'')+'<span onclick="event.stopPropagation();delServicio('+idxReal+')" style="position:absolute;top:8px;right:8px;color:#ddd;cursor:pointer;font-size:11px">× eliminar</span></div>';}).join(''):'<div style="font-size:11px;color:#bbb;padding:6px 0;text-align:center">Sin servicios registrados aún</div>';
           return '<div style="margin-bottom:10px;padding:10px 12px;background:#f4f6f8;border-radius:10px;border:1px solid #dde4e8">'
             +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:10px"><div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">ID SERVICIO</div><div style="background:#455A64;color:white;border-radius:6px;padding:7px 9px;font-size:14px;font-weight:700;letter-spacing:2px">'+nextId+'</div></div>'
@@ -2515,11 +2527,7 @@ async function syncServiciosDesdeSupabase() {
       const locales = appData.servicios || [];
       for (const s of locales) { await upsertServicioSupabase(s); }
     } else {
-      // Subir servicios locales que no están en Supabase
-      const idsRemoto = new Set(data.map(r => r.id));
-      const localesNuevos = (appData.servicios||[]).filter(s => !idsRemoto.has(s.id));
-      for (const s of localesNuevos) { await upsertServicioSupabase(s); }
-      // Supabase manda — reemplazar localStorage con datos remotos
+      // Supabase manda siempre — ignorar locales al sincronizar
       const remotos = data.map(r => ({
         id: r.id, fecha: r.fecha, anio: r.anio, mes: r.mes,
         patente: r.patente, conductor: r.conductor, tipoEquipo: r.tipo_equipo,
@@ -2532,7 +2540,7 @@ async function syncServiciosDesdeSupabase() {
         margen: r.margen||0, rendimiento: r.rendimiento||0,
         tag: r.tag||'', liquidacionId: r.liquidacion_id||'',
       }));
-      appData.servicios = [...remotos, ...localesNuevos];
+      appData.servicios = remotos;
       saveData(); render();
     }
   } catch(e) { console.warn('Error sync servicios:', e); }
@@ -4554,19 +4562,8 @@ async function forzarSyncCompleto() {
   }
   if (btn) btn.textContent = '⏳ Sync...';
   try {
-    const { data: remotos } = await supa.from('servicios').select('id');
-    const idsRemoto = new Set((remotos||[]).map(r => r.id));
-    const localesNuevos = (appData.servicios||[]).filter(s => !idsRemoto.has(s.id));
-    let subidos = 0;
-    for (const s of localesNuevos) {
-      await upsertServicioSupabase(s);
-      subidos++;
-    }
-    // Forzar re-upsert de los últimos 10 por si hubo errores silenciosos previos
-    const ultimos = (appData.servicios||[]).slice(-10);
-    for (const s of ultimos) { await upsertServicioSupabase(s); }
     await syncServiciosDesdeSupabase();
-    showToastGeneral(subidos > 0 ? `✅ ${subidos} servicio(s) sincronizado(s)` : '✅ Todo sincronizado con DB', '#2E7D32');
+    showToastGeneral('✅ Sincronizado con DB', '#2E7D32');
   } catch(e) {
     showToastGeneral('❌ Error sync: ' + (e.message||e), '#C62828');
   }
