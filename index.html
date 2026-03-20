@@ -2,7 +2,10 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-  <meta name="version" content="2026031970">
+  <meta http-equiv="cache-control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="pragma" content="no-cache">
+  <meta http-equiv="expires" content="0">
+  <meta name="version" content="2026031971">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Panel de Gestión — Global Solutions</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -1017,7 +1020,10 @@ function pdfRendicion(id) {
       <td style="padding:8px 10px;border-bottom:1px solid #eee;font-size:11px;text-align:right;font-weight:700;color:#C62828">$${(l.monto||0).toLocaleString('es-CL')}</td>
     </tr>`).join('');
   const obsHTML = ren.observaciones ? `<div style="background:#FFFDE7;border:1px solid #FFF176;border-radius:8px;padding:12px 16px;margin-bottom:24px"><div style="font-size:9px;font-weight:700;color:#888;letter-spacing:1px;margin-bottom:4px">OBSERVACIONES</div><div style="font-size:11px;color:#555">${ren.observaciones}</div></div>` : '';
-  const html = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>${ren.id} — Global Solutions SpA</title>
+  const html = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
+  <meta http-equiv="cache-control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="pragma" content="no-cache">
+  <meta http-equiv="expires" content="0"><title>${ren.id} — Global Solutions SpA</title>
   <style>* {box-sizing:border-box;margin:0;padding:0;} body {font-family:'Segoe UI',Arial,sans-serif;color:#222;background:white;} .page {max-width:860px;margin:0 auto;padding:40px;} table {border-collapse:collapse;width:100%;} @media print {.no-print{display:none!important} .page{padding:20px}}</style>
   </head><body><div class="page">
     <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:24px;padding-bottom:16px;border-bottom:3px solid #0B2545">
@@ -1424,6 +1430,9 @@ function descargarLiqV2(liqId) {
   const rutsHTML = clienteRut ? `<div style="margin-top:4px;font-size:11px;color:#546E7A"><strong>RUT:</strong> ${clienteRut}</div>` : '';
   const obsHTML = liq.observaciones ? `<div style="background:#FFFDE7;border:1px solid #FFF176;border-radius:8px;padding:12px 16px;margin-bottom:24px"><div style="font-size:9px;font-weight:700;color:#888;letter-spacing:1px;margin-bottom:4px">OBSERVACIONES</div><div style="font-size:11px;color:#555">${liq.observaciones}</div></div>` : '';
   const html = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
+  <meta http-equiv="cache-control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="pragma" content="no-cache">
+  <meta http-equiv="expires" content="0">
   <title>${liq.id} — Global Solutions SpA</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -1609,7 +1618,10 @@ function abrirPreviewCotV2(){
   const cotObj={numero,fecha,cliente,origen,destino,km,precio,items:itemsData};
   const win=window.open('','_blank');
   const html=generarHTMLCotV2(cotObj);
-  win.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${numero}</title><style>body{font-family:'Segoe UI',sans-serif;padding:30px;max-width:680px;margin:0 auto}@media print{.no-print{display:none!important}}</style></head><body>${html}<script>setTimeout(()=>window.print(),400);<\/script></body></html>`);
+  win.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8">
+  <meta http-equiv="cache-control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="pragma" content="no-cache">
+  <meta http-equiv="expires" content="0"><title>${numero}</title><style>body{font-family:'Segoe UI',sans-serif;padding:30px;max-width:680px;margin:0 auto}@media print{.no-print{display:none!important}}</style></head><body>${html}<script>setTimeout(()=>window.print(),400);<\/script></body></html>`);
   win.document.close();
   // Guardar cotización
   if(!appData.cotizaciones) appData.cotizaciones=[];
@@ -1621,7 +1633,10 @@ function abrirPreviewCotV2(){
 function abrirPreviewCot(cotObj){
   const win=window.open('','_blank');
   const html=generarHTMLCotV2(cotObj);
-  win.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${cotObj.numero}</title><style>body{font-family:'Segoe UI',sans-serif;padding:30px;max-width:680px;margin:0 auto}@media print{.no-print{display:none!important}}</style></head><body>${html}<script>setTimeout(()=>window.print(),400);<\/script></body></html>`);
+  win.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8">
+  <meta http-equiv="cache-control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="pragma" content="no-cache">
+  <meta http-equiv="expires" content="0"><title>${cotObj.numero}</title><style>body{font-family:'Segoe UI',sans-serif;padding:30px;max-width:680px;margin:0 auto}@media print{.no-print{display:none!important}}</style></head><body>${html}<script>setTimeout(()=>window.print(),400);<\/script></body></html>`);
   win.document.close();
 }
 
