@@ -5,7 +5,7 @@
   <meta http-equiv="cache-control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="pragma" content="no-cache">
   <meta http-equiv="expires" content="0">
-  <meta name="version" content="2026031973">
+  <meta name="version" content="2026031974">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Panel de Gestión — Global Solutions</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -2581,6 +2581,11 @@ function renderFase(fase) {
     if (!fase.rutinarias.some(r=>r.liquidacionTask)) {
       const _iC=fase.rutinarias.findIndex(r=>r.cierreServicioTask);
       fase.rutinarias.splice(_iC+1,0,{titulo:'Liquidaciones',proc:'Gestionar liquidaciones por servicio o grupo.',subtareas:[],liquidacionTask:true,done:false});
+      saveData();
+    }
+    if (!fase.rutinarias.some(r=>r.rendicionTask)) {
+      const _iL=fase.rutinarias.findIndex(r=>r.liquidacionTask);
+      fase.rutinarias.splice(_iL+1,0,{titulo:'Rendición de Gastos',proc:'Registrar y gestionar rendiciones de gastos del equipo.',subtareas:[],rendicionTask:true,done:false});
       saveData();
     }
     fase.rutinarias=fase.rutinarias.filter(r=>!r.liquidacionServicios&&!r.cierreLiquidacion);
