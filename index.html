@@ -981,7 +981,9 @@ function crearRendicion() {
   registrarAccion(`Crear rendición ${id}`, () => {
     appData.rendiciones = appData.rendiciones.filter(r=>r.id!==id);
   });
-  saveData(); render();
+  saveData();
+  upsertRendicionSupabase(appData.rendiciones[appData.rendiciones.length-1]);
+  render();
   showToastGeneral('✅ '+id+' creada — Total: $'+total.toLocaleString('es-CL'),'#2E7D32');
 }
 
@@ -990,6 +992,7 @@ function guardarObsRendicion(id) {
   if (!ren) return;
   ren.observaciones = document.getElementById('ren_obs_'+id)?.value||'';
   saveData();
+  upsertRendicionSupabase(ren);
   showToastGeneral('💾 Observaciones guardadas','#607D8B');
 }
 
@@ -997,7 +1000,9 @@ function cambiarEstadoRendicion(id, estado) {
   const ren = (appData.rendiciones||[]).find(r=>r.id===id);
   if (!ren) return;
   ren.estado = estado;
-  saveData(); render();
+  saveData();
+  upsertRendicionSupabase(ren);
+  render();
 }
 
 function eliminarRendicion(id) {
@@ -1922,7 +1927,7 @@ function renderEditarServicio(id) {
   </div>`;
 }
 
-const ESTRUCTURA_VERSION = '70'; // Incrementar cuando cambie la estructura del panel
+const ESTRUCTURA_VERSION = '71'; // Incrementar cuando cambie la estructura del panel
 
 function loadData() {
   // Si la versión estructural cambió, limpiar la estructura pero preservar datos
@@ -3182,6 +3187,7 @@ async function initSupabase() {
       await syncPipelineDesdeSupabase();
       await syncServiciosDesdeSupabase();
       await syncDisponibilidadDesdeSupabase();
+      await syncRendicionesDesdeSupabase();
       await syncConfigPanel();
       render();
     } else {
@@ -3309,6 +3315,47 @@ async function upsertServicioSupabase(s) {
     await supa.from('servicios').upsert(row, { onConflict: 'id' });
   } catch(e) { console.warn('Error upsert servicio:', e); }
 }
+
+// ── SYNC RENDICIONES SUPABASE ─────────────────────────────
+
+async function upsertRendicionSupabase(ren) {
+  if (!supa || !supaConectado) return;
+  try {
+    const row = {
+      id: ren.id,
+      fecha: ren.fecha || '',
+      responsable: ren.responsable || '',
+      descripcion: ren.descripcion || '',
+      lineas: ren.lineas || [],
+      total: ren.total || 0,
+      estado: ren.estado || 'borrador',
+      observaciones: ren.observaciones || ''
+    };
+    await supa.from('rendiciones').upsert(row, { onConflict: 'id' });
+  } catch(e) { console.warn('Error upsert rendicion:', e); }
+}
+
+async function syncRendicionesDesdeSupabase() {
+  if (!supa || !supaConectado) return;
+  try {
+    const { data, error } = await supa.from('rendiciones').select('*').order('id');
+    if (error) { console.warn('Error sync rendiciones:', error); return; }
+    if (data && data.length > 0) {
+      appData.rendiciones = data.map(r => ({
+        id: r.id,
+        fecha: r.fecha || '',
+        responsable: r.responsable || '',
+        descripcion: r.descripcion || '',
+        lineas: r.lineas || [],
+        total: r.total || 0,
+        estado: r.estado || 'borrador',
+        observaciones: r.observaciones || ''
+      }));
+      saveData();
+    }
+  } catch(e) { console.warn('Error sync rendiciones:', e); }
+}
+
 
 // ── SYNC DISPONIBILIDAD SUPABASE ─────────────────────────
 
