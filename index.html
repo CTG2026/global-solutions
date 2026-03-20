@@ -5,7 +5,7 @@
   <meta http-equiv="cache-control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="pragma" content="no-cache">
   <meta http-equiv="expires" content="0">
-  <meta name="version" content="2026031974">
+  <meta name="version" content="2026031975">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Panel de Gestión — Global Solutions</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -936,7 +936,7 @@ async function guardarCierre(id) {
 }
 
 // ── RENDICIÓN DE GASTOS ──────────────────────────────────
-const CATEGORIAS_GASTO = ['Combustible','Peaje','Viático','Mantención','Repuesto','Lavado','Estacionamiento','Otro'];
+const CATEGORIAS_GASTO = ['Combustible','Peaje','Viático','Mantención','Repuesto','Lavado','Estacionamiento','Distribución','Otro'];
 const ESTADO_RENDICION = {
   borrador: {bg:'#F5F5F5',text:'#757575',label:'📝 Borrador'},
   enviada:  {bg:'#E3F2FD',text:'#1565C0',label:'📤 Enviada'},
@@ -965,7 +965,7 @@ function updLineaRen(li, campo, valor) {
 
 function crearRendicion() {
   const responsable = document.getElementById('ren_responsable')?.value.trim();
-  const descripcion = document.getElementById('ren_descripcion')?.value.trim();
+  const descripcion = '';
   const fecha = document.getElementById('ren_fecha')?.value || new Date().toISOString().split('T')[0];
   if (!responsable) { alert('⚠️ Ingresa el nombre del responsable.'); return; }
   if (!uiState.ren_lineas || !uiState.ren_lineas.some(l=>l.monto)) { alert('⚠️ Agrega al menos una línea de gasto con monto.'); return; }
@@ -1093,8 +1093,7 @@ function renderRendiciones() {
         <div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">RESPONSABLE</div>
           <input id="ren_responsable" placeholder="Nombre del responsable" style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit"></div>
       </div>
-      <div style="margin-bottom:10px"><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">DESCRIPCIÓN GENERAL</div>
-        <input id="ren_descripcion" placeholder="ej: Gastos semana del 18 al 22 de marzo" style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit"></div>
+
       <div style="font-size:9px;font-weight:800;color:#546E7A;letter-spacing:1px;margin-bottom:6px;padding-bottom:4px;border-bottom:1px solid #CFD8DC">LÍNEAS DE GASTO</div>
       ${uiState.ren_lineas.map((l,li)=>`
         <div style="background:white;border:1px solid #dde;border-radius:8px;padding:10px;margin-bottom:6px">
@@ -5768,7 +5767,8 @@ setInterval(async () => {
   // No interrumpir si el usuario está llenando un formulario activo
   const formulariosActivos = [
     'srv_fecha', 'srv_conductor', 'srv_patente', 'srv_cliente',
-    'pip_new_cliente', 'disp_fecha', 'liq_fecha_v2'
+    'pip_new_cliente', 'disp_fecha', 'liq_fecha_v2',
+    'ren_fecha', 'ren_responsable', 'ren_descripcion'
   ];
   const hayFormAbierto = formulariosActivos.some(id => document.getElementById(id) !== null);
   if (hayFormAbierto) return;
@@ -5785,7 +5785,7 @@ document.addEventListener('touchstart', e => { _ptY = e.touches[0].clientY; }, {
 document.addEventListener('touchend', async e => {
   const dy = e.changedTouches[0].clientY - _ptY;
   if (dy > 80 && window.scrollY === 0 && supaConectado) {
-    const formulariosActivos = ['srv_fecha','srv_conductor','srv_patente','srv_cliente','pip_new_cliente','disp_fecha','liq_fecha_v2'];
+    const formulariosActivos = ['srv_fecha','srv_conductor','srv_patente','srv_cliente','pip_new_cliente','disp_fecha','liq_fecha_v2','ren_fecha','ren_responsable','ren_descripcion'];
     if (formulariosActivos.some(id => document.getElementById(id) !== null)) return;
     const el = document.getElementById('save-indicator');
     if (el) { el.textContent = '↻ Actualizando...'; el.classList.add('show'); }
