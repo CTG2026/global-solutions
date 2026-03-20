@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-  <meta name="version" content="2026031968">
+  <meta name="version" content="2026031970">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Panel de Gestión — Global Solutions</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -646,16 +646,6 @@ const DEFAULT_DATA = {
     ],
   }
 };
-// Forzar versión en URL para romper caché de GitHub Pages
-(function() {
-  const VER = '67';
-  const url = new URL(window.location.href);
-  if (url.searchParams.get('v') !== VER) {
-    url.searchParams.set('v', VER);
-    window.location.replace(url.toString());
-  }
-})();
-
 let appData;
 let uiState = {};
 let vistaActual = "todas";
@@ -1918,7 +1908,7 @@ function renderEditarServicio(id) {
   </div>`;
 }
 
-const ESTRUCTURA_VERSION = '67'; // Incrementar cuando cambie la estructura del panel
+const ESTRUCTURA_VERSION = '68'; // Incrementar cuando cambie la estructura del panel
 
 function loadData() {
   // Si la versión estructural cambió, limpiar la estructura pero preservar datos
