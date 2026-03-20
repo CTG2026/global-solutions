@@ -5,7 +5,7 @@
   <meta http-equiv="cache-control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="pragma" content="no-cache">
   <meta http-equiv="expires" content="0">
-  <meta name="version" content="2026031971">
+  <meta name="version" content="2026031972">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Panel de Gestión — Global Solutions</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -1923,7 +1923,7 @@ function renderEditarServicio(id) {
   </div>`;
 }
 
-const ESTRUCTURA_VERSION = '68'; // Incrementar cuando cambie la estructura del panel
+const ESTRUCTURA_VERSION = '70'; // Incrementar cuando cambie la estructura del panel
 
 function loadData() {
   // Si la versión estructural cambió, limpiar la estructura pero preservar datos
@@ -2023,6 +2023,7 @@ function loadData() {
     }
   });
   // Rendimiento Combustible en Operacional
+  if (!appData.fases || !Array.isArray(appData.fases)) appData.fases = JSON.parse(JSON.stringify(DEFAULT_DATA.fases));
   const _opF = appData.fases.find(f=>f.id==='operacional');
   if (_opF && !_opF.rutinarias.some(r=>r.rendimientoCombTask)) {
     _opF.rutinarias.push({titulo:'Rendimiento Combustible',proc:'Registrar odómetro inicio/fin del día para calcular km/litro.',subtareas:[],rendimientoCombTask:true,done:false});
