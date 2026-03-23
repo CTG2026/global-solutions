@@ -1889,7 +1889,11 @@ function generarHTMLCotV2(c){
 // Orden: ID / Cliente / GD (nº guía) / Fecha guía / Origen / Destino / Fecha descarga
 function srvVista(s) {
   const puntos = s.puntos || s.guias || [];
-  const gdNums = puntos.map(g=>g.num||g.guia).filter(Boolean).join(', ') || '—';
+  // Números de guía en orden P1, P2, P3... — lee guia o num según disponibilidad
+  const gdNums = puntos.map((g,i)=>{
+    const n = g.guia||g.num||'';
+    return n ? (puntos.length>1 ? `P${i+1}:${n}` : n) : '';
+  }).filter(Boolean).join('  ·  ') || '—';
   const gdFechaGuia = puntos.map(g=>g.fecha_guia||g.fecha).filter(Boolean).slice(0,1)[0] || s.fecha || '—';
   const gdDescarga = puntos.map(g=>g.fecha_descarga).filter(Boolean).join(', ') || '—';
   const destinoFinal = puntos.map(g=>g.destino).filter(Boolean).slice(-1)[0] || s.destino || '—';
@@ -3538,7 +3542,9 @@ async function syncServiciosDesdeSupabase() {
         id: r.id, fecha: r.fecha, anio: r.anio, mes: r.mes,
         patente: r.patente, conductor: r.conductor, tipoEquipo: r.tipo_equipo,
         cliente: r.cliente, origen: r.origen, peajes: r.peajes||0,
-        guias: r.guias||[], puntos: r.puntos||r.guias||[], precio: r.precio||0, km: r.km||0,
+        guias: (r.guias||[]).map(g=>({...g, guia: g.guia||g.num||'', num: g.num||g.guia||''})),
+        puntos: (r.puntos||r.guias||[]).map(g=>({...g, guia: g.guia||g.num||'', num: g.num||g.guia||''})),
+        precio: r.precio||0, km: r.km||0,
         litros: r.litros||0, montoComb: r.monto_comb||0,
         petroleo: r.petroleo||0, adicional: r.adicional||0,
         viaticos: r.viaticos||0, cobro: r.cobro||'pendiente',
