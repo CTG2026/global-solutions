@@ -449,12 +449,8 @@ const DEFAULT_DATA = {
       rutinarias: [
         { titulo: "Cierre de Servicios", proc: "Completar información faltante del servicio ejecutado: precio, Km, tag y datos pendientes. Etapa previa a liquidar.", subtareas: [], cierreServicioTask: true, done: false },
         { titulo: "Liquidaciones", proc: "Gestionar liquidaciones por servicio o por grupo. Seleccionar servicios, agrupar por cliente (puede tener múltiples RUT), generar y enviar liquidación.", subtareas: [], liquidacionTask: true, done: false },
+        { titulo: "Facturación y Cobro", proc: "Registrar facturas emitidas, gestionar factoring y hacer seguimiento de cobro por cada liquidación.", subtareas: [], facturaTask: true, done: false },
         { titulo: "Rendición de Gastos", proc: "Registrar y gestionar rendiciones de gastos del equipo. Cada rendición agrupa uno o más gastos con su categoría, monto y equipo asociado.", subtareas: [], rendicionTask: true, done: false },
-        { titulo: "Facturación y cobro", proc: "Por cada servicio completado: emitir factura al cliente. Evaluar si aplica factoring para anticipo. Registrar en el sistema de cobranza con fecha de vencimiento. Confirmar pago y liquidar comisión del conductor.", subtareas: ["Emitir factura por servicio completado","Evaluar y gestionar factoring si aplica","Confirmar pago y registrar cobro efectivo","Liquidar comisión conductor"] },
-        { titulo: "Control de caja y presupuesto", proc: "Cada día descargar cartola bancaria y categorizar movimientos. Actualizar el flujo de caja. Contrastar ingresos y gastos vs presupuesto mensual. Revisar si la proyección de la semana cubre el punto de equilibrio.", subtareas: ["Descargar y categorizar cartola bancaria","Actualizar flujo de caja real","Contrastar vs presupuesto mensual","Revisar proyección de ingresos próxima semana"] },
-        { titulo: "Cuentas por cobrar", proc: "Revisar lista de facturas emitidas: cuáles están pagadas, cuáles pendientes, cuáles vencidas. Gestionar cobro directo de las vencidas. Actualizar registro de factoring activo.", subtareas: ["Cargar estado de cobranza del día","Gestionar cobros vencidos","Actualizar registro de factoring activo"] },
-        { titulo: "Cuentas por cobrar", proc: "Revisar lista de facturas emitidas: cuáles están pagadas, cuáles pendientes, cuáles vencidas. Gestionar cobro directo de las vencidas. Actualizar registro de factoring activo.", subtareas: ["Cargar estado de cobranza del día","Gestionar cobros vencidos","Actualizar registro de factoring activo","Actualizar dashboard con total x cobrar"] },
-        { titulo: "Bancarización Global Solutions", proc: "Proceso en curso: abrir cuenta bancaria a nombre de Global Solutions. Reunir carpeta tributaria, inicio de actividades, documentos de la sociedad. Objetivo: operar financieramente con identidad Global Solutions.", subtareas: ["Gestionar apertura cuenta bancaria","Sacar carpetas tributarias Global Solutions","Reunir documentos para bancarización","Iniciar operación financiera con Global Solutions"] },
       ],
       pendientes: [
         { texto: "Gestionar cuenta bancaria Global Solutions", badge: "hoy", done: false },
@@ -945,6 +941,7 @@ const ESTADO_RENDICION = {
 
 function nextRendicionId() {
   if (!appData.rendiciones) appData.rendiciones = [];
+  if (!appData.facturas) appData.facturas = [];
   return 'REN-' + String(appData.rendiciones.length + 1).padStart(3,'0');
 }
 
@@ -1195,6 +1192,215 @@ function renderRendiciones() {
 }
 
 // ── LIQUIDACIONES v36 (por servicio o grupo + múltiples RUT) ──
+
+// ── FACTURACIÓN Y COBRO ──────────────────────────────────
+
+function nextFacturaId() {
+  if (!appData.facturas) appData.facturas = [];
+  return 'FAC-' + String(appData.facturas.length + 1).padStart(3,'0');
+}
+
+function crearFactura() {
+  const numero   = document.getElementById('fac_numero')?.value.trim();
+  const fecha    = document.getElementById('fac_fecha')?.value;
+  const clienteV = document.getElementById('fac_cliente')?.value.trim();
+  const liqId    = document.getElementById('fac_liq')?.value.trim();
+  const monto    = parseInt(document.getElementById('fac_monto')?.value)||0;
+  if (!numero)   { alert('⚠️ Ingresa el número de factura.'); return; }
+  if (!fecha)    { alert('⚠️ Ingresa la fecha de emisión.'); return; }
+  if (!clienteV) { alert('⚠️ Ingresa el cliente.'); return; }
+  if (!monto)    { alert('⚠️ Ingresa el monto de la factura.'); return; }
+  if (!appData.facturas) appData.facturas = [];
+  const p=fecha.split('-');
+  const fechaStr=p.length===3&&p[0].length===4?`${p[2]}-${p[1]}-${p[0]}`:fecha;
+  const id = nextFacturaId();
+  const factura = { id, numero, fecha:fechaStr, cliente:clienteV, liquidacionId:liqId||'', monto, estado:'emitida', factoring:false, factoringEmpresa:'', factoringFechaAnticipo:'', factoringMonto:0, factoringComision:0, factoringFechaLiquidacion:'', observaciones:'' };
+  appData.facturas.push(factura);
+  uiState.fac_form_open = false;
+  saveData();
+  upsertFacturaSupabase(factura);
+  render();
+  showToastGeneral('✅ '+id+' registrada — $'+monto.toLocaleString('es-CL'),'#2E7D32');
+}
+
+function cambiarEstadoFactura(id, estado) {
+  const f=(appData.facturas||[]).find(x=>x.id===id);
+  if (!f) return;
+  f.estado=estado;
+  saveData(); upsertFacturaSupabase(f); render();
+}
+
+function toggleFactoring(id) {
+  const f=(appData.facturas||[]).find(x=>x.id===id);
+  if (!f) return;
+  f.factoring=!f.factoring;
+  if (f.factoring && f.estado==='emitida') f.estado='en_factoring';
+  saveData(); upsertFacturaSupabase(f); render();
+}
+
+function guardarFactoring(id) {
+  const f=(appData.facturas||[]).find(x=>x.id===id);
+  if (!f) return;
+  const p=document.getElementById('fac_fact_fecha_'+id)?.value||'';
+  const pStr=p?p.split('-').reverse().join('-'):'';
+  const pl=document.getElementById('fac_fact_liq_'+id)?.value||'';
+  const plStr=pl?pl.split('-').reverse().join('-'):'';
+  f.factoringEmpresa=document.getElementById('fac_fact_empresa_'+id)?.value.trim()||f.factoringEmpresa;
+  f.factoringFechaAnticipo=pStr||f.factoringFechaAnticipo;
+  f.factoringMonto=parseInt(document.getElementById('fac_fact_monto_'+id)?.value)||f.factoringMonto;
+  f.factoringComision=parseInt(document.getElementById('fac_fact_comision_'+id)?.value)||f.factoringComision;
+  f.factoringFechaLiquidacion=plStr||f.factoringFechaLiquidacion;
+  saveData(); upsertFacturaSupabase(f);
+  showToastGeneral('💾 Factoring guardado','#1565C0');
+}
+
+function guardarObsFactura(id) {
+  const f=(appData.facturas||[]).find(x=>x.id===id);
+  if (!f) return;
+  f.observaciones=document.getElementById('fac_obs_'+id)?.value||'';
+  saveData(); upsertFacturaSupabase(f);
+  showToastGeneral('💾 Observaciones guardadas','#607D8B');
+}
+
+function eliminarFactura(id) {
+  if (!confirm('¿Eliminar factura '+id+'? Esta acción no se puede deshacer.')) return;
+  appData.facturas=(appData.facturas||[]).filter(f=>f.id!==id);
+  saveData(); render();
+  if (supaConectado && supa) supa.from('facturas').delete().eq('id',id).then(()=>{});
+  showToastGeneral('Factura eliminada','#607D8B');
+}
+
+function renderFacturas() {
+  if (!appData.facturas) appData.facturas=[];
+  const facturas=appData.facturas.slice().reverse();
+  const liquidaciones=appData.liquidaciones||[];
+  const liqOpts=liquidaciones.map(l=>`<option value="${l.id}">${l.id} — ${l.fecha||''} — $${(l.total||0).toLocaleString('es-CL')}</option>`).join('');
+  const clientesActivos=[...new Set((appData.pipeline||[]).filter(c=>c.etapa==='activo').map(c=>c.cliente))].sort();
+  const estadoConfig={
+    emitida:     {bg:'#E3F2FD',color:'#1565C0',label:'📄 Emitida'},
+    en_factoring:{bg:'#FFF3E0',color:'#E65100',label:'🏦 En factoring'},
+    cobrada:     {bg:'#E8F5E9',color:'#2E7D32',label:'✅ Cobrada'},
+    vencida:     {bg:'#FFEBEE',color:'#C62828',label:'⚠️ Vencida'},
+  };
+  const hoyISO=(()=>{const h=new Date();return h.getFullYear()+'-'+String(h.getMonth()+1).padStart(2,'0')+'-'+String(h.getDate()).padStart(2,'0');})();
+  const parseFecha=f=>{if(!f)return null;const p=f.split('-');if(p[0].length===2)return new Date(p[2],p[1]-1,p[0]);return new Date(p[0],p[1]-1,p[2]);};
+  const diasDesde=f=>{const d=parseFecha(f);if(!d)return 0;return Math.floor((new Date()-d)/86400000);};
+
+  const totalPendiente=(appData.facturas||[]).filter(f=>f.estado!=='cobrada').reduce((a,f)=>a+(f.monto||0),0);
+  const totalCobrado=(appData.facturas||[]).filter(f=>f.estado==='cobrada').reduce((a,f)=>a+(f.monto||0),0);
+
+  const formOpen=!!uiState.fac_form_open;
+  const histHTML=facturas.length?facturas.map(f=>{
+    const isOpen=!!uiState['fac_open_'+f.id];
+    const est=estadoConfig[f.estado]||estadoConfig.emitida;
+    const dias=diasDesde(f.fecha);
+    const fechaISO=f.fecha?(()=>{const p=f.fecha.split('-');return p[0].length===2?`${p[2]}-${p[1]}-${p[0]}`:f.fecha;})():'';
+    return `<div style="border:1px solid #dde;border-radius:8px;margin-bottom:6px;overflow:hidden">
+      <div onclick="uiState['fac_open_${f.id}']=!uiState['fac_open_${f.id}'];render()" style="padding:10px 12px;cursor:pointer;background:${isOpen?'#F8F9FA':'white'};display:flex;justify-content:space-between;align-items:center">
+        <div style="flex:1">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:3px">
+            <span style="font-size:12px;font-weight:900;color:#37474F">${f.numero||f.id}</span>
+            <span style="font-size:9px;font-weight:700;padding:2px 7px;border-radius:8px;background:${est.bg};color:${est.color}">${est.label}</span>
+            ${f.factoring?'<span style="font-size:9px;background:#FFF3E0;color:#E65100;padding:2px 6px;border-radius:6px;font-weight:700">🏦 FACTORING</span>':''}
+          </div>
+          <div style="font-size:11px;color:#546E7A;font-weight:600">${f.cliente||'—'} · $${(f.monto||0).toLocaleString('es-CL')}</div>
+          <div style="font-size:10px;color:#aaa">${f.fecha||'—'} · ${dias} días${f.liquidacionId?' · '+f.liquidacionId:''}</div>
+        </div>
+        <span style="font-size:10px;color:#aaa">${isOpen?'▲':'▼'}</span>
+      </div>
+      ${isOpen?`<div style="padding:10px 12px;background:#FAFAFA;border-top:1px solid #eee">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:10px;font-size:10px">
+          <div><span style="color:#888">Número</span><div style="font-weight:700">${f.numero||'—'}</div></div>
+          <div><span style="color:#888">Fecha emisión</span><div>${f.fecha||'—'}</div></div>
+          <div><span style="color:#888">Cliente</span><div style="font-weight:600">${f.cliente||'—'}</div></div>
+          <div><span style="color:#888">Monto</span><div style="font-weight:700;color:#2E7D32">$${(f.monto||0).toLocaleString('es-CL')}</div></div>
+          ${f.liquidacionId?`<div style="grid-column:1/-1"><span style="color:#888">Liquidación</span><div style="color:#1565C0;font-weight:700">${f.liquidacionId}</div></div>`:''}
+        </div>
+        <!-- FACTORING -->
+        <div style="margin-bottom:8px">
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:11px;font-weight:700;color:#E65100">
+            <input type="checkbox" ${f.factoring?'checked':''} onchange="toggleFactoring('${f.id}')" style="width:16px;height:16px">
+            Esta factura va a factoring
+          </label>
+        </div>
+        ${f.factoring?`<div style="background:#FFF8E1;border:1px solid #FFE082;border-radius:8px;padding:10px;margin-bottom:8px">
+          <div style="font-size:9px;font-weight:700;color:#E65100;margin-bottom:6px">🏦 DATOS FACTORING</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-bottom:6px">
+            <div style="grid-column:1/-1"><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">EMPRESA FACTORING</div>
+              <input id="fac_fact_empresa_${f.id}" value="${f.factoringEmpresa||''}" placeholder="ej: Latam Capital" style="width:100%;border:1px solid #dde;border-radius:5px;padding:6px 8px;font-size:12px;outline:none;font-family:inherit"></div>
+            <div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">FECHA ANTICIPO</div>
+              <input id="fac_fact_fecha_${f.id}" type="date" value="${(()=>{const p=(f.factoringFechaAnticipo||'').split('-');return p[0].length===2?p[2]+'-'+p[1]+'-'+p[0]:f.factoringFechaAnticipo||'';})()}" style="width:100%;border:1px solid #dde;border-radius:5px;padding:6px 8px;font-size:12px;outline:none;font-family:inherit"></div>
+            <div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">MONTO ANTICIPADO ($)</div>
+              <input id="fac_fact_monto_${f.id}" type="number" value="${f.factoringMonto||''}" placeholder="ej: 800000" style="width:100%;border:1px solid #dde;border-radius:5px;padding:6px 8px;font-size:12px;outline:none;font-family:inherit"></div>
+            <div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">COMISIÓN ($)</div>
+              <input id="fac_fact_comision_${f.id}" type="number" value="${f.factoringComision||''}" placeholder="ej: 25000" style="width:100%;border:1px solid #dde;border-radius:5px;padding:6px 8px;font-size:12px;outline:none;font-family:inherit"></div>
+            <div style="grid-column:1/-1"><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">FECHA LIQUIDACIÓN FINAL</div>
+              <input id="fac_fact_liq_${f.id}" type="date" value="${(()=>{const p=(f.factoringFechaLiquidacion||'').split('-');return p[0].length===2?p[2]+'-'+p[1]+'-'+p[0]:f.factoringFechaLiquidacion||'';})()}" style="width:100%;border:1px solid #dde;border-radius:5px;padding:6px 8px;font-size:12px;outline:none;font-family:inherit"></div>
+          </div>
+          <button onclick="guardarFactoring('${f.id}')" style="width:100%;padding:8px;background:#E65100;color:white;border:none;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer">💾 Guardar factoring</button>
+        </div>`:''}
+        <!-- OBSERVACIONES -->
+        <div style="margin-bottom:8px">
+          <div style="font-size:9px;font-weight:700;color:#888;margin-bottom:3px">OBSERVACIONES</div>
+          <textarea id="fac_obs_${f.id}" rows="2" placeholder="Agregar observaciones..." style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:11px;outline:none;font-family:inherit;resize:vertical">${f.observaciones||''}</textarea>
+          <button onclick="guardarObsFactura('${f.id}')" style="margin-top:4px;padding:6px 12px;background:#607D8B;color:white;border:none;border-radius:6px;font-size:10px;font-weight:700;cursor:pointer">💾 Guardar obs.</button>
+        </div>
+        <!-- ESTADOS -->
+        <div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:6px">
+          ${f.estado!=='cobrada'?`<button onclick="cambiarEstadoFactura('${f.id}','cobrada')" style="flex:1;padding:8px;background:#E8F5E9;color:#2E7D32;border:1px solid #2E7D32;border-radius:7px;font-size:10px;font-weight:700;cursor:pointer">✅ Marcar cobrada</button>`:''}
+          ${f.estado!=='vencida'&&f.estado!=='cobrada'?`<button onclick="cambiarEstadoFactura('${f.id}','vencida')" style="flex:1;padding:8px;background:#FFEBEE;color:#C62828;border:1px solid #FFCDD2;border-radius:7px;font-size:10px;font-weight:700;cursor:pointer">⚠️ Marcar vencida</button>`:''}
+          ${f.estado!=='emitida'?`<button onclick="cambiarEstadoFactura('${f.id}','emitida')" style="flex:1;padding:8px;background:#E3F2FD;color:#1565C0;border:1px solid #BBDEFB;border-radius:7px;font-size:10px;font-weight:700;cursor:pointer">↩ Volver a emitida</button>`:''}
+        </div>
+        <button onclick="eliminarFactura('${f.id}')" style="width:100%;padding:7px;background:#FFEBEE;color:#C62828;border:1px solid #FFCDD2;border-radius:7px;font-size:10px;font-weight:700;cursor:pointer">× Eliminar factura</button>
+      </div>`:''}</div>`;
+  }).join(''):'<div style="text-align:center;color:#aaa;font-size:11px;padding:12px">Sin facturas registradas aún</div>';
+
+  return `<div style="padding:2px">
+    <!-- RESUMEN -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:10px">
+      <div style="background:#FFEBEE;border-radius:8px;padding:8px 10px;text-align:center">
+        <div style="font-size:9px;font-weight:700;color:#C62828;margin-bottom:2px">POR COBRAR</div>
+        <div style="font-size:14px;font-weight:900;color:#C62828">$${totalPendiente.toLocaleString('es-CL')}</div>
+      </div>
+      <div style="background:#E8F5E9;border-radius:8px;padding:8px 10px;text-align:center">
+        <div style="font-size:9px;font-weight:700;color:#2E7D32;margin-bottom:2px">COBRADO MES</div>
+        <div style="font-size:14px;font-weight:900;color:#2E7D32">$${totalCobrado.toLocaleString('es-CL')}</div>
+      </div>
+    </div>
+    <!-- FORMULARIO NUEVA FACTURA -->
+    <div style="background:#F4F6F8;border-radius:10px;border:1px solid #dde;margin-bottom:10px">
+      <div onclick="uiState.fac_form_open=!uiState.fac_form_open;render()" style="padding:10px 12px;cursor:pointer;display:flex;justify-content:space-between;align-items:center">
+        <span style="font-size:10px;font-weight:700;color:#546E7A;letter-spacing:1px">+ NUEVA FACTURA</span>
+        <span style="font-size:10px;color:#aaa">${formOpen?'▲':'▼'}</span>
+      </div>
+      ${formOpen?`<div style="padding:0 12px 12px">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px">
+          <div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">N° FACTURA</div>
+            <input id="fac_numero" placeholder="ej: 001234" style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit"></div>
+          <div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">FECHA EMISIÓN</div>
+            <input id="fac_fecha" type="date" style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit"></div>
+          <div style="grid-column:1/-1"><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">CLIENTE</div>
+            <select id="fac_cliente" style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit;background:white;-webkit-appearance:auto">
+              <option value="">Seleccionar cliente...</option>
+              ${clientesActivos.map(c=>`<option value="${c}">${c}</option>`).join('')}
+            </select></div>
+          <div style="grid-column:1/-1"><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">LIQUIDACIÓN ASOCIADA <span style="font-weight:400;color:#aaa">— opcional</span></div>
+            <select id="fac_liq" style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit;background:white;-webkit-appearance:auto">
+              <option value="">Sin liquidación asociada</option>
+              ${liqOpts}
+            </select></div>
+          <div style="grid-column:1/-1"><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">MONTO FACTURA ($)</div>
+            <input id="fac_monto" type="number" placeholder="ej: 950000" style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:14px;font-weight:700;outline:none;font-family:inherit"></div>
+        </div>
+        <button onclick="crearFactura()" style="width:100%;padding:12px;background:#546E7A;color:white;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer">+ Registrar factura</button>
+      </div>`:''}
+    </div>
+    <!-- HISTORIAL -->
+    <div style="font-size:9px;font-weight:700;color:#888;letter-spacing:0.5px;margin-bottom:6px">HISTORIAL — ${appData.facturas.length} factura${appData.facturas.length!==1?'s':''}</div>
+    ${histHTML}
+  </div>`;
+}
+
 function renderLiquidacionesV2() {
   if(!appData.liquidaciones) appData.liquidaciones=[];
   const servicios=appData.servicios||[];
@@ -1927,7 +2133,7 @@ function renderEditarServicio(id) {
   </div>`;
 }
 
-const ESTRUCTURA_VERSION = '71'; // Incrementar cuando cambie la estructura del panel
+const ESTRUCTURA_VERSION = '73'; // Incrementar cuando cambie la estructura del panel
 
 function loadData() {
   // Si la versión estructural cambió, limpiar la estructura pero preservar datos
@@ -1941,6 +2147,7 @@ function loadData() {
         pipeline: viejos.pipeline || [],
         liquidaciones: viejos.liquidaciones || [],
         rendiciones: viejos.rendiciones || [],
+        facturas: viejos.facturas || [],
         conductores: viejos.conductores || [],
         patentes: viejos.patentes || [],
         clientesRut: viejos.clientesRut || {},
@@ -1955,6 +2162,7 @@ function loadData() {
     if (datosAPreservar.pipeline?.length) appData.pipeline = datosAPreservar.pipeline;
     if (datosAPreservar.liquidaciones?.length) appData.liquidaciones = datosAPreservar.liquidaciones;
     if (datosAPreservar.rendiciones?.length) appData.rendiciones = datosAPreservar.rendiciones;
+    if (datosAPreservar.facturas?.length) appData.facturas = datosAPreservar.facturas;
     if (datosAPreservar.conductores?.length) appData.conductores = datosAPreservar.conductores;
     if (datosAPreservar.patentes?.length) appData.patentes = datosAPreservar.patentes;
     if (Object.keys(datosAPreservar.clientesRut||{}).length) appData.clientesRut = datosAPreservar.clientesRut;
@@ -2042,11 +2250,30 @@ function loadData() {
       const _iCs=_finF.rutinarias.findIndex(r=>r.cierreServicioTask);
       _finF.rutinarias.splice(_iCs+1,0,{titulo:'Liquidaciones',proc:'Gestionar liquidaciones por servicio o grupo con múltiples RUT.',subtareas:[],liquidacionTask:true,done:false});
     }
-    if (!_finF.rutinarias.some(r=>r.rendicionTask)) {
+    // Agregar Facturación y Cobro si no existe
+    if (!_finF.rutinarias.some(r=>r.facturaTask)) {
       const _iLq=_finF.rutinarias.findIndex(r=>r.liquidacionTask);
-      _finF.rutinarias.splice(_iLq+1,0,{titulo:'Rendición de Gastos',proc:'Registrar y gestionar rendiciones de gastos del equipo.',subtareas:[],rendicionTask:true,done:false});
+      _finF.rutinarias.splice(_iLq+1,0,{titulo:'Facturación y Cobro',proc:'Registrar facturas emitidas, gestionar factoring y hacer seguimiento de cobro.',subtareas:[],facturaTask:true,done:false});
     }
-    _finF.rutinarias=_finF.rutinarias.filter(r=>!r.liquidacionServicios&&!r.cierreLiquidacion);
+    // Rendición siempre al final
+    if (!_finF.rutinarias.some(r=>r.rendicionTask)) {
+      _finF.rutinarias.push({titulo:'Rendición de Gastos',proc:'Registrar y gestionar rendiciones de gastos del equipo.',subtareas:[],rendicionTask:true,done:false});
+    } else {
+      const _iRen=_finF.rutinarias.findIndex(r=>r.rendicionTask);
+      if (_iRen!==-1 && _iRen!==_finF.rutinarias.length-1) {
+        const [_ren]=_finF.rutinarias.splice(_iRen,1);
+        _finF.rutinarias.push(_ren);
+      }
+    }
+    // Limpiar módulos obsoletos y duplicados
+    let _cpcCount=0;
+    _finF.rutinarias=_finF.rutinarias.filter(r=>{
+      if (r.liquidacionServicios||r.cierreLiquidacion) return false;
+      if (r.titulo==='Bancarización Global Solutions'||r.titulo==='Bancarizacion Global Solutions') return false;
+      if (r.titulo==='Control de caja y presupuesto') return false;
+      if (r.titulo==='Cuentas por cobrar') { _cpcCount++; return _cpcCount<=1; }
+      return true;
+    });
   }
   // Cotización PDF en Comercial
   const _comF = appData.fases.find(f=>f.id==='comercial');
@@ -2154,7 +2381,7 @@ function delTarea(faseId, ti) {
   if (!fase) return;
   const tarea = fase.rutinarias[ti];
   // Proteger tareas del sistema
-  if (tarea && (tarea.registroServicio || tarea.liquidacionServicios || tarea.disponibilidadDiaria || tarea.pipelineTask || tarea.respaldoTask || tarea.rendimientoCombTask || tarea.cierreServicioTask || tarea.liquidacionTask || tarea.cotizacionTask || tarea.rendicionTask)) {
+  if (tarea && (tarea.registroServicio || tarea.liquidacionServicios || tarea.disponibilidadDiaria || tarea.pipelineTask || tarea.respaldoTask || tarea.rendimientoCombTask || tarea.cierreServicioTask || tarea.liquidacionTask || tarea.cotizacionTask || tarea.rendicionTask || tarea.facturaTask)) {
     alert('Esta tarea es del sistema y no puede eliminarse.');
     return;
   }
@@ -2587,12 +2814,30 @@ function renderFase(fase) {
       fase.rutinarias.splice(_iC+1,0,{titulo:'Liquidaciones',proc:'Gestionar liquidaciones por servicio o grupo.',subtareas:[],liquidacionTask:true,done:false});
       saveData();
     }
-    if (!fase.rutinarias.some(r=>r.rendicionTask)) {
-      const _iL=fase.rutinarias.findIndex(r=>r.liquidacionTask);
-      fase.rutinarias.splice(_iL+1,0,{titulo:'Rendición de Gastos',proc:'Registrar y gestionar rendiciones de gastos del equipo.',subtareas:[],rendicionTask:true,done:false});
+    if (!fase.rutinarias.some(r=>r.facturaTask)) {
+      const _iLqRF=fase.rutinarias.findIndex(r=>r.liquidacionTask);
+      fase.rutinarias.splice(_iLqRF+1,0,{titulo:'Facturación y Cobro',proc:'Registrar facturas emitidas, gestionar factoring y hacer seguimiento de cobro.',subtareas:[],facturaTask:true,done:false});
       saveData();
     }
-    fase.rutinarias=fase.rutinarias.filter(r=>!r.liquidacionServicios&&!r.cierreLiquidacion);
+    if (!fase.rutinarias.some(r=>r.rendicionTask)) {
+      fase.rutinarias.push({titulo:'Rendición de Gastos',proc:'Registrar y gestionar rendiciones de gastos del equipo.',subtareas:[],rendicionTask:true,done:false});
+      saveData();
+    } else {
+      const _iRenRF=fase.rutinarias.findIndex(r=>r.rendicionTask);
+      if (_iRenRF!==-1 && _iRenRF!==fase.rutinarias.length-1) {
+        const [_renRF]=fase.rutinarias.splice(_iRenRF,1);
+        fase.rutinarias.push(_renRF);
+        saveData();
+      }
+    }
+    let _cpcRF=0;
+    fase.rutinarias=fase.rutinarias.filter(r=>{
+      if (r.liquidacionServicios||r.cierreLiquidacion) return false;
+      if (r.titulo==='Bancarización Global Solutions'||r.titulo==='Bancarizacion Global Solutions') return false;
+      if (r.titulo==='Control de caja y presupuesto') return false;
+      if (r.titulo==='Cuentas por cobrar') { _cpcRF++; return _cpcRF<=1; }
+      return true;
+    });
   }
   // v36: Rendimiento Combustible en operacional
   if (fase.id==='operacional' && !fase.rutinarias.some(r=>r.rendimientoCombTask)) {
@@ -2841,7 +3086,7 @@ function renderFase(fase) {
       </div>`;
     })() : '';
 
-    const _flag = tarea.registroServicio?'registroServicio':tarea.disponibilidadDiaria?'disponibilidadDiaria':tarea.rendimientoCombTask?'rendimientoCombTask':tarea.liquidacionTask?'liquidacionTask':tarea.cierreServicioTask?'cierreServicioTask':tarea.cotizacionTask?'cotizacionTask':tarea.pipelineTask?'pipelineTask':tarea.respaldoTask?'respaldoTask':tarea.rendicionTask?'rendicionTask':'';
+    const _flag = tarea.registroServicio?'registroServicio':tarea.disponibilidadDiaria?'disponibilidadDiaria':tarea.rendimientoCombTask?'rendimientoCombTask':tarea.liquidacionTask?'liquidacionTask':tarea.cierreServicioTask?'cierreServicioTask':tarea.cotizacionTask?'cotizacionTask':tarea.pipelineTask?'pipelineTask':tarea.respaldoTask?'respaldoTask':tarea.rendicionTask?'rendicionTask':tarea.facturaTask?'facturaTask':'';
     return `<div class="acord-item" data-flag="${_flag}" style="${isDone?'opacity:0.6':''}">
       <div class="acord-header ${isOpen?'open':''}" style="${isDone?'background:#f5f5f5':''}">
         <span class="acord-arrow" onclick="toggleAcord('${fase.id}',${tiReal})" style="padding:4px 6px 4px 0;cursor:pointer">▶</span>
@@ -2851,13 +3096,13 @@ function renderFase(fase) {
         }
         <span onclick="toggleTareaDone('${fase.id}',${tiReal})" title="${isDone?'Reactivar':'Tachar tarea'}" style="cursor:pointer;font-size:14px;color:${isDone?fase.color:'#ccc'};padding:0 4px">${isDone?'✓':'○'}</span>
         <span onclick="editTareaTitulo('${fase.id}',${tiReal})" title="Editar nombre" style="cursor:pointer;font-size:12px;color:#bbb;padding:0 4px">✎</span>
-        ${!tarea.registroServicio&&!tarea.liquidacionServicios&&!tarea.disponibilidadDiaria&&!tarea.pipelineTask&&!tarea.respaldoTask&&!tarea.rendimientoCombTask&&!tarea.cierreServicioTask&&!tarea.liquidacionTask&&!tarea.cotizacionTask&&!tarea.rendicionTask?`
+        ${!tarea.registroServicio&&!tarea.liquidacionServicios&&!tarea.disponibilidadDiaria&&!tarea.pipelineTask&&!tarea.respaldoTask&&!tarea.rendimientoCombTask&&!tarea.cierreServicioTask&&!tarea.liquidacionTask&&!tarea.cotizacionTask&&!tarea.rendicionTask&&!tarea.facturaTask?`
       <span onclick="moverTarea('${fase.id}',${tiReal},-1)" title="Subir" style="cursor:pointer;font-size:10px;color:#ddd;padding:0 2px">▲</span>
       <span onclick="moverTarea('${fase.id}',${tiReal},1)" title="Bajar" style="cursor:pointer;font-size:10px;color:#ddd;padding:0 2px">▼</span>
       ${modoEdicion ? `
         <span onclick="moverTarea('${fase.id}',${tiReal},-1)" title="Subir" style="cursor:pointer;font-size:12px;color:#90A4AE;padding:0 3px">↑</span>
         <span onclick="moverTarea('${fase.id}',${tiReal},1)" title="Bajar" style="cursor:pointer;font-size:12px;color:#90A4AE;padding:0 3px">↓</span>
-        ${!tarea.registroServicio && !tarea.liquidacionServicios && !tarea.disponibilidadDiaria && !tarea.pipelineTask && !tarea.respaldoTask && !tarea.rendimientoCombTask && !tarea.cierreServicioTask && !tarea.liquidacionTask && !tarea.cotizacionTask && !tarea.rendicionTask ? `<span onclick="delTarea('${fase.id}',${tiReal})" title="Eliminar tarea" style="cursor:pointer;font-size:16px;color:#E53935;padding:0 4px">×</span>` : ''}
+        ${!tarea.registroServicio && !tarea.liquidacionServicios && !tarea.disponibilidadDiaria && !tarea.pipelineTask && !tarea.respaldoTask && !tarea.rendimientoCombTask && !tarea.cierreServicioTask && !tarea.liquidacionTask && !tarea.cotizacionTask && !tarea.rendicionTask && !tarea.facturaTask ? `<span onclick="delTarea('${fase.id}',${tiReal})" title="Eliminar tarea" style="cursor:pointer;font-size:16px;color:#E53935;padding:0 4px">×</span>` : ''}
       ` : ''}
     `:''}
         <span class="acord-count" onclick="toggleAcord('${fase.id}',${tiReal})">${tarea.subtareas.length}</span>
@@ -2961,6 +3206,7 @@ function renderFase(fase) {
         ${tarea.disponibilidadDiaria ? `<div style="margin:-4px">${renderDisponibilidad()}</div>` : ''}
         ${tarea.pipelineTask ? `<div style="margin-bottom:8px">${renderPipeline()}</div>` : ''}
         ${tarea.rendicionTask ? `<div style="margin:-4px">${renderRendiciones()}</div>` : ''}
+        ${tarea.facturaTask ? `<div style="margin:-4px">${renderFacturas()}</div>` : ''}
         ${tarea.respaldoTask ? `<div style="padding:8px 0">
           <button onclick="descargarRespaldo()" style="width:100%;padding:12px;background:#37474F;color:white;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer">💾 Descargar respaldo</button></div>` : ''}
         ${subsHTML}
@@ -3188,6 +3434,7 @@ async function initSupabase() {
       await syncServiciosDesdeSupabase();
       await syncDisponibilidadDesdeSupabase();
       await syncRendicionesDesdeSupabase();
+      await syncFacturasDesdeSupabase();
       await syncConfigPanel();
       render();
     } else {
@@ -3322,6 +3569,50 @@ async function upsertServicioSupabase(s) {
     };
     await supa.from('servicios').upsert(row, { onConflict: 'id' });
   } catch(e) { console.warn('Error upsert servicio:', e); }
+}
+
+
+// ── SYNC FACTURAS SUPABASE ────────────────────────────────
+
+async function upsertFacturaSupabase(f) {
+  if (!supa || !supaConectado) return;
+  try {
+    await supa.from('facturas').upsert({
+      id: f.id, numero: f.numero||'', fecha: f.fecha||'',
+      cliente: f.cliente||'', liquidacion_id: f.liquidacionId||'',
+      monto: f.monto||0, estado: f.estado||'emitida',
+      factoring: f.factoring||false,
+      factoring_empresa: f.factoringEmpresa||'',
+      factoring_fecha_anticipo: f.factoringFechaAnticipo||'',
+      factoring_monto: f.factoringMonto||0,
+      factoring_comision: f.factoringComision||0,
+      factoring_fecha_liquidacion: f.factoringFechaLiquidacion||'',
+      observaciones: f.observaciones||''
+    }, { onConflict: 'id' });
+  } catch(e) { console.warn('Error upsert factura:', e); }
+}
+
+async function syncFacturasDesdeSupabase() {
+  if (!supa || !supaConectado) return;
+  try {
+    const { data, error } = await supa.from('facturas').select('*').order('id');
+    if (error) { console.warn('Error sync facturas:', error); return; }
+    if (data && data.length > 0) {
+      appData.facturas = data.map(r => ({
+        id: r.id, numero: r.numero||'', fecha: r.fecha||'',
+        cliente: r.cliente||'', liquidacionId: r.liquidacion_id||'',
+        monto: r.monto||0, estado: r.estado||'emitida',
+        factoring: r.factoring||false,
+        factoringEmpresa: r.factoring_empresa||'',
+        factoringFechaAnticipo: r.factoring_fecha_anticipo||'',
+        factoringMonto: r.factoring_monto||0,
+        factoringComision: r.factoring_comision||0,
+        factoringFechaLiquidacion: r.factoring_fecha_liquidacion||'',
+        observaciones: r.observaciones||''
+      }));
+      saveData();
+    }
+  } catch(e) { console.warn('Error sync facturas:', e); }
 }
 
 // ── SYNC RENDICIONES SUPABASE ─────────────────────────────
