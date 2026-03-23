@@ -5,8 +5,28 @@
   <meta http-equiv="cache-control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="pragma" content="no-cache">
   <meta http-equiv="expires" content="0">
-  <meta name="version" content="2026031975">
+  <meta name="version" content="1774302675">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<script>
+// Forzar versión más reciente — anti-caché
+(function() {
+  var VERSION = '1774302675';
+  var stored = localStorage.getItem('gs_app_version');
+  if (stored !== VERSION) {
+    localStorage.setItem('gs_app_version', VERSION);
+    if (stored !== null) {
+      // Limpiar caché del service worker si existe
+      if ('caches' in window) {
+        caches.keys().then(function(names) {
+          names.forEach(function(name) { caches.delete(name); });
+        });
+      }
+      // Forzar recarga sin caché
+      window.location.reload(true);
+    }
+  }
+})();
+</script>
 <title>Panel de Gestión — Global Solutions</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
