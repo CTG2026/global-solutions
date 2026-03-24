@@ -5,11 +5,11 @@
   <meta http-equiv="cache-control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="pragma" content="no-cache">
   <meta http-equiv="expires" content="0">
-  <meta name="version" content="1774310857">
+  <meta name="version" content="1774314377">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <script>
 (function() {
-  var VERSION = '1774310857';
+  var VERSION = '1774314377';
   var stored = localStorage.getItem('gs_app_version');
   if (stored !== VERSION) {
     // Versión nueva detectada — limpiar datos locales y forzar sync desde Supabase
@@ -881,20 +881,6 @@ function renderCierreServicios() {
               <div style="text-align:right;font-weight:900;color:#1B5E20">$${((s.precio||0)-Math.round((s.precio||0)*0.1)-(s.petroleo||0)-(s.peajes||0)-(s.viaticos||0)-(s.adicional||0)-(s.cfProrrateado||50800)).toLocaleString('es-CL')}</div>
             </div>
           </div>` : ''}
-          <!-- ADJUNTAR DOCUMENTOS -->
-          <div style="margin-bottom:10px;background:#F8F9FA;border-radius:8px;padding:10px;border:1px solid #eee">
-            <div style="font-size:9px;font-weight:700;color:#546E7A;margin-bottom:6px">📎 DOCUMENTOS ADJUNTOS (guías, OC, orden de servicio)</div>
-            ${(s.documentos||[]).length ? `<div style="margin-bottom:6px">${(s.documentos||[]).map((d,di)=>`
-              <div style="display:flex;align-items:center;gap:6px;padding:5px 0;border-bottom:1px solid #f0f0f0">
-                <a href="${d.url}" target="_blank" style="flex:1;font-size:10px;color:#1565C0;text-decoration:none;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">📄 ${d.nombre||'Documento'}</a>
-                <span style="font-size:9px;color:#aaa">${d.fecha||''}</span>
-                <button onclick="eliminarDocumentoCierre('${s.id}',${di})" style="background:none;border:none;color:#E53935;font-size:14px;cursor:pointer;padding:0 4px">×</button>
-              </div>`).join('')}</div>` : '<div style="font-size:10px;color:#bbb;margin-bottom:6px">Sin documentos adjuntos</div>'}
-            <label style="display:flex;align-items:center;justify-content:center;gap:8px;background:white;border:1px dashed #90A4AE;border-radius:7px;padding:10px;cursor:pointer;font-size:11px;color:#546E7A;font-weight:700">
-              📷 Cámara / 🖼️ Biblioteca — adjuntar imagen o documento
-              <input type="file" accept="image/*,application/pdf" multiple onchange="subirDocumentoCierre(event,'${s.id}')" style="display:none">
-            </label>
-          </div>
           <!-- BOTONES -->
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:4px">
             <button onclick="guardarBorradorCierre('${s.id}')" style="padding:10px;background:#ECEFF1;color:#546E7A;border:1px solid #B0BEC5;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer">💾 Guardar borrador</button>
@@ -906,47 +892,6 @@ function renderCierreServicios() {
     }).join('')}
   </div>`;
 }
-
-// ── ADJUNTAR DOCUMENTOS EN CIERRE ────────────────────────
-
-async function subirDocumentoCierre(event, sId) {
-  const files = event.target.files;
-  if (!files || !files.length) return;
-  if (!supaConectado || !supa) { showToastGeneral('❌ Sin conexión a base de datos','#C62828'); return; }
-  const idx = (appData.servicios||[]).findIndex(s=>s.id===sId);
-  if (idx===-1) return;
-  if (!appData.servicios[idx].documentos) appData.servicios[idx].documentos = [];
-  showToastGeneral('⏳ Subiendo documento...','#1565C0');
-  try {
-    for (const file of files) {
-      const ext = file.name.split('.').pop();
-      const nombre = `cierre_${sId}_${Date.now()}.${ext}`;
-      const { error } = await supa.storage.from('guias').upload(nombre, file, {upsert:true});
-      if (error) { showToastGeneral('❌ Error al subir: '+error.message,'#C62828'); continue; }
-      const { data: urlData } = supa.storage.from('guias').getPublicUrl(nombre);
-      appData.servicios[idx].documentos.push({
-        url: urlData.publicUrl,
-        nombre: file.name,
-        fecha: new Date().toLocaleDateString('es-CL')
-      });
-    }
-    saveData();
-    await upsertServicioSupabase(appData.servicios[idx]);
-    showToastGeneral('✅ Documento(s) adjuntado(s)','#2E7D32');
-    render();
-  } catch(e) { showToastGeneral('❌ Error: '+e.message,'#C62828'); }
-}
-
-function eliminarDocumentoCierre(sId, di) {
-  const idx = (appData.servicios||[]).findIndex(s=>s.id===sId);
-  if (idx===-1) return;
-  if (!appData.servicios[idx].documentos) return;
-  appData.servicios[idx].documentos.splice(di, 1);
-  saveData();
-  upsertServicioSupabase(appData.servicios[idx]);
-  render();
-}
-
 function _leerCamposCierre(id, idx) {
   const s = appData.servicios[idx];
   return {
@@ -2162,7 +2107,7 @@ function renderEditarServicio(id) {
                </div>`
             : `<label style="display:flex;align-items:center;gap:6px;background:#f8f9fa;border:1px dashed #ccc;border-radius:6px;padding:8px 10px;cursor:pointer;font-size:11px;color:#607D8B">
                 📷 Adjuntar imagen
-                <input type="file" accept="image/*" onchange="subirImagenEditGuia(event,${pi})" style="display:none">
+                <input type="file" accept="image/*" capture="environment" onchange="subirImagenEditGuia(event,${pi})" style="display:none">
                </label>`}
         </div>
       </div>
@@ -3250,7 +3195,7 @@ function renderFase(fase) {
            </div>`
         : `<label style="display:flex;align-items:center;gap:6px;background:#f8f9fa;border:1px dashed #ccc;border-radius:6px;padding:8px 10px;cursor:pointer;font-size:11px;color:#607D8B">
             📷 Toca para adjuntar imagen
-            <input type="file" accept="image/*" onchange="subirImagenGuia(event,${pi})" style="display:none">
+            <input type="file" accept="image/*" capture="environment" onchange="subirImagenGuia(event,${pi})" style="display:none">
            </label>`
       }
     </div>
@@ -3631,7 +3576,6 @@ async function syncServiciosDesdeSupabase() {
         cerrado: r.cerrado||false, estado: r.estado||'activo',
         cfProrrateado: r.cf_prorrateado||50800,
         comisionConductor: r.comision_conductor||0,
-        documentos: r.documentos||[],
       }));
       appData.servicios = remotos;
     }
@@ -3657,8 +3601,7 @@ async function upsertServicioSupabase(s) {
       puntos: s.puntos||s.guias||[],
       cf_prorrateado: s.cfProrrateado||50800,
       comision_conductor: s.comisionConductor||0,
-      liquidacion_id: s.liquidacionId||'',
-      documentos: s.documentos||[]
+      liquidacion_id: s.liquidacionId||''
     };
     await supa.from('servicios').upsert(row, { onConflict: 'id' });
   } catch(e) { console.warn('Error upsert servicio:', e); }
@@ -3903,10 +3846,19 @@ const ETAPAS_PIPELINE = ['prospecto','cotizado','activo','inactivo'];
 const ETAPA_LABELS  = { prospecto:'PROSPECTO', cotizado:'COTIZADO', activo:'ACTIVO', inactivo:'INACTIVO' };
 
 function renderPipeline() {
-  const pipeline = appData.pipeline || [];
   if (!appData.pipeline) appData.pipeline = [];
+  // Ordenar: activo primero, luego cotizado, prospecto, inactivo — dentro de cada etapa alfabético
+  const ETAPA_ORDEN = { activo:0, cotizado:1, prospecto:2, inactivo:3 };
+  const pipeline = (appData.pipeline||[]).slice().sort((a,b)=>{
+    const oa = ETAPA_ORDEN[a.etapa]??99;
+    const ob = ETAPA_ORDEN[b.etapa]??99;
+    if (oa !== ob) return oa - ob;
+    return (a.cliente||'').localeCompare(b.cliente||'', 'es');
+  });
 
-  const filas = pipeline.map((c, ci) => {
+  const filas = pipeline.map((c) => {
+    // Usar índice real en appData.pipeline para operaciones
+    const ci = appData.pipeline.findIndex(x => x.id ? x.id === c.id : x.cliente === c.cliente);
     const col = ETAPA_COLORES[c.etapa] || '#607D8B';
     const editando = uiState[`pip_edit_${ci}`];
         const isOpenPip = !!uiState['pip_open_'+ci];
