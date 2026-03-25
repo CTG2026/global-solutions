@@ -6000,7 +6000,16 @@ function renderDashboard() {
   const metaVentas = d.meta_pe || 20320000;
   const costosFijos = d.gasto_meta || 5080000;
   const presupuesto = d.presupuesto_mes || 0;
-  const ventas = d.ventas_mes || 0;
+  const mesPadded = String(hoy.getMonth()+1).padStart(2,'0');
+  const anioStr = String(hoy.getFullYear());
+  const serviciosMesArr = (appData.servicios||[]).filter(s => {
+    if (s.mes && s.anio) return s.mes === mesPadded && s.anio === anioStr;
+    if (!s.fecha) return false;
+    const parts = s.fecha.split('-');
+    return parts.length===3 && parseInt(parts[1])===hoy.getMonth()+1 && parseInt(parts[2])===hoy.getFullYear();
+  });
+  const serviciosMes = serviciosMesArr.length;
+  const ventas = serviciosMesArr.filter(s => s.cerrado && s.precio).reduce((a,s) => a + (s.precio||0), 0);
   const gasto = d.gasto_real || 0;
   const caja = d.caja || 0;
   const resultado = ventas - gasto;
@@ -6013,11 +6022,6 @@ function renderDashboard() {
   const ocupPct = (d.flota_disponible||0) > 0 ? Math.round((d.flota_ocupada||0)/(d.flota_disponible||1)*100) : 0;
   const serviciosSemana = d.servicios_semana || 0;
   const serviciosSemanaPresup = d.servicios_semana_presup || 0;
-  const serviciosMes = (appData.servicios||[]).filter(s => {
-    if (!s.fecha) return false;
-    const parts = s.fecha.split('-');
-    return parts.length===3 && parseInt(parts[1])===hoy.getMonth()+1 && parseInt(parts[2])===hoy.getFullYear();
-  }).length;
   const facturasCobrar = d.facturas_cobrar || 0;
   const semanaActual = Math.ceil(hoy.getDate()/7);
 
