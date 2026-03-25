@@ -5,16 +5,16 @@
   <meta http-equiv="cache-control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="pragma" content="no-cache">
   <meta http-equiv="expires" content="0">
-  <meta name="version" content="1774405025">
+  <meta name="version" content="1774480000">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <script>
 (function() {
-  var VERSION = '1774405025';
+  var VERSION = '1774480000';
   var stored = localStorage.getItem('gs_app_version');
   if (stored !== VERSION) {
     var session = localStorage.getItem('gs_session');
     var keys = Object.keys(localStorage);
-    keys.forEach(function(k) { if (k !== 'gs_session') localStorage.removeItem(k); });
+    keys.forEach(function(k) { if (k !== 'gs_session' && k !== 'gs_panel_v5') localStorage.removeItem(k); });
     localStorage.setItem('gs_app_version', VERSION);
     if (session) localStorage.setItem('gs_session', session);
     if ('caches' in window) caches.keys().then(function(n){n.forEach(function(x){caches.delete(x);});});
@@ -465,6 +465,8 @@ const DEFAULT_DATA = {
         { titulo: "Cierre de Servicios", proc: "Completar información faltante del servicio ejecutado: precio, Km, tag y datos pendientes. Etapa previa a liquidar.", subtareas: [], cierreServicioTask: true, done: false },
         { titulo: "Liquidaciones", proc: "Gestionar liquidaciones por servicio o por grupo. Seleccionar servicios, agrupar por cliente (puede tener múltiples RUT), generar y enviar liquidación.", subtareas: [], liquidacionTask: true, done: false },
         { titulo: "Facturación y Cobro", proc: "Registrar facturas emitidas, gestionar factoring y hacer seguimiento de cobro por cada liquidación.", subtareas: [], facturaTask: true, done: false },
+        { titulo: "Costos", proc: "Resumen de costos del mes: petróleo, peajes, viáticos, comisiones, costos fijos y rendiciones. Margen bruto del período.", subtareas: [], costosTask: true, done: false },
+        { titulo: "Caja", proc: "Flujo de caja del mes: cobros recibidos, egresos, saldo estimado y pendientes de facturar.", subtareas: [], cajaTask: true, done: false },
         { titulo: "Rendición de Gastos", proc: "Registrar y gestionar rendiciones de gastos del equipo. Cada rendición agrupa uno o más gastos con su categoría, monto y equipo asociado.", subtareas: [], rendicionTask: true, done: false },
       ],
       pendientes: [
@@ -874,6 +876,17 @@ function renderCierreServicios() {
               <div style="text-align:right;font-weight:900;color:#1B5E20">$${((s.precio||0)-Math.round((s.precio||0)*0.1)-(s.petroleo||0)-(s.peajes||0)-(s.viaticos||0)-(s.adicional||0)-(s.cfProrrateado||50800)).toLocaleString('es-CL')}</div>
             </div>
           </div>` : ''}
+          <!-- FOTO COMPROBANTE -->
+          <div style="margin-bottom:8px">
+            <div style="font-size:9px;font-weight:700;color:#888;margin-bottom:5px">📷 FOTO COMPROBANTE</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+              <button onclick="document.getElementById('foto_cam_${s.id}').click()" style="padding:9px;background:#E3F2FD;color:#1565C0;border:1px solid #BBDEFB;border-radius:7px;font-size:11px;font-weight:700;cursor:pointer">📷 Tomar foto</button>
+              <button onclick="document.getElementById('foto_lib_${s.id}').click()" style="padding:9px;background:#F3E5F5;color:#6A1B9A;border:1px solid #E1BEE7;border-radius:7px;font-size:11px;font-weight:700;cursor:pointer">🖼️ Elegir</button>
+            </div>
+            <input type="file" id="foto_cam_${s.id}" accept="image/*" capture="environment" style="display:none" onchange="agregarFotoServicio('${s.id}',this)">
+            <input type="file" id="foto_lib_${s.id}" accept="image/*" style="display:none" onchange="agregarFotoServicio('${s.id}',this)">
+            ${(s.fotos&&s.fotos.length)?`<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">${s.fotos.map((f,fi)=>`<div style="position:relative"><img src="${f}" style="width:64px;height:64px;object-fit:cover;border-radius:6px;border:1px solid #dde"><span onclick="eliminarFotoServicio('${s.id}',${fi})" style="position:absolute;top:-5px;right:-5px;background:#C62828;color:white;border-radius:50%;width:16px;height:16px;font-size:10px;display:flex;align-items:center;justify-content:center;cursor:pointer;font-weight:700;line-height:16px;text-align:center">×</span></div>`).join('')}</div>`:''}
+          </div>
           <!-- BOTONES -->
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:4px">
             <button onclick="guardarBorradorCierre('${s.id}')" style="padding:10px;background:#ECEFF1;color:#546E7A;border:1px solid #B0BEC5;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer">💾 Guardar borrador</button>
@@ -955,6 +968,41 @@ async function guardarCierre(id) {
   saveData();
   await upsertServicioSupabase(appData.servicios[idx]);
   showToastGeneral('✅ Servicio cerrado correctamente','#2E7D32');
+  render();
+}
+
+function agregarFotoServicio(id, input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    const img = new Image();
+    img.onload = function() {
+      const MAX = 400;
+      const ratio = Math.min(MAX/img.width, MAX/img.height, 1);
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.round(img.width * ratio);
+      canvas.height = Math.round(img.height * ratio);
+      canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
+      const idx = appData.servicios.findIndex(s=>s.id===id);
+      if (idx === -1) return;
+      if (!appData.servicios[idx].fotos) appData.servicios[idx].fotos = [];
+      appData.servicios[idx].fotos.push(dataUrl);
+      saveData();
+      input.value = '';
+      render();
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+function eliminarFotoServicio(id, fi) {
+  const idx = appData.servicios.findIndex(s=>s.id===id);
+  if (idx === -1) return;
+  appData.servicios[idx].fotos.splice(fi, 1);
+  saveData();
   render();
 }
 
@@ -1382,6 +1430,24 @@ function renderFacturas() {
       </div>`:''}</div>`;
   }).join(''):'<div style="text-align:center;color:#aaa;font-size:11px;padding:12px">Sin facturas registradas aún</div>';
 
+  const liqFacturadas = liquidaciones.filter(l => l.estado === 'facturada' || l.estado === 'pagada');
+  const liqFacHTML = liqFacturadas.length === 0
+    ? '<div style="text-align:center;color:#aaa;font-size:11px;padding:8px">Sin liquidaciones facturadas aún</div>'
+    : liqFacturadas.map(l => {
+        const esPagada = l.estado === 'pagada';
+        return `<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 10px;background:#F8F9FA;border-radius:7px;margin-bottom:5px;border-left:3px solid ${esPagada?'#2E7D32':'#1565C0'}">
+          <div style="flex:1;min-width:0">
+            <div style="font-size:11px;font-weight:700;color:#37474F">${l.id} · $${(l.total||0).toLocaleString('es-CL')}</div>
+            <div style="font-size:10px;color:#888">${l.fecha||'—'} · ${(l.serviciosIds||[]).length} serv.</div>
+          </div>
+          <div style="display:flex;align-items:center;gap:5px;flex-shrink:0">
+            <span style="font-size:9px;font-weight:700;padding:2px 7px;border-radius:8px;background:${esPagada?'#E8F5E9':'#E3F2FD'};color:${esPagada?'#2E7D32':'#1565C0'}">${esPagada?'✅ Pagada':'📄 Facturada'}</span>
+            ${!esPagada?`<button onclick="cambiarEstadoLiq('${l.id}','pagada')" style="padding:4px 8px;background:#E8F5E9;color:#2E7D32;border:1px solid #A5D6A7;border-radius:5px;font-size:9px;font-weight:700;cursor:pointer">✅ Pagada</button>`:''}
+            ${esPagada?`<button onclick="cambiarEstadoLiq('${l.id}','facturada')" style="padding:4px 8px;background:#E3F2FD;color:#1565C0;border:1px solid #BBDEFB;border-radius:5px;font-size:9px;font-weight:700;cursor:pointer">↩ Facturada</button>`:''}
+          </div>
+        </div>`;
+      }).join('');
+
   return `<div style="padding:2px">
     <!-- RESUMEN -->
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:10px">
@@ -1394,6 +1460,9 @@ function renderFacturas() {
         <div style="font-size:14px;font-weight:900;color:#2E7D32">$${totalCobrado.toLocaleString('es-CL')}</div>
       </div>
     </div>
+    <!-- LIQUIDACIONES FACTURADAS -->
+    <div style="font-size:9px;font-weight:700;color:#546E7A;letter-spacing:0.5px;margin-bottom:6px">LIQUIDACIONES FACTURADAS</div>
+    ${liqFacHTML}
     <!-- FORMULARIO NUEVA FACTURA -->
     <div style="background:#F4F6F8;border-radius:10px;border:1px solid #dde;margin-bottom:10px">
       <div onclick="uiState.fac_form_open=!uiState.fac_form_open;render()" style="padding:10px 12px;cursor:pointer;display:flex;justify-content:space-between;align-items:center">
@@ -1425,6 +1494,113 @@ function renderFacturas() {
     <!-- HISTORIAL -->
     <div style="font-size:9px;font-weight:700;color:#888;letter-spacing:0.5px;margin-bottom:6px">HISTORIAL — ${appData.facturas.length} factura${appData.facturas.length!==1?'s':''}</div>
     ${histHTML}
+  </div>`;
+}
+
+function renderCostos() {
+  const servicios = appData.servicios || [];
+  const rendiciones = appData.rendiciones || [];
+  const hoy = new Date();
+  const mesSel = String(hoy.getMonth()+1).padStart(2,'0');
+  const anioSel = String(hoy.getFullYear());
+  const srvMes = servicios.filter(s => s.mes === mesSel && s.anio === anioSel);
+  const totalPetroleo = srvMes.reduce((a,s)=>a+(s.petroleo||0),0);
+  const totalPeajes = srvMes.reduce((a,s)=>a+(s.peajes||0),0);
+  const totalViaticos = srvMes.reduce((a,s)=>a+(s.viaticos||0),0);
+  const totalAdicional = srvMes.reduce((a,s)=>a+(s.adicional||0),0);
+  const totalComision = srvMes.reduce((a,s)=>a+Math.round((s.precio||0)*0.1),0);
+  const totalCF = srvMes.reduce((a,s)=>a+(s.cfProrrateado||50800),0);
+  const parseFechaDDMMYYYY = f => { if(!f) return null; const p=f.split('-'); return p[0].length===2 ? new Date(p[2],p[1]-1,p[0]) : new Date(p[0],p[1]-1,p[2]); };
+  const renMes = rendiciones.filter(r => { const d=parseFechaDDMMYYYY(r.fecha); return d && d.getMonth()+1===parseInt(mesSel) && d.getFullYear()===parseInt(anioSel); });
+  const totalRendiciones = renMes.reduce((a,r)=>a+(r.total||0),0);
+  const totalVariable = totalPetroleo+totalPeajes+totalViaticos+totalAdicional+totalComision;
+  const totalGeneral = totalVariable+totalCF+totalRendiciones;
+  const totalIngresos = srvMes.reduce((a,s)=>a+(s.precio||0),0);
+  const margenBruto = totalIngresos - totalGeneral;
+  const filas = [
+    { label:'⛽ Petróleo / combustible', monto:totalPetroleo, color:'#E65100' },
+    { label:'🛣️ Peajes', monto:totalPeajes, color:'#1565C0' },
+    { label:'🍽️ Viáticos', monto:totalViaticos, color:'#5D4037' },
+    { label:'➕ Adicionales', monto:totalAdicional, color:'#37474F' },
+    { label:'👤 Comisiones conductores (10%)', monto:totalComision, color:'#6A1B9A' },
+    { label:'🏢 CF prorrateado', monto:totalCF, color:'#607D8B' },
+    { label:'🧾 Rendiciones de gastos', monto:totalRendiciones, color:'#C62828' },
+  ];
+  return `<div style="padding:2px">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:10px">
+      <div style="background:#FFEBEE;border-radius:8px;padding:8px 10px;text-align:center">
+        <div style="font-size:9px;font-weight:700;color:#C62828;margin-bottom:2px">TOTAL COSTOS</div>
+        <div style="font-size:14px;font-weight:900;color:#C62828">$${totalGeneral.toLocaleString('es-CL')}</div>
+      </div>
+      <div style="background:${margenBruto>=0?'#E8F5E9':'#FFEBEE'};border-radius:8px;padding:8px 10px;text-align:center">
+        <div style="font-size:9px;font-weight:700;color:${margenBruto>=0?'#2E7D32':'#C62828'};margin-bottom:2px">MARGEN BRUTO</div>
+        <div style="font-size:14px;font-weight:900;color:${margenBruto>=0?'#2E7D32':'#C62828'}">$${margenBruto.toLocaleString('es-CL')}</div>
+      </div>
+    </div>
+    <div style="font-size:9px;font-weight:700;color:#888;letter-spacing:0.5px;margin-bottom:6px">DESGLOSE MES ACTUAL</div>
+    ${filas.filter(f=>f.monto>0).map(f=>`
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:7px 10px;background:#F8F9FA;border-radius:7px;margin-bottom:4px;border-left:3px solid ${f.color}">
+        <span style="font-size:11px;color:#555">${f.label}</span>
+        <span style="font-size:12px;font-weight:700;color:${f.color}">$${f.monto.toLocaleString('es-CL')}</span>
+      </div>`).join('')}
+    ${filas.every(f=>f.monto===0)?'<div style="text-align:center;color:#aaa;font-size:11px;padding:12px">Sin costos registrados en el mes actual</div>':''}
+  </div>`;
+}
+
+function renderCaja() {
+  const facturas = appData.facturas || [];
+  const rendiciones = appData.rendiciones || [];
+  const liquidaciones = appData.liquidaciones || [];
+  const hoy = new Date();
+  const mesSel = String(hoy.getMonth()+1).padStart(2,'0');
+  const anioSel = String(hoy.getFullYear());
+  const parseFechaDDMMYYYY = f => { if(!f) return null; const p=f.split('-'); return p[0].length===2 ? new Date(p[2],p[1]-1,p[0]) : new Date(p[0],p[1]-1,p[2]); };
+  const esMes = f => { const d=parseFechaDDMMYYYY(f); return d && d.getMonth()+1===parseInt(mesSel) && d.getFullYear()===parseInt(anioSel); };
+  const facMes = facturas.filter(f=>esMes(f.fecha));
+  const cobradoMes = facMes.filter(f=>f.estado==='cobrada').reduce((a,f)=>a+(f.monto||0),0);
+  const porCobrar = facturas.filter(f=>f.estado!=='cobrada').reduce((a,f)=>a+(f.monto||0),0);
+  const renMes = rendiciones.filter(r=>esMes(r.fecha));
+  const egresosMes = renMes.reduce((a,r)=>a+(r.total||0),0);
+  const saldoEstimado = cobradoMes - egresosMes;
+  const montoPendFac = liquidaciones.filter(l=>l.estado==='enviada').reduce((a,l)=>a+(l.total||0),0);
+  const ultFacCob = facMes.filter(f=>f.estado==='cobrada').slice(-5).reverse();
+  const ultRen = renMes.slice(-5).reverse();
+  return `<div style="padding:2px">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:6px">
+      <div style="background:#E8F5E9;border-radius:8px;padding:8px 10px;text-align:center">
+        <div style="font-size:9px;font-weight:700;color:#2E7D32;margin-bottom:2px">COBRADO MES</div>
+        <div style="font-size:14px;font-weight:900;color:#2E7D32">$${cobradoMes.toLocaleString('es-CL')}</div>
+      </div>
+      <div style="background:#FFEBEE;border-radius:8px;padding:8px 10px;text-align:center">
+        <div style="font-size:9px;font-weight:700;color:#C62828;margin-bottom:2px">EGRESOS MES</div>
+        <div style="font-size:14px;font-weight:900;color:#C62828">$${egresosMes.toLocaleString('es-CL')}</div>
+      </div>
+    </div>
+    <div style="background:${saldoEstimado>=0?'#E8F5E9':'#FFEBEE'};border-radius:8px;padding:10px;text-align:center;margin-bottom:10px">
+      <div style="font-size:9px;font-weight:700;color:${saldoEstimado>=0?'#2E7D32':'#C62828'};margin-bottom:2px">SALDO ESTIMADO MES</div>
+      <div style="font-size:20px;font-weight:900;color:${saldoEstimado>=0?'#1B5E20':'#B71C1C'}">$${saldoEstimado.toLocaleString('es-CL')}</div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:10px">
+      <div style="background:#FFFDE7;border-radius:8px;padding:8px 10px;text-align:center">
+        <div style="font-size:9px;font-weight:700;color:#F9A825;margin-bottom:2px">POR COBRAR</div>
+        <div style="font-size:13px;font-weight:900;color:#F57F17">$${porCobrar.toLocaleString('es-CL')}</div>
+      </div>
+      <div style="background:#E8EAF6;border-radius:8px;padding:8px 10px;text-align:center">
+        <div style="font-size:9px;font-weight:700;color:#3949AB;margin-bottom:2px">PEND. FACTURAR</div>
+        <div style="font-size:13px;font-weight:900;color:#3949AB">$${montoPendFac.toLocaleString('es-CL')}</div>
+      </div>
+    </div>
+    ${ultFacCob.length?`<div style="font-size:9px;font-weight:700;color:#888;letter-spacing:0.5px;margin-bottom:5px">ÚLTIMAS COBRADAS</div>
+    ${ultFacCob.map(f=>`<div style="display:flex;justify-content:space-between;padding:6px 10px;background:#F8F9FA;border-radius:7px;margin-bottom:4px;border-left:3px solid #2E7D32">
+      <span style="font-size:11px;color:#555">${f.numero||f.id} · ${f.cliente||'—'}</span>
+      <span style="font-size:11px;font-weight:700;color:#2E7D32">$${(f.monto||0).toLocaleString('es-CL')}</span>
+    </div>`).join('')}`:''}
+    ${ultRen.length?`<div style="font-size:9px;font-weight:700;color:#888;letter-spacing:0.5px;margin:6px 0 5px">ÚLTIMAS RENDICIONES</div>
+    ${ultRen.map(r=>`<div style="display:flex;justify-content:space-between;padding:6px 10px;background:#F8F9FA;border-radius:7px;margin-bottom:4px;border-left:3px solid #C62828">
+      <span style="font-size:11px;color:#555">${r.id} · ${r.descripcion||'—'}</span>
+      <span style="font-size:11px;font-weight:700;color:#C62828">$${(r.total||0).toLocaleString('es-CL')}</span>
+    </div>`).join('')}`:''}
+    ${!ultFacCob.length&&!ultRen.length?'<div style="text-align:center;color:#aaa;font-size:11px;padding:12px">Sin movimientos en el mes actual</div>':''}
   </div>`;
 }
 
@@ -1619,14 +1795,15 @@ function toggleSrvLiq(id,checked){if(!uiState.liq_sel)uiState.liq_sel=[];if(chec
 function toggleTodosClienteLiq(cl,checked){if(!uiState.liq_sel)uiState.liq_sel=[];const svcs=(appData.servicios||[]).filter(s=>s.cliente===cl&&s.cerrado&&!s.liquidacionId);svcs.forEach(s=>{if(checked){if(!uiState.liq_sel.includes(s.id))uiState.liq_sel.push(s.id);}else{uiState.liq_sel=uiState.liq_sel.filter(x=>x!==s.id);}});render();}
 function toggleRutLiq(rut,checked){if(!uiState.liq_ruts_sel)uiState.liq_ruts_sel=[];if(checked){if(!uiState.liq_ruts_sel.includes(rut))uiState.liq_ruts_sel.push(rut);}else{uiState.liq_ruts_sel=uiState.liq_ruts_sel.filter(r=>r!==rut);}render();}
 function agregarRutLiq(){const input=document.getElementById('liq_rut_nuevo');const rut=input?.value.trim();if(!rut)return;const cl=uiState.liq_cliente_sel||'';if(cl){if(!appData.clientesRut)appData.clientesRut={};if(!appData.clientesRut[cl])appData.clientesRut[cl]=[];if(!appData.clientesRut[cl].includes(rut)){appData.clientesRut[cl].push(rut);saveData();}}if(!uiState.liq_ruts_sel)uiState.liq_ruts_sel=[];if(!uiState.liq_ruts_sel.includes(rut))uiState.liq_ruts_sel.push(rut);input.value='';render();}
-function crearLiquidacionV2(){const sel=uiState.liq_sel||[];if(!sel.length)return alert('Selecciona al menos un servicio');const fecha=document.getElementById('liq_fecha_v2')?.value||new Date().toISOString().split('T')[0];const email=document.getElementById('liq_email_v2')?.value||'';const p=fecha.split('-');const fechaStr=`${p[2]}-${p[1]}-${p[0]}`;const ruts=uiState.liq_ruts_sel||[];const servicios=appData.servicios||[];const total=sel.reduce((a,id)=>{const s=servicios.find(sv=>sv.id===id);return a+(s?s.precio||0:0);},0);const id='LIQ-'+String(appData.liquidaciones.length+1).padStart(3,'0');appData.liquidaciones.push({id,fecha:fechaStr,email,serviciosIds:[...sel],total,estado:'creada',nFactura:'',ruts});sel.forEach(sid=>{const s=servicios.find(sv=>sv.id===sid);if(s){s.liquidacionId=id;upsertServicioSupabase(s);}});uiState.liq_sel=[];uiState.liq_ruts_sel=[];saveData();render();alert('✅ '+id+' creada — Total: $'+total.toLocaleString('es-CL'));}
-function cambiarEstadoLiq(liqId,estado){const liq=(appData.liquidaciones||[]).find(l=>l.id===liqId);if(!liq)return;liq.estado=estado;saveData();render();}
+function crearLiquidacionV2(){const sel=uiState.liq_sel||[];if(!sel.length)return alert('Selecciona al menos un servicio');const fecha=document.getElementById('liq_fecha_v2')?.value||new Date().toISOString().split('T')[0];const email=document.getElementById('liq_email_v2')?.value||'';const p=fecha.split('-');const fechaStr=`${p[2]}-${p[1]}-${p[0]}`;const ruts=uiState.liq_ruts_sel||[];const servicios=appData.servicios||[];const total=sel.reduce((a,id)=>{const s=servicios.find(sv=>sv.id===id);return a+(s?s.precio||0:0);},0);const id='LIQ-'+String(appData.liquidaciones.length+1).padStart(3,'0');appData.liquidaciones.push({id,fecha:fechaStr,email,serviciosIds:[...sel],total,estado:'creada',nFactura:'',ruts});sel.forEach(sid=>{const s=servicios.find(sv=>sv.id===sid);if(s){s.liquidacionId=id;upsertServicioSupabase(s);}});uiState.liq_sel=[];uiState.liq_ruts_sel=[];saveData();pushLiquidacionesSupabase();render();alert('✅ '+id+' creada — Total: $'+total.toLocaleString('es-CL'));}
+function cambiarEstadoLiq(liqId,estado){const liq=(appData.liquidaciones||[]).find(l=>l.id===liqId);if(!liq)return;liq.estado=estado;saveData();pushLiquidacionesSupabase();render();}
 function guardarObsLiq(liqId) {
   const liq = (appData.liquidaciones||[]).find(l=>l.id===liqId);
   if (!liq) return;
   const obs = document.getElementById('liq_obs_'+liqId)?.value||'';
   liq.observaciones = obs;
   saveData();
+  pushLiquidacionesSupabase();
   showToastGeneral('💾 Observaciones guardadas','#607D8B');
 }
 function descargarLiqV2(liqId) {
@@ -2164,7 +2341,7 @@ function renderEditarServicio(id) {
   </div>`;
 }
 
-const ESTRUCTURA_VERSION = '76'; // Incrementar cuando cambie la estructura del panel
+const ESTRUCTURA_VERSION = '77'; // Incrementar cuando cambie la estructura del panel
 
 function loadData() {
   // Si la versión estructural cambió, limpiar la estructura pero preservar datos
@@ -2285,6 +2462,16 @@ function loadData() {
     if (!_finF.rutinarias.some(r=>r.facturaTask)) {
       const _iLq=_finF.rutinarias.findIndex(r=>r.liquidacionTask);
       _finF.rutinarias.splice(_iLq+1,0,{titulo:'Facturación y Cobro',proc:'Registrar facturas emitidas, gestionar factoring y hacer seguimiento de cobro.',subtareas:[],facturaTask:true,done:false});
+    }
+    // Agregar Costos si no existe
+    if (!_finF.rutinarias.some(r=>r.costosTask)) {
+      const _iFac=_finF.rutinarias.findIndex(r=>r.facturaTask);
+      _finF.rutinarias.splice(_iFac+1,0,{titulo:'Costos',proc:'Resumen de costos del mes: petróleo, peajes, viáticos, comisiones, costos fijos y rendiciones.',subtareas:[],costosTask:true,done:false});
+    }
+    // Agregar Caja si no existe
+    if (!_finF.rutinarias.some(r=>r.cajaTask)) {
+      const _iCos=_finF.rutinarias.findIndex(r=>r.costosTask);
+      _finF.rutinarias.splice(_iCos+1,0,{titulo:'Caja',proc:'Flujo de caja del mes: cobros recibidos, egresos, saldo estimado y pendientes de facturar.',subtareas:[],cajaTask:true,done:false});
     }
     // Rendición siempre al final
     if (!_finF.rutinarias.some(r=>r.rendicionTask)) {
@@ -2855,6 +3042,16 @@ function renderFase(fase) {
       fase.rutinarias.splice(_iLqRF+1,0,{titulo:'Facturación y Cobro',proc:'Registrar facturas emitidas, gestionar factoring y hacer seguimiento de cobro.',subtareas:[],facturaTask:true,done:false});
       saveData();
     }
+    if (!fase.rutinarias.some(r=>r.costosTask)) {
+      const _iFacRF=fase.rutinarias.findIndex(r=>r.facturaTask);
+      fase.rutinarias.splice(_iFacRF+1,0,{titulo:'Costos',proc:'Resumen de costos del mes: petróleo, peajes, viáticos, comisiones, costos fijos y rendiciones.',subtareas:[],costosTask:true,done:false});
+      saveData();
+    }
+    if (!fase.rutinarias.some(r=>r.cajaTask)) {
+      const _iCosRF=fase.rutinarias.findIndex(r=>r.costosTask);
+      fase.rutinarias.splice(_iCosRF+1,0,{titulo:'Caja',proc:'Flujo de caja del mes: cobros recibidos, egresos, saldo estimado y pendientes de facturar.',subtareas:[],cajaTask:true,done:false});
+      saveData();
+    }
     if (!fase.rutinarias.some(r=>r.rendicionTask)) {
       fase.rutinarias.push({titulo:'Rendición de Gastos',proc:'Registrar y gestionar rendiciones de gastos del equipo.',subtareas:[],rendicionTask:true,done:false});
       saveData();
@@ -3151,7 +3348,7 @@ function renderFase(fase) {
       </div>`;
     })() : '';
 
-    const _flag = tarea.registroServicio?'registroServicio':tarea.disponibilidadDiaria?'disponibilidadDiaria':tarea.rendimientoCombTask?'rendimientoCombTask':tarea.liquidacionTask?'liquidacionTask':tarea.cierreServicioTask?'cierreServicioTask':tarea.cotizacionTask?'cotizacionTask':tarea.pipelineTask?'pipelineTask':tarea.respaldoTask?'respaldoTask':tarea.rendicionTask?'rendicionTask':tarea.facturaTask?'facturaTask':'';
+    const _flag = tarea.registroServicio?'registroServicio':tarea.disponibilidadDiaria?'disponibilidadDiaria':tarea.rendimientoCombTask?'rendimientoCombTask':tarea.liquidacionTask?'liquidacionTask':tarea.cierreServicioTask?'cierreServicioTask':tarea.cotizacionTask?'cotizacionTask':tarea.pipelineTask?'pipelineTask':tarea.respaldoTask?'respaldoTask':tarea.rendicionTask?'rendicionTask':tarea.facturaTask?'facturaTask':tarea.costosTask?'costosTask':tarea.cajaTask?'cajaTask':'';
     return `<div class="acord-item" data-flag="${_flag}" style="${isDone?'opacity:0.6':''}">
       <div class="acord-header ${isOpen?'open':''}" style="${isDone?'background:#f5f5f5':''}">
         <span class="acord-arrow" onclick="toggleAcord('${fase.id}',${tiReal})" style="padding:4px 6px 4px 0;cursor:pointer">▶</span>
@@ -3161,13 +3358,13 @@ function renderFase(fase) {
         }
         <span onclick="toggleTareaDone('${fase.id}',${tiReal})" title="${isDone?'Reactivar':'Tachar tarea'}" style="cursor:pointer;font-size:14px;color:${isDone?fase.color:'#ccc'};padding:0 4px">${isDone?'✓':'○'}</span>
         <span onclick="editTareaTitulo('${fase.id}',${tiReal})" title="Editar nombre" style="cursor:pointer;font-size:12px;color:#bbb;padding:0 4px">✎</span>
-        ${!tarea.registroServicio&&!tarea.liquidacionServicios&&!tarea.disponibilidadDiaria&&!tarea.pipelineTask&&!tarea.respaldoTask&&!tarea.rendimientoCombTask&&!tarea.cierreServicioTask&&!tarea.liquidacionTask&&!tarea.cotizacionTask&&!tarea.rendicionTask&&!tarea.facturaTask?`
+        ${!tarea.registroServicio&&!tarea.liquidacionServicios&&!tarea.disponibilidadDiaria&&!tarea.pipelineTask&&!tarea.respaldoTask&&!tarea.rendimientoCombTask&&!tarea.cierreServicioTask&&!tarea.liquidacionTask&&!tarea.cotizacionTask&&!tarea.rendicionTask&&!tarea.facturaTask&&!tarea.costosTask&&!tarea.cajaTask?`
       <span onclick="moverTarea('${fase.id}',${tiReal},-1)" title="Subir" style="cursor:pointer;font-size:10px;color:#ddd;padding:0 2px">▲</span>
       <span onclick="moverTarea('${fase.id}',${tiReal},1)" title="Bajar" style="cursor:pointer;font-size:10px;color:#ddd;padding:0 2px">▼</span>
       ${modoEdicion ? `
         <span onclick="moverTarea('${fase.id}',${tiReal},-1)" title="Subir" style="cursor:pointer;font-size:12px;color:#90A4AE;padding:0 3px">↑</span>
         <span onclick="moverTarea('${fase.id}',${tiReal},1)" title="Bajar" style="cursor:pointer;font-size:12px;color:#90A4AE;padding:0 3px">↓</span>
-        ${!tarea.registroServicio && !tarea.liquidacionServicios && !tarea.disponibilidadDiaria && !tarea.pipelineTask && !tarea.respaldoTask && !tarea.rendimientoCombTask && !tarea.cierreServicioTask && !tarea.liquidacionTask && !tarea.cotizacionTask && !tarea.rendicionTask && !tarea.facturaTask ? `<span onclick="delTarea('${fase.id}',${tiReal})" title="Eliminar tarea" style="cursor:pointer;font-size:16px;color:#E53935;padding:0 4px">×</span>` : ''}
+        ${!tarea.registroServicio && !tarea.liquidacionServicios && !tarea.disponibilidadDiaria && !tarea.pipelineTask && !tarea.respaldoTask && !tarea.rendimientoCombTask && !tarea.cierreServicioTask && !tarea.liquidacionTask && !tarea.cotizacionTask && !tarea.rendicionTask && !tarea.facturaTask && !tarea.costosTask && !tarea.cajaTask ? `<span onclick="delTarea('${fase.id}',${tiReal})" title="Eliminar tarea" style="cursor:pointer;font-size:16px;color:#E53935;padding:0 4px">×</span>` : ''}
       ` : ''}
     `:''}
         <span class="acord-count" onclick="toggleAcord('${fase.id}',${tiReal})">${tarea.subtareas.length}</span>
@@ -3280,6 +3477,8 @@ function renderFase(fase) {
         ${tarea.pipelineTask ? `<div style="margin-bottom:8px">${renderPipeline()}</div>` : ''}
         ${tarea.rendicionTask ? `<div style="margin:-4px">${renderRendiciones()}</div>` : ''}
         ${tarea.facturaTask ? `<div style="margin:-4px">${renderFacturas()}</div>` : ''}
+        ${tarea.costosTask ? `<div style="margin:-4px">${renderCostos()}</div>` : ''}
+        ${tarea.cajaTask ? `<div style="margin:-4px">${renderCaja()}</div>` : ''}
         ${tarea.respaldoTask ? `<div style="padding:8px 0">
           <button onclick="descargarRespaldo()" style="width:100%;padding:12px;background:#37474F;color:white;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer">💾 Descargar respaldo</button></div>` : ''}
         ${subsHTML}
@@ -3508,6 +3707,7 @@ async function initSupabase() {
       await syncDisponibilidadDesdeSupabase();
       await syncRendicionesDesdeSupabase();
       await syncFacturasDesdeSupabase();
+      await syncLiquidacionesDesdeSupabase();
       await syncConfigPanel();
       render();
     } else {
@@ -3745,6 +3945,29 @@ async function upsertDisponibilidadSupa(fecha, patente, r) {
       mant_manual: r.mantManual||''
     }, { onConflict: 'id' });
   } catch(e) { console.warn('Error upsert disponibilidad:', e); }
+}
+
+// ── SYNC LIQUIDACIONES SUPABASE ───────────────────────────
+async function syncLiquidacionesDesdeSupabase() {
+  if (!supa || !supaConectado) return;
+  try {
+    const { data, error } = await supa.from('config_panel').select('*').eq('id','liquidaciones').single();
+    if (!error && data && data.data && Array.isArray(data.data.liquidaciones) && data.data.liquidaciones.length > 0) {
+      appData.liquidaciones = data.data.liquidaciones;
+      saveData();
+    }
+  } catch(e) { console.warn('Error sync liquidaciones:', e); }
+}
+
+async function pushLiquidacionesSupabase() {
+  if (!supa || !supaConectado) return;
+  try {
+    await supa.from('config_panel').upsert({
+      id: 'liquidaciones',
+      data: { liquidaciones: appData.liquidaciones || [] },
+      updated_at: new Date().toISOString()
+    }, { onConflict: 'id' });
+  } catch(e) { console.warn('Error push liquidaciones:', e); }
 }
 
 // ── SYNC CONFIG PANEL SUPABASE ────────────────────────────
@@ -4939,6 +5162,7 @@ function crearLiquidacion() {
 
   uiState.liq_form = {};
   saveData();
+  pushLiquidacionesSupabase();
   render();
   alert('✅ Liquidación ' + id + ' creada correctamente');
 }
