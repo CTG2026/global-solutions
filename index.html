@@ -5,26 +5,19 @@
   <meta http-equiv="cache-control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="pragma" content="no-cache">
   <meta http-equiv="expires" content="0">
-  <meta name="version" content="1774314377">
+  <meta name="version" content="1774405025">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <script>
 (function() {
-  var VERSION = '1774314377';
+  var VERSION = '1774405025';
   var stored = localStorage.getItem('gs_app_version');
   if (stored !== VERSION) {
-    // Versión nueva detectada — limpiar datos locales y forzar sync desde Supabase
     var session = localStorage.getItem('gs_session');
     var keys = Object.keys(localStorage);
-    keys.forEach(function(k) {
-      if (k !== 'gs_session') localStorage.removeItem(k);
-    });
+    keys.forEach(function(k) { if (k !== 'gs_session') localStorage.removeItem(k); });
     localStorage.setItem('gs_app_version', VERSION);
     if (session) localStorage.setItem('gs_session', session);
-    if ('caches' in window) {
-      caches.keys().then(function(names) {
-        names.forEach(function(name) { caches.delete(name); });
-      });
-    }
+    if ('caches' in window) caches.keys().then(function(n){n.forEach(function(x){caches.delete(x);});});
     window.location.reload(true);
   }
 })();
@@ -924,6 +917,18 @@ async function guardarBorradorCierre(id) {
     litros: d.litros, petroleo: d.petroleo, cfProrrateado: d.cfProrrateado,
     comisionConductor, cerrado: false, estado: 'borrador'
   });
+  // Preservar valores en uiState para que no se borren al render
+  const _s2 = appData.servicios[idx];
+  uiState['cs_precio_'+id] = _s2.precio||'';
+  uiState['cs_km_'+id] = _s2.km||'';
+  uiState['cs_tag_'+id] = _s2.tag||'';
+  uiState['cs_oc_'+id] = _s2.oc||'';
+  uiState['cs_peajes_'+id] = _s2.peajes||'';
+  uiState['cs_via_'+id] = _s2.viaticos||'';
+  uiState['cs_adic_'+id] = _s2.adicional||'';
+  uiState['cs_litros_'+id] = _s2.litros||'';
+  uiState['cs_petroleo_'+id] = _s2.petroleo||'';
+  uiState['cs_cf_'+id] = _s2.cfProrrateado||50800;
   saveData();
   await upsertServicioSupabase(appData.servicios[idx]);
   showToastGeneral('💾 Borrador guardado correctamente','#E65100');
@@ -2159,7 +2164,7 @@ function renderEditarServicio(id) {
   </div>`;
 }
 
-const ESTRUCTURA_VERSION = '74'; // Incrementar cuando cambie la estructura del panel
+const ESTRUCTURA_VERSION = '76'; // Incrementar cuando cambie la estructura del panel
 
 function loadData() {
   // Si la versión estructural cambió, limpiar la estructura pero preservar datos
@@ -2292,12 +2297,14 @@ function loadData() {
       }
     }
     // Limpiar módulos obsoletos y duplicados
-    let _cpcCount=0;
+    let _cpcCount=0; let _facCount=0; let _factCount=0;
     _finF.rutinarias=_finF.rutinarias.filter(r=>{
-      if (r.liquidacionServicios||r.cierreLiquidacion) return false;
-      if (r.titulo==='Bancarización Global Solutions'||r.titulo==='Bancarizacion Global Solutions') return false;
-      if (r.titulo==='Control de caja y presupuesto') return false;
-      if (r.titulo==='Cuentas por cobrar') { _cpcCount++; return _cpcCount<=1; }
+      if(r.liquidacionServicios||r.cierreLiquidacion) return false;
+      if(r.titulo==='Bancarización Global Solutions'||r.titulo==='Bancarizacion Global Solutions') return false;
+      if(r.titulo==='Control de caja y presupuesto') return false;
+      if(r.titulo==='Cuentas por cobrar'||r.cuentasCobrarTask){_cpcCount++;return _cpcCount<=1;}
+      if(r.facturaTask){_facCount++;return _facCount<=1;}
+      if(r.factoringTask){_factCount++;return _factCount<=1;}
       return true;
     });
   }
@@ -2581,7 +2588,10 @@ async function addServicio() {
   const tag = '';
   const km = 0;
   const viaticos = 0;
-  const servicio = { id, fecha: fechaFinal, anio, mes, patente, conductor, tipoEquipo, cliente, precio: 0, petroleo: 0, adicional: 0, liquidado: false, origen, tag, km, viaticos, peajes, guias, puntos };
+  const numPuntos = parseInt(document.getElementById('srv_num_puntos')?.value||uiState.srvForm?.numPuntos||'1')||1;
+  const estadia = document.getElementById('srv_estadia')?.value||uiState.srvForm?.estadia||'no';
+  const estadiaDias = parseInt(document.getElementById('srv_estadia_dias')?.value||uiState.srvForm?.estadiaDias||'1')||1;
+  const servicio = { id, fecha: fechaFinal, anio, mes, patente, conductor, tipoEquipo, cliente, precio: 0, petroleo: 0, adicional: 0, liquidado: false, origen: 'Casablanca', tag, km, viaticos, peajes, guias, puntos, numPuntos, estadia, estadiaDias };
   appData.servicios.push(servicio);
   // Registrar para deshacer
   registrarAccion(`Registrar servicio ${id} — ${cliente}`, () => {
@@ -2856,12 +2866,14 @@ function renderFase(fase) {
         saveData();
       }
     }
-    let _cpcRF=0;
+    let _cpcRF=0; let _facRF=0; let _factRF=0;
     fase.rutinarias=fase.rutinarias.filter(r=>{
-      if (r.liquidacionServicios||r.cierreLiquidacion) return false;
-      if (r.titulo==='Bancarización Global Solutions'||r.titulo==='Bancarizacion Global Solutions') return false;
-      if (r.titulo==='Control de caja y presupuesto') return false;
-      if (r.titulo==='Cuentas por cobrar') { _cpcRF++; return _cpcRF<=1; }
+      if(r.liquidacionServicios||r.cierreLiquidacion) return false;
+      if(r.titulo==='Bancarización Global Solutions'||r.titulo==='Bancarizacion Global Solutions') return false;
+      if(r.titulo==='Control de caja y presupuesto') return false;
+      if(r.titulo==='Cuentas por cobrar'||r.cuentasCobrarTask){_cpcRF++;return _cpcRF<=1;}
+      if(r.facturaTask){_facRF++;return _facRF<=1;}
+      if(r.factoringTask){_factRF++;return _factRF<=1;}
       return true;
     });
   }
@@ -3087,8 +3099,35 @@ function renderFase(fase) {
           </div>
         </div>
 
-        <!-- PUNTOS DE RUTA -->
-        <div style="font-size:10px;font-weight:800;color:#455A64;letter-spacing:1px;margin-bottom:8px;padding-bottom:5px;border-bottom:2px solid #CFD8DC">PUNTOS DE RUTA</div>
+        <!-- RUTA Y CONDICIONES -->
+        <div style="font-size:10px;font-weight:800;color:#455A64;letter-spacing:1px;margin-bottom:8px;padding-bottom:5px;border-bottom:2px solid #CFD8DC">RUTA Y CONDICIONES</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:10px">
+          <div>
+            <div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">ORIGEN</div>
+            <div style="background:#ECEFF1;border:1px solid #CFD8DC;border-radius:6px;padding:7px 9px;font-size:12px;font-weight:700;color:#455A64">Casablanca</div>
+          </div>
+          <div>
+            <div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">N° PUNTOS DE ENTREGA</div>
+            <select id="srv_num_puntos" onchange="if(!uiState.srvForm)uiState.srvForm={};uiState.srvForm.numPuntos=this.value" style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit;background:white;-webkit-appearance:auto">
+              ${[1,2,3,4,5].map(n=>'<option value="'+n+'" '+((sf.numPuntos||'1')==String(n)?'selected':'')+'>'+n+' punto'+(n>1?'s':'')+'</option>').join('')}
+            </select>
+          </div>
+          <div>
+            <div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">ESTADÍA</div>
+            <select id="srv_estadia" onchange="if(!uiState.srvForm)uiState.srvForm={};uiState.srvForm.estadia=this.value;render()" style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit;background:white;-webkit-appearance:auto">
+              <option value="no" ${(sf.estadia||'no')==='no'?'selected':''}>No</option>
+              <option value="si" ${sf.estadia==='si'?'selected':''}>Sí</option>
+            </select>
+          </div>
+          ${sf.estadia==='si'?`<div>
+            <div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">DÍAS DE ESTADÍA</div>
+            <select id="srv_estadia_dias" onchange="if(!uiState.srvForm)uiState.srvForm={};uiState.srvForm.estadiaDias=this.value" style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit;background:white;-webkit-appearance:auto">
+              ${[1,2,3,4,5].map(n=>'<option value="'+n+'" '+((sf.estadiaDias||'1')==String(n)?'selected':'')+'>'+n+' día'+(n>1?'s':'')+'</option>').join('')}
+            </select>
+          </div>`:'<div></div>'}
+        </div>
+        <!-- PUNTOS DE RUTA (guías y destinos) -->
+        <div style="font-size:9px;font-weight:700;color:#607D8B;letter-spacing:0.5px;margin-bottom:6px">PUNTOS DE RUTA</div>
         ${puntosHTML}
         <button onclick="addPunto()" style="width:100%;background:white;color:#455A64;border:1px dashed #90A4AE;border-radius:6px;padding:8px;font-size:11px;cursor:pointer;font-weight:700;margin-bottom:12px">+ Agregar punto de ruta</button>
 
@@ -3148,7 +3187,7 @@ function renderFase(fase) {
           const conductoresLista=appData.conductores;
           const patentesLista=appData.patentes||['GKFD84','WR9192','XR8555','GCFF12','BPBL35','XA1114','DSDV36'];
           const conductorPresel=(sessionRol&&sessionRol.acceso==='conductor'&&sessionConductor)?sessionConductor:'';
-          if(!uiState.srv_puntos||!uiState.srv_puntos.length){uiState.srv_puntos=[{origen:'',destino:'',tipo:'descarga',guia:'',fecha_guia:'',fecha_descarga:'',kg:'',imagen_url:''}];}
+          if(!uiState.srv_puntos||!uiState.srv_puntos.length){uiState.srv_puntos=[{origen:'Casablanca',destino:'',tipo:'descarga',guia:'',fecha_guia:'',fecha_descarga:'',kg:'',imagen_url:''}];}
           const puntos=uiState.srv_puntos;
           if(!uiState.srvForm)uiState.srvForm={};
           const sf=uiState.srvForm;
@@ -3899,8 +3938,8 @@ function renderPipeline() {
             </div>
             <input id="pip_accion_${ci}" value="${c.proximaAccion||''}" placeholder="Próxima acción" style="border:1px solid #dde;border-radius:6px;padding:6px 9px;font-size:12px;outline:none;font-family:inherit">
             <div style="font-size:9px;font-weight:800;color:#607D8B;letter-spacing:1px;padding-top:6px;border-top:1px solid #eee">DATOS FACTURACIÓN</div>
-            <input id="pip_rut_${ci}" value="${c.rut||''}" placeholder="RUT ej: 76.123.456-7" style="border:1px solid #dde;border-radius:6px;padding:6px 9px;font-size:12px;outline:none;font-family:inherit">
-            <input id="pip_email_factura_${ci}" value="${c.emailFactura||''}" placeholder="Email facturación" style="border:1px solid #dde;border-radius:6px;padding:6px 9px;font-size:12px;outline:none;font-family:inherit">
+            <input id="pip_rut_${ci}" value="${(uiState.pip_form_vals&&uiState.pip_form_vals[ci]&&uiState.pip_form_vals[ci].rut!==undefined)?uiState.pip_form_vals[ci].rut:(c.rut||'')}" placeholder="RUT ej: 76.123.456-7" oninput="if(!uiState.pip_form_vals)uiState.pip_form_vals={};if(!uiState.pip_form_vals[${ci}])uiState.pip_form_vals[${ci}]={};uiState.pip_form_vals[${ci}].rut=this.value" style="border:1px solid #dde;border-radius:6px;padding:6px 9px;font-size:12px;outline:none;font-family:inherit">
+            <input id="pip_email_factura_${ci}" value="${(uiState.pip_form_vals&&uiState.pip_form_vals[ci]&&uiState.pip_form_vals[ci].email_factura!==undefined)?uiState.pip_form_vals[ci].email_factura:(c.emailFactura||'')}" placeholder="Email facturación" oninput="if(!uiState.pip_form_vals)uiState.pip_form_vals={};if(!uiState.pip_form_vals[${ci}])uiState.pip_form_vals[${ci}]={};uiState.pip_form_vals[${ci}].email_factura=this.value" style="border:1px solid #dde;border-radius:6px;padding:6px 9px;font-size:12px;outline:none;font-family:inherit">
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
               <div><div style="font-size:9px;color:#888;margin-bottom:2px">Tipo</div>
                 <select id="pip_tipo_${ci}" style="width:100%;border:1px solid #dde;border-radius:6px;padding:6px 9px;font-size:12px;outline:none;background:white;-webkit-appearance:auto">
@@ -4010,13 +4049,25 @@ function renderPipeline() {
   </div>`;
 }
 
+function preservarFormPipeline(ci) {
+  if (!uiState.pip_form_vals) uiState.pip_form_vals = {};
+  const vals = {};
+  ['cliente','etapa','cat','accion','rut','email_factura','tipo','pago'].forEach(f=>{
+    const el = document.getElementById('pip_'+f+'_'+ci);
+    if (el) vals[f] = el.value;
+  });
+  const aprueba = document.getElementById('pip_aprueba_'+ci);
+  if (aprueba) vals.aprueba = aprueba.checked;
+  uiState.pip_form_vals[ci] = vals;
+}
 function editarPipeline(ci) {
-  // cerrar otros
   Object.keys(uiState).filter(k=>k.startsWith('pip_edit_')).forEach(k=>delete uiState[k]);
+  if (!uiState.pip_form_vals) uiState.pip_form_vals = {};
+  delete uiState.pip_form_vals[ci];
   uiState[`pip_edit_${ci}`] = true;
   render();
 }
-function cancelarEditPipeline(ci) { delete uiState[`pip_edit_${ci}`]; render(); }
+function cancelarEditPipeline(ci) { delete uiState[`pip_edit_${ci}`]; if(uiState.pip_form_vals) delete uiState.pip_form_vals[ci]; render(); }
 function cancelarAddPipeline() { delete uiState['pip_add']; delete uiState.pipNew; render(); }
 async function agregarNotaPipeline(ci) {
   const input = document.getElementById('pip_nota_nueva_' + ci);
@@ -4057,13 +4108,14 @@ async function guardarPipeline(ci) {
     notas: item.notas || '',
     ultimaGestion: item.ultimaGestion || '',
     notasMultiples: notasExistentes,
-    rut: document.getElementById(`pip_rut_${ci}`)?.value.trim() || item.rut || '',
-    emailFactura: document.getElementById(`pip_email_factura_${ci}`)?.value.trim() || item.emailFactura || '',
+    rut: (uiState.pip_form_vals&&uiState.pip_form_vals[ci]&&uiState.pip_form_vals[ci].rut!==undefined)?uiState.pip_form_vals[ci].rut:(document.getElementById(`pip_rut_${ci}`)?.value.trim()||item.rut||''),
+    emailFactura: (uiState.pip_form_vals&&uiState.pip_form_vals[ci]&&uiState.pip_form_vals[ci].email_factura!==undefined)?uiState.pip_form_vals[ci].email_factura:(document.getElementById(`pip_email_factura_${ci}`)?.value.trim()||item.emailFactura||''),
     tipoCliente: document.getElementById(`pip_tipo_${ci}`)?.value || item.tipoCliente || 'directo',
     condicionPago: document.getElementById(`pip_pago_${ci}`)?.value || item.condicionPago || '30',
     requiereAprobacion: !!(document.getElementById('pip_aprueba_'+ci)?.checked),
   };
   delete uiState[`pip_edit_${ci}`];
+  if(uiState.pip_form_vals) delete uiState.pip_form_vals[ci];
   await guardarPipelineSupabase(appData.pipeline[ci]);
   saveData(); render();
   showToastGeneral('✅ Cliente guardado correctamente');
@@ -5847,10 +5899,10 @@ function renderDashboard() {
       <div style="background:#1a3d6b;border-radius:10px;padding:10px 12px">
         <div style="font-size:9px;font-weight:800;letter-spacing:1px;color:rgba(255,255,255,0.5);margin-bottom:4px">FLOTA</div>
         <div style="font-size:11px;color:rgba(255,255,255,0.6)">Disp.</div>
-        <div style="font-size:22px;font-weight:900;color:white;line-height:1">${d.flota_disponible||0}<span style="font-size:11px;color:rgba(255,255,255,0.4)">/${d.flota_total||9}</span></div>
+        <div style="font-size:22px;font-weight:900;color:white;line-height:1">${dispPct}%</div>
         ${bar(dispPct,'rgba(255,255,255,0.7)',5)}
         <div style="font-size:11px;color:rgba(255,255,255,0.6)">Ocup.</div>
-        <div style="font-size:22px;font-weight:900;color:white;line-height:1">${d.flota_ocupada||0}<span style="font-size:11px;color:rgba(255,255,255,0.4)">/${d.flota_disponible||0}</span></div>
+        <div style="font-size:22px;font-weight:900;color:white;line-height:1">${ocupPct}%</div>
         ${bar(ocupPct,'rgba(255,255,255,0.7)',5)}
         ${eBtn('flota_disponible','Camiones disponibles hoy',d.flota_disponible||0)}
       </div>
@@ -5859,7 +5911,7 @@ function renderDashboard() {
         <div style="font-size:11px;color:rgba(255,255,255,0.6)">Esta sem.</div>
         <div style="font-size:22px;font-weight:900;color:white;line-height:1">${serviciosSemana}<span style="font-size:11px;color:rgba(255,255,255,0.4)">/${serviciosSemanaPresup||'?'}</span></div>
         <div style="font-size:10px;color:rgba(255,255,255,0.55);margin-top:4px">Sem ${semanaActual} del mes</div>
-        <div style="font-size:10px;color:rgba(255,255,255,0.55)">${serviciosMes} en el mes</div>
+        <div style="font-size:12px;font-weight:700;color:rgba(255,255,255,0.85);margin-top:2px">${serviciosMes} en el mes</div>
         ${eBtn('servicios_semana','Servicios esta semana',serviciosSemana)}
       </div>
       <div style="background:#1a3d6b;border-radius:10px;padding:10px 12px">
