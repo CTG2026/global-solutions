@@ -1515,6 +1515,159 @@ async function syncCostosDesdeSupabase() {
   } catch(e) { console.warn('Error sync costos desde Supabase:', e); }
 }
 
+// ─── CRUD COSTOS MANUALES ─────────────────────────────────────────────────────
+function agregarCosto() {
+  const f = uiState.costoForm || {};
+  const montoNeto = parseInt(f.monto_neto) || 0;
+  if (!montoNeto) { alert('⚠️ El monto neto es obligatorio.'); return; }
+  if (!f.fecha) { alert('⚠️ La fecha es obligatoria.'); return; }
+  if (!f.empresa) { alert('⚠️ La empresa emisora es obligatoria.'); return; }
+  const p = f.fecha.split('-');
+  const mes = p.length===3 ? (p[0].length===4 ? p[1] : p[1]) : String(new Date().getMonth()+1).padStart(2,'0');
+  const anio = p.length===3 ? (p[0].length===4 ? p[0] : p[2]) : String(new Date().getFullYear());
+  const iva = Math.round(montoNeto * 0.19);
+  if (!appData.costos) appData.costos = [];
+  appData.costos.push({ id:_genIdCosto(), fecha:f.fecha, empresa:f.empresa.trim(), monto_neto:montoNeto, iva, total:montoNeto+iva, equipo:f.equipo||'flota_completa', categoria:f.categoria||'administrativo', tipo_costo:f.tipo_costo||'', descripcion:(f.descripcion||'').trim(), mes, anio });
+  uiState.costoForm = {};
+  saveData(); pushCostosSupabase();
+  showToastGeneral('✅ Costo registrado','#2E7D32'); render();
+}
+function editarCosto(id) {
+  const c = (appData.costos||[]).find(x=>x.id===id);
+  if (!c) return;
+  uiState.costoEditId = id; uiState.costoForm = {...c}; uiState.costoTab = 'manual'; render();
+}
+function guardarEdicionCosto() {
+  const idx = (appData.costos||[]).findIndex(x=>x.id===uiState.costoEditId);
+  if (idx===-1) return;
+  const f = uiState.costoForm || {};
+  const montoNeto = parseInt(f.monto_neto) || 0;
+  const iva = Math.round(montoNeto * 0.19);
+  Object.assign(appData.costos[idx], { fecha:f.fecha, empresa:(f.empresa||'').trim(), monto_neto:montoNeto, iva, total:montoNeto+iva, equipo:f.equipo||'flota_completa', categoria:f.categoria||'administrativo', tipo_costo:f.tipo_costo||'', descripcion:(f.descripcion||'').trim() });
+  uiState.costoEditId = null; uiState.costoForm = {};
+  saveData(); pushCostosSupabase();
+  showToastGeneral('✅ Costo actualizado','#2E7D32'); render();
+}
+function eliminarCosto(id) {
+  if (!confirm('¿Eliminar este costo?')) return;
+  appData.costos = (appData.costos||[]).filter(x=>x.id!==id);
+  saveData(); pushCostosSupabase();
+  showToastGeneral('🗑️ Costo eliminado','#E65100'); render();
+}
+function cancelarEdicionCosto() { uiState.costoEditId = null; uiState.costoForm = {}; render(); }
+
+// ─── CRUD COPEC ───────────────────────────────────────────────────────────────
+function leerImagenCopec(input) {
+  const apiKey = appData.config && appData.config.anthropicApiKey;
+  if (!apiKey) { showToastGeneral('⚠️ Configura tu API key de Anthropic en Ajustes para usar lectura automática','#E65100'); return; }
+  const file = input.files[0]; if (!file) return;
+  showToastGeneral('🔍 Analizando imagen...','#1565C0');
+  const reader = new FileReader();
+  reader.onload = async function(e) {
+    try {
+      const base64 = e.target.result.split(',')[1];
+      const resp = await fetch('https://api.anthropic.com/v1/messages', { method:'POST', headers:{'x-api-key':apiKey,'anthropic-version':'2023-06-01','content-type':'application/json'}, body:JSON.stringify({ model:'claude-opus-4-6', max_tokens:256, messages:[{role:'user',content:[{type:'image',source:{type:'base64',media_type:file.type,data:base64}},{type:'text',text:'Imagen de carga COPEC. Extrae: patente, fecha (DD-MM-YYYY), litros, monto en pesos chilenos. Responde SOLO JSON: {"patente":"","fecha":"","litros":0,"monto":0}'}]}] }) });
+      const data = await resp.json();
+      const json = JSON.parse(data.content[0].text.match(/\{[\s\S]*\}/)[0]);
+      uiState.copecForm = {...(uiState.copecForm||{}), ...json};
+      showToastGeneral('✅ Datos leídos — revisa y confirma','#2E7D32'); render();
+    } catch(err) { showToastGeneral('❌ Error leyendo imagen','#C62828'); }
+  };
+  reader.readAsDataURL(file);
+}
+function agregarCopec() {
+  const f = uiState.copecForm || {};
+  if (!f.patente) { alert('⚠️ Selecciona una patente.'); return; }
+  if (!f.fecha) { alert('⚠️ La fecha es obligatoria.'); return; }
+  if (!parseInt(f.monto)) { alert('⚠️ El monto es obligatorio.'); return; }
+  const p = f.fecha.split('-');
+  const mes = p.length===3 ? p[1] : String(new Date().getMonth()+1).padStart(2,'0');
+  const anio = p.length===3 ? p[2] : String(new Date().getFullYear());
+  if (!appData.copec) appData.copec = [];
+  appData.copec.push({ id:_genIdCopec(), fecha:f.fecha, patente:f.patente, litros:parseFloat(f.litros)||0, monto:parseInt(f.monto)||0, id_manual:(f.id_manual||'').trim(), mes, anio });
+  uiState.copecForm = {};
+  saveData(); pushCostosSupabase();
+  showToastGeneral('✅ Carga COPEC registrada','#2E7D32'); render();
+}
+function eliminarCopec(id) {
+  if (!confirm('¿Eliminar esta carga COPEC?')) return;
+  appData.copec = (appData.copec||[]).filter(x=>x.id!==id);
+  saveData(); pushCostosSupabase();
+  showToastGeneral('🗑️ Carga eliminada','#E65100'); render();
+}
+function editarCopecId(id) {
+  const actual = (appData.copec||[]).find(x=>x.id===id)?.id_manual||'';
+  const nuevo = prompt('ID de la transacción:', actual); if (nuevo===null) return;
+  const idx = (appData.copec||[]).findIndex(x=>x.id===id);
+  if (idx!==-1) { appData.copec[idx].id_manual = nuevo.trim(); saveData(); pushCostosSupabase(); render(); }
+}
+
+// ─── CARTOLA EXCEL ────────────────────────────────────────────────────────────
+function procesarCartolaExcel(input) {
+  const file = input.files[0]; if (!file) return;
+  if (typeof XLSX === 'undefined') { showToastGeneral('⚠️ Librería Excel no disponible, recarga la página','#E65100'); return; }
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      const wb = XLSX.read(e.target.result, {type:'array'});
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
+      const dataRows = (rows[0] && typeof rows[0][0]==='string' && isNaN(rows[0][0])) ? rows.slice(1) : rows;
+      if (!appData.cartola) appData.cartola = [];
+      const hoy = new Date(); let agregados = 0;
+      dataRows.forEach(row => {
+        if (!row || row.length < 3) return;
+        const fechaRaw = String(row[0]||'').trim();
+        const glosa = String(row[1]||'').trim();
+        const montoRaw = parseFloat(String(row[2]||'').replace(/\./g,'').replace(',','.')) || 0;
+        const categoria = String(row[3]||'').trim();
+        if (!fechaRaw || !glosa || !montoRaw) return;
+        let fecha = fechaRaw.includes('/') ? fechaRaw.replace(/\//g,'-') : fechaRaw;
+        if (/^\d{5}$/.test(fecha)) { const d=new Date((parseInt(fecha)-25569)*86400*1000); fecha=`${String(d.getDate()).padStart(2,'0')}-${String(d.getMonth()+1).padStart(2,'0')}-${d.getFullYear()}`; }
+        const p = fecha.split('-');
+        const mes = p.length===3 ? p[1] : String(hoy.getMonth()+1).padStart(2,'0');
+        const anio = p.length===3 ? p[2] : String(hoy.getFullYear());
+        appData.cartola.push({ id:_genIdCartola(), fecha, glosa, monto:Math.abs(montoRaw), categoria, mes, anio, importado:false });
+        agregados++;
+      });
+      saveData(); pushCostosSupabase();
+      showToastGeneral(`✅ ${agregados} movimientos importados`,'#2E7D32'); render();
+    } catch(err) { showToastGeneral('❌ Error leyendo Excel: '+err.message,'#C62828'); }
+  };
+  reader.readAsArrayBuffer(file);
+}
+function eliminarCartola(id) {
+  if (!confirm('¿Eliminar este movimiento?')) return;
+  appData.cartola = (appData.cartola||[]).filter(x=>x.id!==id);
+  saveData(); pushCostosSupabase(); render();
+}
+function limpiarCartolaMes(mes, anio) {
+  if (!confirm('¿Eliminar TODOS los movimientos del mes?')) return;
+  appData.cartola = (appData.cartola||[]).filter(c=>!(c.mes===mes&&c.anio===anio));
+  saveData(); pushCostosSupabase(); render();
+}
+function importarCartolaSeleccionados() {
+  const ids = Object.keys(uiState).filter(k=>k.startsWith('cartola_sel_')&&uiState[k]).map(k=>k.replace('cartola_sel_',''));
+  if (!ids.length) { showToastGeneral('⚠️ Selecciona al menos un movimiento','#E65100'); return; }
+  if (!appData.costos) appData.costos = [];
+  const hoy = new Date(); let importados = 0;
+  ids.forEach(id => {
+    const item = (appData.cartola||[]).find(x=>x.id===id);
+    if (!item||item.importado) return;
+    const p = item.fecha.split('-');
+    const mes = p.length===3?p[1]:String(hoy.getMonth()+1).padStart(2,'0');
+    const anio = p.length===3?p[2]:String(hoy.getFullYear());
+    const montoNeto = Math.round(item.monto/1.19);
+    appData.costos.push({ id:_genIdCosto(), fecha:item.fecha, empresa:item.glosa, monto_neto:montoNeto, iva:item.monto-montoNeto, total:item.monto, equipo:'flota_completa', categoria:'administrativo', tipo_costo:item.categoria||'', descripcion:'Importado de cartola', mes, anio });
+    const idx = (appData.cartola||[]).findIndex(x=>x.id===id);
+    if (idx!==-1) appData.cartola[idx].importado = true;
+    uiState['cartola_sel_'+id] = false;
+    importados++;
+  });
+  saveData(); pushCostosSupabase();
+  showToastGeneral(`✅ ${importados} movimientos importados a Costos`,'#2E7D32'); render();
+}
+
 function renderCostos() {
   const servicios = appData.servicios || [];
   const rendiciones = appData.rendiciones || [];
