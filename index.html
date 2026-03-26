@@ -4509,12 +4509,26 @@ async function syncConfigPanel() {
 function _deduplicarFases() {
   (appData.fases||[]).forEach(f => {
     if (!f.rutinarias) return;
+    // Deduplicar por flag de sistema
     const flags = ['facturaTask','costosTask','cajaTask','liquidacionTask','cierreServicioTask','rendicionTask','pipelineTask','rendimientoCombTask'];
     flags.forEach(flag => {
       let cnt = 0;
       f.rutinarias = f.rutinarias.filter(r => r[flag] ? ++cnt <= 1 : true);
     });
+    // Eliminar tareas manuales con títulos duplicados de tareas de sistema
+    const titulosEliminar = ['facturación y cobro','facturacion y cobro','cuentas por cobrar','bancarización global solutions','bancarizacion global solutions','control de caja y presupuesto'];
+    const tieneSistema = { facturaTask: f.rutinarias.some(r=>r.facturaTask) };
+    f.rutinarias = f.rutinarias.filter(r => {
+      const titulo = (r.titulo||'').toLowerCase().trim();
+      // Si es tarea de sistema con flag, la conservamos
+      if (flags.some(fl => r[fl])) return true;
+      // Si el título coincide con uno de sistema y ya existe la versión con flag, eliminar
+      if (titulo.includes('facturación y cobro') || titulo.includes('facturacion y cobro')) return !tieneSistema.facturaTask;
+      if (titulo === 'cuentas por cobrar' || r.cuentasCobrarTask) return false;
+      return true;
+    });
   });
+  saveData();
 }
 
 async function pushConfigPanel() {
