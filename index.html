@@ -1668,6 +1668,65 @@ function importarCartolaSeleccionados() {
   showToastGeneral(`✅ ${importados} movimientos importados a Costos`,'#2E7D32'); render();
 }
 
+// ─── TAB HISTORIAL ────────────────────────────────────────────────────────────
+function _costoTabHistorial(mes, anio) {
+  const fMes = uiState.costoFiltroMes || mes;
+  const fAnio = uiState.costoFiltroAnio || anio;
+  const costos = (appData.costos||[]).filter(c=>c.mes===fMes&&c.anio===fAnio);
+  const copec  = (appData.copec||[]).filter(c=>c.mes===fMes&&c.anio===fAnio);
+  const tCostos = costos.reduce((a,c)=>a+c.total,0);
+  const tCopec  = copec.reduce((a,c)=>a+c.monto,0);
+  const tTotal  = tCostos + tCopec;
+  const MNOMBRES = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+  const selStyle = 'padding:7px;border:1px solid #dde;border-radius:6px;font-size:12px';
+  return `
+  <div style="display:flex;gap:6px;margin-bottom:10px">
+    <select onchange="uiState.costoFiltroMes=this.value;render()" style="flex:1;${selStyle}">
+      ${['01','02','03','04','05','06','07','08','09','10','11','12'].map((m,i)=>`<option value="${m}" ${fMes===m?'selected':''}>${MNOMBRES[i]}</option>`).join('')}
+    </select>
+    <select onchange="uiState.costoFiltroAnio=this.value;render()" style="${selStyle}">
+      ${['2025','2026','2027'].map(y=>`<option value="${y}" ${fAnio===y?'selected':''}>${y}</option>`).join('')}
+    </select>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:12px">
+    <div style="background:#FFEBEE;border-radius:8px;padding:8px;text-align:center">
+      <div style="font-size:9px;font-weight:700;color:#C62828">COSTOS</div>
+      <div style="font-size:14px;font-weight:900;color:#C62828">$${tCostos.toLocaleString('es-CL')}</div>
+    </div>
+    <div style="background:#FFF8E1;border-radius:8px;padding:8px;text-align:center">
+      <div style="font-size:9px;font-weight:700;color:#E65100">COPEC</div>
+      <div style="font-size:14px;font-weight:900;color:#E65100">$${tCopec.toLocaleString('es-CL')}</div>
+    </div>
+    <div style="background:#EDE7F6;border-radius:8px;padding:8px;text-align:center">
+      <div style="font-size:9px;font-weight:700;color:#4527A0">TOTAL</div>
+      <div style="font-size:14px;font-weight:900;color:#4527A0">$${tTotal.toLocaleString('es-CL')}</div>
+    </div>
+  </div>
+  ${costos.length===0&&copec.length===0?'<div style="text-align:center;color:#aaa;font-size:11px;padding:20px">Sin registros en este período</div>':''}
+  ${costos.length?`<div style="font-size:9px;font-weight:700;color:#C62828;margin-bottom:5px">COSTOS GENERALES (${costos.length})</div>
+  ${costos.slice().reverse().map(c=>`
+  <div style="background:white;border:1px solid #eee;border-radius:8px;padding:8px 10px;margin-bottom:4px;display:flex;justify-content:space-between;align-items:center">
+    <div style="flex:1;min-width:0">
+      <div style="font-size:11px;font-weight:700;color:#333">${c.empresa}</div>
+      <div style="font-size:10px;color:#888">${c.fecha} · ${c.equipo==='flota_completa'?'Flota completa':c.equipo} · ${c.tipo_costo||c.categoria}</div>
+      ${c.descripcion?`<div style="font-size:10px;color:#bbb">${c.descripcion}</div>`:''}
+    </div>
+    <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;margin-left:8px;flex-shrink:0">
+      <div style="font-size:12px;font-weight:700;color:#C62828">$${c.total.toLocaleString('es-CL')}</div>
+      <button onclick="editarCosto('${c.id}');uiState.costoTab='manual';render()" style="font-size:10px;padding:3px 8px;background:#E3F2FD;color:#1565C0;border:1px solid #BBDEFB;border-radius:5px;cursor:pointer">✏️</button>
+    </div>
+  </div>`).join('')}`:''}
+  ${copec.length?`<div style="font-size:9px;font-weight:700;color:#E65100;margin-top:8px;margin-bottom:5px">CARGAS COPEC (${copec.length})</div>
+  ${copec.slice().reverse().map(c=>`
+  <div style="background:white;border:1px solid #FFE082;border-radius:8px;padding:8px 10px;margin-bottom:4px;display:flex;justify-content:space-between;align-items:center">
+    <div>
+      <div style="font-size:11px;font-weight:700;color:#E65100">${c.patente}</div>
+      <div style="font-size:10px;color:#888">${c.fecha}${c.litros?' · '+c.litros+'L':''}${c.id_manual?' · ID: '+c.id_manual:''}</div>
+    </div>
+    <div style="font-size:12px;font-weight:700;color:#E65100">$${c.monto.toLocaleString('es-CL')}</div>
+  </div>`).join('')}`:''}`;
+}
+
 // ─── TAB COPEC ────────────────────────────────────────────────────────────────
 function _costoTabCopec(mes, anio, flota) {
   const f = uiState.copecForm || {};
