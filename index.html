@@ -1481,6 +1481,40 @@ function renderFacturas() {
   </div>`;
 }
 
+// ─── MÓDULO COSTOS — FUNCIONES BASE ──────────────────────────────────────────
+function getFlota() {
+  const camiones = (appData.patentes && appData.patentes.length) ? appData.patentes : ['WR9192','GKFD84','XR8555','GCFF12','BPBL35','XA1114','DSDV36'];
+  const camionetas = (appData.camionetas && appData.camionetas.length) ? appData.camionetas : ['BWGH46','KSRC78','JYJV21'];
+  return { camiones, camionetas, todas: [...camiones, ...camionetas] };
+}
+function _genIdCosto() { return 'CST-' + Date.now().toString(36).toUpperCase(); }
+function _genIdCopec() { return 'CPC-' + Date.now().toString(36).toUpperCase(); }
+function _genIdCartola() { return 'CTL-' + Date.now().toString(36).toUpperCase(); }
+
+async function pushCostosSupabase() {
+  if (!supa || !supaConectado) return;
+  try {
+    await supa.from('config_panel').upsert({
+      id: 'costos',
+      data: { costos: appData.costos||[], copec: appData.copec||[], cartola: appData.cartola||[] },
+      updated_at: new Date().toISOString()
+    }, { onConflict: 'id' });
+  } catch(e) { console.warn('Error sync costos Supabase:', e); }
+}
+
+async function syncCostosDesdeSupabase() {
+  if (!supa || !supaConectado) return;
+  try {
+    const { data, error } = await supa.from('config_panel').select('*').eq('id','costos').single();
+    if (!error && data?.data) {
+      if (Array.isArray(data.data.costos)) appData.costos = data.data.costos;
+      if (Array.isArray(data.data.copec)) appData.copec = data.data.copec;
+      if (Array.isArray(data.data.cartola)) appData.cartola = data.data.cartola;
+      saveData();
+    }
+  } catch(e) { console.warn('Error sync costos desde Supabase:', e); }
+}
+
 function renderCostos() {
   const servicios = appData.servicios || [];
   const rendiciones = appData.rendiciones || [];
