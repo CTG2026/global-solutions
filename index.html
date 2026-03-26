@@ -1668,6 +1668,57 @@ function importarCartolaSeleccionados() {
   showToastGeneral(`✅ ${importados} movimientos importados a Costos`,'#2E7D32'); render();
 }
 
+// ─── IMPORTAR COSTOS DESDE EXCEL ─────────────────────────────────────────────
+// Columnas esperadas: Fecha | Empresa | Monto neto | Equipo | Categoría | Tipo | Descripción
+function importarCostosDesdeExcel(input) {
+  const file = input.files[0]; if (!file) return;
+  if (typeof XLSX === 'undefined') { showToastGeneral('⚠️ Librería Excel no disponible, recarga la página','#E65100'); return; }
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      const wb = XLSX.read(e.target.result, { type:'array' });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(ws, { header:1, defval:'' });
+      // Detectar si primera fila es encabezado
+      const dataRows = (rows[0] && typeof rows[0][0]==='string' && isNaN(rows[0][0])) ? rows.slice(1) : rows;
+      if (!appData.costos) appData.costos = [];
+      const hoy = new Date(); let agregados = 0; const errores = [];
+      dataRows.forEach((row, ri) => {
+        if (!row || row.every(c=>!c)) return; // fila vacía
+        const fechaRaw = String(row[0]||'').trim();
+        const empresa  = String(row[1]||'').trim();
+        const montoRaw = parseFloat(String(row[2]||'').replace(/\./g,'').replace(',','.')) || 0;
+        const equipo   = String(row[3]||'flota_completa').trim() || 'flota_completa';
+        const categoria= String(row[4]||'administrativo').trim().toLowerCase() || 'administrativo';
+        const tipoCosto= String(row[5]||'').trim();
+        const desc     = String(row[6]||'').trim();
+        if (!empresa || !montoRaw) { errores.push(`Fila ${ri+2}: empresa o monto vacío`); return; }
+        // Parsear fecha
+        let fecha = fechaRaw.includes('/') ? fechaRaw.replace(/\//g,'-') : fechaRaw;
+        if (/^\d{5}$/.test(fecha)) {
+          const d = new Date((parseInt(fecha)-25569)*86400*1000);
+          fecha = `${String(d.getDate()).padStart(2,'0')}-${String(d.getMonth()+1).padStart(2,'0')}-${d.getFullYear()}`;
+        }
+        if (!fecha) fecha = `${String(hoy.getDate()).padStart(2,'0')}-${String(hoy.getMonth()+1).padStart(2,'0')}-${hoy.getFullYear()}`;
+        const p = fecha.split('-');
+        const mes  = p.length===3 ? (p[0].length===4 ? p[1] : p[1]) : String(hoy.getMonth()+1).padStart(2,'0');
+        const anio = p.length===3 ? (p[0].length===4 ? p[0] : p[2]) : String(hoy.getFullYear());
+        const montoNeto = Math.round(montoRaw);
+        const iva = Math.round(montoNeto * 0.19);
+        appData.costos.push({ id:_genIdCosto(), fecha, empresa, monto_neto:montoNeto, iva, total:montoNeto+iva, equipo, categoria, tipo_costo:tipoCosto, descripcion:desc, mes, anio });
+        agregados++;
+      });
+      saveData(); pushCostosSupabase();
+      let msg = `✅ ${agregados} costos importados`;
+      if (errores.length) msg += ` (${errores.length} filas omitidas)`;
+      showToastGeneral(msg, agregados>0?'#2E7D32':'#E65100');
+      if (errores.length) console.warn('Errores importación costos:', errores);
+      render();
+    } catch(err) { showToastGeneral('❌ Error leyendo Excel: '+err.message,'#C62828'); }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
 // ─── TAB HISTORIAL ────────────────────────────────────────────────────────────
 function _costoTabHistorial(mes, anio) {
   const fMes = uiState.costoFiltroMes || mes;
@@ -1680,6 +1731,12 @@ function _costoTabHistorial(mes, anio) {
   const MNOMBRES = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
   const selStyle = 'padding:7px;border:1px solid #dde;border-radius:6px;font-size:12px';
   return `
+  <div style="background:#E8F5E9;border:1px solid #A5D6A7;border-radius:8px;padding:10px;margin-bottom:10px">
+    <div style="font-size:10px;font-weight:700;color:#2E7D32;margin-bottom:6px">📥 IMPORTAR COSTOS DESDE EXCEL</div>
+    <div style="font-size:10px;color:#555;margin-bottom:8px">Columnas: <b>Fecha · Empresa · Monto neto · Equipo · Categoría · Tipo · Descripción</b></div>
+    <button onclick="document.getElementById('costos_excel_inp').click()" style="width:100%;padding:9px;background:#2E7D32;color:white;border:none;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer">📊 Subir Excel de costos</button>
+    <input type="file" id="costos_excel_inp" accept=".xlsx,.xls" style="display:none" onchange="importarCostosDesdeExcel(this)">
+  </div>
   <div style="display:flex;gap:6px;margin-bottom:10px">
     <select onchange="uiState.costoFiltroMes=this.value;render()" style="flex:1;${selStyle}">
       ${['01','02','03','04','05','06','07','08','09','10','11','12'].map((m,i)=>`<option value="${m}" ${fMes===m?'selected':''}>${MNOMBRES[i]}</option>`).join('')}
