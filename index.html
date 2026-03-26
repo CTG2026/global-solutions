@@ -1763,6 +1763,7 @@ function _costoTabHistorial(mes, anio) {
     <div style="font-size:10px;color:#555;margin-bottom:8px">Columnas: <b>Fecha · Empresa · Monto neto · Equipo · Categoría · Tipo · Descripción</b></div>
     <button onclick="document.getElementById('costos_excel_inp').click()" style="width:100%;padding:9px;background:#2E7D32;color:white;border:none;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer">📊 Subir Excel de costos</button>
     <input type="file" id="costos_excel_inp" accept=".xlsx,.xls" style="display:none" onchange="importarCostosDesdeExcel(this)">
+  </div>`}
   <div style="display:flex;gap:6px;margin-bottom:10px">
     <select onchange="uiState.costoFiltroMes=this.value;render()" style="flex:1;${selStyle}">
       ${['01','02','03','04','05','06','07','08','09','10','11','12'].map((m,i)=>`<option value="${m}" ${fMes===m?'selected':''}>${MNOMBRES[i]}</option>`).join('')}
