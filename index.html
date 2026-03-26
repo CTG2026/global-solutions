@@ -1728,10 +1728,11 @@ function cancelarImportacionCostos() {
 
 // ─── TAB HISTORIAL ────────────────────────────────────────────────────────────
 function _costoTabHistorial(mes, anio) {
-  const fMes = uiState.costoFiltroMes || mes;
+  const fMes  = uiState.costoFiltroMes  || mes;
   const fAnio = uiState.costoFiltroAnio || anio;
-  const costos = (appData.costos||[]).filter(c=>c.mes===fMes&&c.anio===fAnio);
-  const copec  = (appData.copec||[]).filter(c=>c.mes===fMes&&c.anio===fAnio);
+  const todosLosMeses = uiState.costoFiltroTodos || false;
+  const costos = (appData.costos||[]).filter(c => todosLosMeses ? c.anio===fAnio : c.mes===fMes&&c.anio===fAnio);
+  const copec  = (appData.copec||[]).filter(c  => todosLosMeses ? c.anio===fAnio : c.mes===fMes&&c.anio===fAnio);
   const tCostos = costos.reduce((a,c)=>a+c.total,0);
   const tCopec  = copec.reduce((a,c)=>a+c.monto,0);
   const tTotal  = tCostos + tCopec;
@@ -1764,14 +1765,19 @@ function _costoTabHistorial(mes, anio) {
     <button onclick="document.getElementById('costos_excel_inp').click()" style="width:100%;padding:9px;background:#2E7D32;color:white;border:none;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer">📊 Subir Excel de costos</button>
     <input type="file" id="costos_excel_inp" accept=".xlsx,.xls" style="display:none" onchange="importarCostosDesdeExcel(this)">
   </div>`}
-  <div style="display:flex;gap:6px;margin-bottom:10px">
+  <div style="display:flex;gap:6px;margin-bottom:6px;flex-wrap:wrap">
+    <button onclick="uiState.costoFiltroTodos=!uiState.costoFiltroTodos;render()" style="padding:7px 10px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;border:1px solid ${todosLosMeses?'#4527A0':'#dde'};background:${todosLosMeses?'#EDE7F6':'#fff'};color:${todosLosMeses?'#4527A0':'#666'}">
+      ${todosLosMeses?'✅ Todos':'📅 Todos'}
+    </button>
+    ${!todosLosMeses?`
     <select onchange="uiState.costoFiltroMes=this.value;render()" style="flex:1;${selStyle}">
       ${['01','02','03','04','05','06','07','08','09','10','11','12'].map((m,i)=>`<option value="${m}" ${fMes===m?'selected':''}>${MNOMBRES[i]}</option>`).join('')}
-    </select>
+    </select>`:''}
     <select onchange="uiState.costoFiltroAnio=this.value;render()" style="${selStyle}">
       ${['2025','2026','2027'].map(y=>`<option value="${y}" ${fAnio===y?'selected':''}>${y}</option>`).join('')}
     </select>
   </div>
+  ${todosLosMeses?`<div style="font-size:10px;color:#4527A0;font-weight:700;margin-bottom:8px">Mostrando todos los meses del año ${fAnio} · ${costos.length+copec.length} registros</div>`:`<div style="font-size:10px;color:#888;margin-bottom:8px">${MNOMBRES[parseInt(fMes)-1]} ${fAnio} · ${costos.length+copec.length} registros</div>`}
   <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:12px">
     <div style="background:#FFEBEE;border-radius:8px;padding:8px;text-align:center">
       <div style="font-size:9px;font-weight:700;color:#C62828">COSTOS</div>
