@@ -6629,6 +6629,7 @@ function saveDashSingle() {
 }
 
 function render() {
+  _deduplicarFases();
   const dashEl = document.getElementById('dashboard-container');
   // Ocultar dashboard cuando se filtra por un ámbito específico
   if (vistaActual !== 'todas') {
