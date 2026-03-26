@@ -4495,17 +4495,26 @@ async function syncConfigPanel() {
   try {
     const { data, error } = await supa.from('config_panel').select('*').eq('id', 'main').single();
     if (error || !data) {
-      // Primera vez — guardar config actual en Supabase
       await pushConfigPanel();
     } else {
-      // Restaurar fases desde Supabase
       if (data.data && data.data.fases) {
-        // Merge: mantener datos operacionales locales, tomar estructura de Supabase
         appData.fases = data.data.fases;
+        _deduplicarFases();
         saveData();
       }
     }
   } catch(e) { console.warn('Error sync config panel:', e); }
+}
+
+function _deduplicarFases() {
+  (appData.fases||[]).forEach(f => {
+    if (!f.rutinarias) return;
+    const flags = ['facturaTask','costosTask','cajaTask','liquidacionTask','cierreServicioTask','rendicionTask','pipelineTask','rendimientoCombTask'];
+    flags.forEach(flag => {
+      let cnt = 0;
+      f.rutinarias = f.rutinarias.filter(r => r[flag] ? ++cnt <= 1 : true);
+    });
+  });
 }
 
 async function pushConfigPanel() {
