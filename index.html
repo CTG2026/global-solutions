@@ -24,6 +24,7 @@
 </script>
 <title>Panel de Gestión — Global Solutions</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: 'Segoe UI', system-ui, sans-serif; background: #f0f2f5; min-height: 100vh; }
@@ -389,6 +390,10 @@ const DEFAULT_DATA = {
     facturas_cobrar: 0,
     historial: [],
   },
+  costos: [],
+  copec: [],
+  cartola: [],
+  camionetas: ['BWGH46','KSRC78','JYJV21'],
   conductores: ['Manuel Madrid','Felipe Vidal','Felipe Madariaga','Sebastián Zúñiga','Pablo Riquelme'],
   midia_foco: [],
   midia_open: {},
@@ -694,7 +699,7 @@ document.addEventListener('keydown', (e) => {
 // ── RENDIMIENTO COMBUSTIBLE v36 ───────────────────────────
 function renderRendimientoComb() {
   if (!appData.rendimientoComb) appData.rendimientoComb = [];
-  const FLOTA = appData.patentes || ['GKFD84','WR9192','XR8555','GCFF12','BPBL35','XA1114','DSDV36'];
+  const FLOTA = appData.patentes || ['WR9192','GKFD84','XR8555','GCFF12','BPBL35','XA1114'];
   const hoyISO = (()=>{const h=new Date();return `${h.getFullYear()}-${String(h.getMonth()+1).padStart(2,'0')}-${String(h.getDate()).padStart(2,'0')}`;})();
   const pendientes = appData.rendimientoComb.filter(r=>!r.odometroFin);
   const completados = appData.rendimientoComb.filter(r=>r.odometroFin).slice(-8).reverse();
@@ -1157,7 +1162,7 @@ function pdfRendicion(id) {
 
 function renderRendiciones() {
   if (!appData.rendiciones) appData.rendiciones = [];
-  const patentesLista = appData.patentes||['GKFD84','WR9192','XR8555','GCFF12','BPBL35','XA1114','DSDV36'];
+  const patentesLista = appData.patentes||['WR9192','GKFD84','XR8555','GCFF12','BPBL35','XA1114'];
   const hoyISO = (()=>{const h=new Date();return h.getFullYear()+'-'+String(h.getMonth()+1).padStart(2,'0')+'-'+String(h.getDate()).padStart(2,'0');})();
   if (!uiState.ren_lineas||!uiState.ren_lineas.length) uiState.ren_lineas=[{fecha:'',categoria:'Combustible',descripcion:'',patente:'',monto:''}];
 
@@ -2223,7 +2228,7 @@ function renderEditarServicio(id) {
   const hoyISO=(()=>{const h=new Date();return h.getFullYear()+'-'+String(h.getMonth()+1).padStart(2,'0')+'-'+String(h.getDate()).padStart(2,'0');})();
   const fechaISO = s.fecha?(()=>{const p=s.fecha.split('-');return p.length===3&&p[0].length===2?`${p[2]}-${p[1]}-${p[0]}`:s.fecha;})():hoyISO;
   const conductoresLista = appData.conductores||['Manuel Madrid','Felipe Vidal','Felipe Madariaga','Sebastián Zúñiga','Pablo Riquelme','Tercero'];
-  const patentesLista = appData.patentes||['GKFD84','WR9192','XR8555','GCFF12','BPBL35','XA1114','DSDV36'];
+  const patentesLista = appData.patentes||['WR9192','GKFD84','XR8555','GCFF12','BPBL35','XA1114'];
   const clientesDefault = (window.DEFAULT_DATA||{pipeline:[]}).pipeline.filter(c=>c.etapa==='activo').map(c=>c.cliente);
   const clientesLocal = (appData.pipeline||[]).filter(c=>c.etapa==='activo').map(c=>c.cliente);
   const clientesActivos = [...new Set([...clientesDefault,...clientesLocal])].sort();
@@ -2332,6 +2337,10 @@ function loadData() {
         facturas: viejos.facturas || [],
         conductores: viejos.conductores || [],
         patentes: viejos.patentes || [],
+        camionetas: viejos.camionetas || [],
+        costos: viejos.costos || [],
+        copec: viejos.copec || [],
+        cartola: viejos.cartola || [],
         clientesRut: viejos.clientesRut || {},
         cotizaciones: viejos.cotizaciones || [],
         rendimientoComb: viejos.rendimientoComb || [],
@@ -2350,6 +2359,10 @@ function loadData() {
     if (Object.keys(datosAPreservar.clientesRut||{}).length) appData.clientesRut = datosAPreservar.clientesRut;
     if (datosAPreservar.cotizaciones?.length) appData.cotizaciones = datosAPreservar.cotizaciones;
     if (datosAPreservar.rendimientoComb?.length) appData.rendimientoComb = datosAPreservar.rendimientoComb;
+    if (datosAPreservar.camionetas?.length) appData.camionetas = datosAPreservar.camionetas;
+    if (datosAPreservar.costos?.length) appData.costos = datosAPreservar.costos;
+    if (datosAPreservar.copec?.length) appData.copec = datosAPreservar.copec;
+    if (datosAPreservar.cartola?.length) appData.cartola = datosAPreservar.cartola;
     // Guardar nueva versión
     localStorage.setItem('gs_estructura_ver', ESTRUCTURA_VERSION);
     localStorage.setItem('gs_panel_ui_v5', '{}');
@@ -2629,7 +2642,7 @@ function mostrarAgregarConductor() {
 function mostrarAgregarPatente() {
   const pat = prompt('Patente nueva (ej: AB1234):');
   if (!pat || !pat.trim()) return;
-  if (!appData.patentes) appData.patentes = ['GKFD84','WR9192','XR8555','GCFF12','BPBL35','XA1114','DSDV36'];
+  if (!appData.patentes) appData.patentes = ['WR9192','GKFD84','XR8555','GCFF12','BPBL35','XA1114'];
   if (!appData.patentes.includes(pat.trim().toUpperCase())) {
     appData.patentes.push(pat.trim().toUpperCase());
     saveData(); render();
@@ -3333,7 +3346,7 @@ function renderFase(fase) {
           if(!appData.conductores||appData.conductores.length<2){appData.conductores=conductoresDefault;saveData();}
           if(!appData.conductores.includes('Tercero')){appData.conductores.push('Tercero');saveData();}
           const conductoresLista=appData.conductores;
-          const patentesLista=appData.patentes||['GKFD84','WR9192','XR8555','GCFF12','BPBL35','XA1114','DSDV36'];
+          const patentesLista=appData.patentes||['WR9192','GKFD84','XR8555','GCFF12','BPBL35','XA1114'];
           const conductorPresel=(sessionRol&&sessionRol.acceso==='conductor'&&sessionConductor)?sessionConductor:'';
           if(!uiState.srv_puntos||!uiState.srv_puntos.length){uiState.srv_puntos=[{origen:'Casablanca',destino:'',guia:'',fecha_guia:'',fecha_descarga:'',kg:'',imagenes:[],puntosDescarga:1}];}
           const puntos=uiState.srv_puntos;
@@ -3654,6 +3667,7 @@ async function initSupabase() {
       await syncRendicionesDesdeSupabase();
       await syncFacturasDesdeSupabase();
       await syncLiquidacionesDesdeSupabase();
+      await syncCostosDesdeSupabase();
       await syncConfigPanel();
       render();
     } else {
@@ -4480,7 +4494,7 @@ function renderInformes() {
   }
 
   function contenidoOperacional() {
-    const FLOTA = appData.patentes || ['GKFD84','WR9192','XR8555','GCFF12','BPBL35','XA1114','DSDV36'];
+    const FLOTA = appData.patentes || ['WR9192','GKFD84','XR8555','GCFF12','BPBL35','XA1114'];
 
     // Por equipo (flota completa)
     const porPatente = {};
@@ -4591,7 +4605,7 @@ function renderInformes() {
 
   function contenidoDisponibilidad() {
     const disponibilidad = appData.disponibilidad || {};
-    const FLOTA = ['GKFD84','WR9192','XR8555','GCFF12','BPBL35','XA1114','DSDV36'];
+    const FLOTA = ['WR9192','GKFD84','XR8555','GCFF12','BPBL35','XA1114'];
     const ESTADO_COLOR = {
       'Disponible':      { bg:'#E8F5E9', text:'#2E7D32' },
       'En servicio':     { bg:'#E3F2FD', text:'#1565C0' },
@@ -4926,7 +4940,7 @@ function renderCierreLiquidacion() {
 
 function renderDisponibilidad() {
   if (!appData.disponibilidad) appData.disponibilidad = {};
-  const FLOTA = appData.patentes || ['GKFD84','WR9192','XR8555','GCFF12','BPBL35','XA1114','DSDV36'];
+  const FLOTA = appData.patentes || ['WR9192','GKFD84','XR8555','GCFF12','BPBL35','XA1114'];
   const conductores = appData.conductores || ['Manuel Madrid','Felipe Vidal','Felipe Madariaga','Sebastián Zúñiga','Pablo Riquelme','Tercero'];
   const ESTADOS = ['Disponible','En servicio','Mantención'];
   const TIPOS_MANT = ['Frenos','Caja de cambios','Motor','Suspensión','Eléctrico','Neumáticos','Diferencial','Embrague','Dirección','Preventivo','Puesta en marcha','Otro'];
@@ -5301,7 +5315,7 @@ function renderMiDia() {
   const hoyStr = `${String(hoy.getDate()).padStart(2,'0')}-${String(hoy.getMonth()+1).padStart(2,'0')}-${hoy.getFullYear()}`;
   const dispHoy = Object.values(appData.disponibilidad||{}).flat().filter(d => d.fecha===hoyStr);
   const patentesCubiertas = [...new Set(dispHoy.map(d=>d.patente))];
-  const FLOTA = appData.patentes || ['GKFD84','WR9192','XR8555','GCFF12','BPBL35','XA1114','DSDV36'];
+  const FLOTA = appData.patentes || ['WR9192','GKFD84','XR8555','GCFF12','BPBL35','XA1114'];
   const sinDisp = FLOTA.filter(p => !patentesCubiertas.includes(p));
   if (sinDisp.length) prioSistema.push({
     tipo: 'info', ambito: 'OPERACIONAL',
@@ -6009,7 +6023,9 @@ function renderDashboard() {
     return parts.length===3 && parseInt(parts[1])===hoy.getMonth()+1 && parseInt(parts[2])===hoy.getFullYear();
   });
   const serviciosMes = serviciosMesArr.length;
-  const ventas = serviciosMesArr.filter(s => s.cerrado && s.precio).reduce((a,s) => a + (s.precio||0), 0);
+  const ventasCerradas = serviciosMesArr.filter(s => s.cerrado && s.precio).reduce((a,s) => a + (s.precio||0), 0);
+  const ventasBorrador = serviciosMesArr.filter(s => !s.cerrado && s.estado === 'borrador' && s.precio).reduce((a,s) => a + (s.precio||0), 0);
+  const ventas = ventasCerradas + ventasBorrador;
   const gasto = d.gasto_real || 0;
   const caja = d.caja || 0;
   const resultado = ventas - gasto;
@@ -6045,16 +6061,15 @@ function renderDashboard() {
       <div style="font-size:11px;font-weight:700;color:${peAlcanzado?'#81C784':'rgba(255,255,255,0.8)'}">${peAlcanzado?'✓ PE ALCANZADO':'Faltan '+fmtPesoCompacto(metaVentas-ventas)+' para el PE'}</div>
     </div>`;
 
-  // ── 2. INGRESOS vs COSTOS ──
+  // ── 2. VENTAS vs COSTOS ──
   const ingcosBlock = `
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px">
       <div style="background:#1a3d6b;border-radius:10px;padding:12px 14px">
-        <div style="font-size:9px;font-weight:800;letter-spacing:1.5px;color:rgba(255,255,255,0.5);margin-bottom:4px">INGRESOS</div>
+        <div style="font-size:9px;font-weight:800;letter-spacing:1.5px;color:rgba(255,255,255,0.5);margin-bottom:4px">VENTAS</div>
         <div style="font-size:26px;font-weight:900;color:white;line-height:1">${fmtPesoCompacto(ventas)}</div>
-        <div style="font-size:10px;color:rgba(255,255,255,0.55);margin-top:2px">meta ${fmtPesoCompacto(metaVentas)}</div>
+        <div style="font-size:10px;color:rgba(255,255,255,0.55);margin-top:2px">${ventasBorrador>0?'✓ '+fmtPesoCompacto(ventasCerradas)+' + ~'+fmtPesoCompacto(ventasBorrador)+' borr.':'✓ '+fmtPesoCompacto(ventasCerradas)+' cerrados'}</div>
         ${bar(resultadoPct,'rgba(255,255,255,0.7)',6)}
         <div style="font-size:10px;font-weight:700;color:rgba(255,255,255,0.8)">${resultadoPct}% del PE</div>
-        ${eBtn('ventas','Ventas del mes ($)',ventas)}
       </div>
       <div style="background:#1a3d6b;border-radius:10px;padding:12px 14px">
         <div style="font-size:9px;font-weight:800;letter-spacing:1.5px;color:rgba(255,255,255,0.5);margin-bottom:4px">COSTOS</div>
