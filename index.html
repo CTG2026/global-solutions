@@ -1668,6 +1668,105 @@ function importarCartolaSeleccionados() {
   showToastGeneral(`✅ ${importados} movimientos importados a Costos`,'#2E7D32'); render();
 }
 
+// ─── TAB COPEC ────────────────────────────────────────────────────────────────
+function _costoTabCopec(mes, anio, flota) {
+  const f = uiState.copecForm || {};
+  const apiKey = appData.config && appData.config.anthropicApiKey;
+  const copecMes = (appData.copec||[]).filter(c=>c.mes===mes&&c.anio===anio);
+  const totalCopec = copecMes.reduce((a,c)=>a+c.monto,0);
+  const inpStyle = 'width:100%;padding:7px;border:1px solid #dde;border-radius:6px;font-size:12px;box-sizing:border-box';
+  const eqOpts = `<option value="">— Seleccionar —</option><optgroup label="Camiones">${flota.camiones.map(p=>`<option value="${p}" ${f.patente===p?'selected':''}>${p}</option>`).join('')}</optgroup><optgroup label="Camionetas">${flota.camionetas.map(p=>`<option value="${p}" ${f.patente===p?'selected':''}>${p}</option>`).join('')}</optgroup>`;
+  return `
+  <div style="background:#FFF8E1;border:1px solid #FFE082;border-radius:10px;padding:10px;margin-bottom:10px">
+    ${!apiKey?`<div style="font-size:10px;color:#E65100;font-weight:700;margin-bottom:8px">⚠️ Lectura automática requiere API key — agrégala en Configuración</div>`:''}
+    <div style="font-size:11px;font-weight:800;color:#E65100;margin-bottom:8px">📷 LEER IMAGEN COPEC</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+      <button onclick="document.getElementById('copec_img_cam').click()" style="padding:9px;background:#E3F2FD;color:#1565C0;border:1px solid #BBDEFB;border-radius:7px;font-size:11px;font-weight:700;cursor:pointer">📷 Tomar foto</button>
+      <button onclick="document.getElementById('copec_img_lib').click()" style="padding:9px;background:#F3E5F5;color:#6A1B9A;border:1px solid #E1BEE7;border-radius:7px;font-size:11px;font-weight:700;cursor:pointer">🖼️ Elegir imagen</button>
+    </div>
+    <input type="file" id="copec_img_cam" accept="image/*" capture="environment" style="display:none" onchange="leerImagenCopec(this)">
+    <input type="file" id="copec_img_lib" accept="image/*" style="display:none" onchange="leerImagenCopec(this)">
+  </div>
+  <div style="background:#F8F9FA;border-radius:10px;padding:12px;margin-bottom:10px">
+    <div style="font-size:11px;font-weight:800;color:#E65100;margin-bottom:10px">⛽ REGISTRAR CARGA</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+      <div>
+        <div style="font-size:9px;font-weight:700;color:#888;margin-bottom:3px">FECHA</div>
+        <input type="text" placeholder="DD-MM-YYYY" value="${f.fecha||''}" oninput="uiState.copecForm={...uiState.copecForm||{},fecha:this.value}" style="${inpStyle}">
+      </div>
+      <div>
+        <div style="font-size:9px;font-weight:700;color:#888;margin-bottom:3px">PATENTE</div>
+        <select onchange="uiState.copecForm={...uiState.copecForm||{},patente:this.value}" style="${inpStyle}">${eqOpts}</select>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:10px">
+      <div>
+        <div style="font-size:9px;font-weight:700;color:#888;margin-bottom:3px">LITROS</div>
+        <input type="number" placeholder="0" value="${f.litros||''}" oninput="uiState.copecForm={...uiState.copecForm||{},litros:this.value}" style="${inpStyle}">
+      </div>
+      <div>
+        <div style="font-size:9px;font-weight:700;color:#888;margin-bottom:3px">MONTO ($)</div>
+        <input type="number" placeholder="0" value="${f.monto||''}" oninput="uiState.copecForm={...uiState.copecForm||{},monto:this.value}" style="${inpStyle}">
+      </div>
+      <div>
+        <div style="font-size:9px;font-weight:700;color:#888;margin-bottom:3px">ID TRANSACCIÓN</div>
+        <input type="text" placeholder="Opcional" value="${f.id_manual||''}" oninput="uiState.copecForm={...uiState.copecForm||{},id_manual:this.value}" style="${inpStyle}">
+      </div>
+    </div>
+    <button onclick="agregarCopec()" style="width:100%;padding:10px;background:#E65100;color:white;border:none;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer">✓ Registrar carga</button>
+  </div>
+  ${copecMes.length?`
+  <div style="font-size:9px;font-weight:700;color:#888;margin-bottom:6px">CARGAS DEL MES — $${totalCopec.toLocaleString('es-CL')}</div>
+  ${copecMes.slice().reverse().map(c=>`
+  <div style="background:white;border:1px solid #FFE082;border-radius:8px;padding:8px 10px;margin-bottom:5px;display:flex;justify-content:space-between;align-items:center">
+    <div>
+      <div style="font-size:11px;font-weight:700;color:#E65100">${c.patente}</div>
+      <div style="font-size:10px;color:#888">${c.fecha}${c.litros?' · '+c.litros+'L':''}</div>
+      <div style="font-size:10px;color:#aaa">${c.id_manual?'ID: '+c.id_manual+' ':''}
+        <span onclick="editarCopecId('${c.id}')" style="color:#1565C0;cursor:pointer;text-decoration:underline">${c.id_manual?'editar':'+ ID transacción'}</span>
+      </div>
+    </div>
+    <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">
+      <div style="font-size:13px;font-weight:900;color:#E65100">$${c.monto.toLocaleString('es-CL')}</div>
+      <button onclick="eliminarCopec('${c.id}')" style="font-size:10px;padding:3px 8px;background:#FFEBEE;color:#C62828;border:1px solid #FFCDD2;border-radius:5px;cursor:pointer">🗑️</button>
+    </div>
+  </div>`).join('')}`
+  :'<div style="text-align:center;color:#aaa;font-size:11px;padding:12px">Sin cargas COPEC este mes</div>'}`;
+}
+
+// ─── TAB CARTOLA ──────────────────────────────────────────────────────────────
+function _costoTabCartola(mes, anio) {
+  const cartola = (appData.cartola||[]).filter(c=>c.mes===mes&&c.anio===anio);
+  const pendientes = cartola.filter(c=>!c.importado);
+  const total = cartola.reduce((a,c)=>a+c.monto,0);
+  return `
+  <div style="background:#F8F9FA;border-radius:10px;padding:12px;margin-bottom:10px">
+    <div style="font-size:11px;font-weight:800;color:#1565C0;margin-bottom:4px">🏦 SUBIR CARTOLA BANCARIA</div>
+    <div style="font-size:10px;color:#888;margin-bottom:8px">Excel con columnas: Fecha contable · Glosa · Monto · Categoría</div>
+    <button onclick="document.getElementById('cartola_excel_inp').click()" style="width:100%;padding:10px;background:#E3F2FD;color:#1565C0;border:1px solid #BBDEFB;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer">📊 Subir Excel</button>
+    <input type="file" id="cartola_excel_inp" accept=".xlsx,.xls" style="display:none" onchange="procesarCartolaExcel(this)">
+  </div>
+  ${cartola.length?`
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+    <div style="font-size:9px;font-weight:700;color:#888">${cartola.length} MOVIMIENTOS · $${total.toLocaleString('es-CL')}</div>
+    ${pendientes.length?`<button onclick="importarCartolaSeleccionados()" style="padding:6px 10px;background:#1565C0;color:white;border:none;border-radius:6px;font-size:10px;font-weight:700;cursor:pointer">⬆️ Importar sel.</button>`:''}
+  </div>
+  ${cartola.slice().reverse().map(c=>`
+  <div style="background:white;border:1px solid ${c.importado?'#C8E6C9':'#eee'};border-radius:8px;padding:8px 10px;margin-bottom:4px;display:flex;align-items:center;gap:8px">
+    ${!c.importado?`<input type="checkbox" ${uiState['cartola_sel_'+c.id]?'checked':''} onchange="uiState['cartola_sel_${c.id}']=this.checked" style="flex-shrink:0">`:`<span style="font-size:12px;color:#2E7D32">✓</span>`}
+    <div style="flex:1;min-width:0">
+      <div style="font-size:11px;font-weight:700;color:#333;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${c.glosa}</div>
+      <div style="font-size:10px;color:#888">${c.fecha}${c.categoria?' · '+c.categoria:''}</div>
+    </div>
+    <div style="display:flex;flex-direction:column;align-items:flex-end;gap:3px;flex-shrink:0">
+      <div style="font-size:12px;font-weight:700;color:#C62828">$${c.monto.toLocaleString('es-CL')}</div>
+      ${c.importado?`<span style="font-size:9px;color:#2E7D32;font-weight:700">IMPORTADO</span>`:`<button onclick="eliminarCartola('${c.id}')" style="font-size:10px;padding:2px 6px;background:#FFEBEE;color:#C62828;border:1px solid #FFCDD2;border-radius:4px;cursor:pointer">🗑️</button>`}
+    </div>
+  </div>`).join('')}
+  <button onclick="limpiarCartolaMes('${mes}','${anio}')" style="width:100%;margin-top:8px;padding:7px;background:#FFEBEE;color:#C62828;border:1px solid #FFCDD2;border-radius:7px;font-size:11px;font-weight:700;cursor:pointer">🗑️ Limpiar todos del mes</button>`
+  :'<div style="text-align:center;color:#aaa;font-size:11px;padding:20px">Sin movimientos — sube un Excel para comenzar</div>'}`;
+}
+
 // ─── TAB MANUAL ───────────────────────────────────────────────────────────────
 function _costoTabManual(mes, anio, flota) {
   const f = uiState.costoForm || {};
