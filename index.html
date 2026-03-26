@@ -1668,53 +1668,108 @@ function importarCartolaSeleccionados() {
   showToastGeneral(`✅ ${importados} movimientos importados a Costos`,'#2E7D32'); render();
 }
 
-function renderCostos() {
-  const servicios = appData.servicios || [];
-  const rendiciones = appData.rendiciones || [];
-  const hoy = new Date();
-  const mesSel = String(hoy.getMonth()+1).padStart(2,'0');
-  const anioSel = String(hoy.getFullYear());
-  const srvMes = servicios.filter(s => s.mes === mesSel && s.anio === anioSel);
-  const totalPetroleo = srvMes.reduce((a,s)=>a+(s.petroleo||0),0);
-  const totalPeajes = srvMes.reduce((a,s)=>a+(s.peajes||0),0);
-  const totalViaticos = srvMes.reduce((a,s)=>a+(s.viaticos||0),0);
-  const totalAdicional = srvMes.reduce((a,s)=>a+(s.adicional||0),0);
-  const totalComision = srvMes.reduce((a,s)=>a+Math.round((s.precio||0)*0.1),0);
-  const totalCF = srvMes.reduce((a,s)=>a+(s.cfProrrateado||50800),0);
-  const parseFechaDDMMYYYY = f => { if(!f) return null; const p=f.split('-'); return p[0].length===2 ? new Date(p[2],p[1]-1,p[0]) : new Date(p[0],p[1]-1,p[2]); };
-  const renMes = rendiciones.filter(r => { const d=parseFechaDDMMYYYY(r.fecha); return d && d.getMonth()+1===parseInt(mesSel) && d.getFullYear()===parseInt(anioSel); });
-  const totalRendiciones = renMes.reduce((a,r)=>a+(r.total||0),0);
-  const totalGeneral = totalPetroleo+totalPeajes+totalViaticos+totalAdicional+totalComision+totalCF+totalRendiciones;
-  const totalIngresos = srvMes.reduce((a,s)=>a+(s.precio||0),0);
-  const margenBruto = totalIngresos - totalGeneral;
-  const filas = [
-    { label:'⛽ Petróleo / combustible', monto:totalPetroleo, color:'#E65100' },
-    { label:'🛣️ Peajes', monto:totalPeajes, color:'#1565C0' },
-    { label:'🍽️ Viáticos', monto:totalViaticos, color:'#5D4037' },
-    { label:'➕ Adicionales', monto:totalAdicional, color:'#37474F' },
-    { label:'👤 Comisiones conductores (10%)', monto:totalComision, color:'#6A1B9A' },
-    { label:'🏢 CF prorrateado', monto:totalCF, color:'#607D8B' },
-    { label:'🧾 Rendiciones de gastos', monto:totalRendiciones, color:'#C62828' },
-  ];
-  return `<div style="padding:2px">
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:10px">
-      <div style="background:#FFEBEE;border-radius:8px;padding:8px 10px;text-align:center">
-        <div style="font-size:9px;font-weight:700;color:#C62828;margin-bottom:2px">TOTAL COSTOS</div>
-        <div style="font-size:14px;font-weight:900;color:#C62828">$${totalGeneral.toLocaleString('es-CL')}</div>
+// ─── TAB MANUAL ───────────────────────────────────────────────────────────────
+function _costoTabManual(mes, anio, flota) {
+  const f = uiState.costoForm || {};
+  const editId = uiState.costoEditId || null;
+  const montoNeto = parseInt(f.monto_neto) || 0;
+  const iva = Math.round(montoNeto * 0.19);
+  const total = montoNeto + iva;
+  const CATS = { mantencion:'Mantención', administrativo:'Administrativo', financiero:'Financiero', contable:'Contable' };
+  const TIPOS = { mantencion:['Repuestos','Insumos de mantención','Mano de obra'], administrativo:['Arriendo','Telefonía','GPS','Soporte informático','Gastos comunes','Otro'], financiero:['Factoring','Intereses','Comisiones bancarias','Otro'], contable:['Honorarios','Software contable','Otro'] };
+  const cat = f.categoria || 'administrativo';
+  const eqOpts = `<option value="flota_completa" ${(f.equipo||'flota_completa')==='flota_completa'?'selected':''}>Flota completa (distribución)</option><optgroup label="Camiones">${flota.camiones.map(p=>`<option value="${p}" ${f.equipo===p?'selected':''}>${p}</option>`).join('')}</optgroup><optgroup label="Camionetas">${flota.camionetas.map(p=>`<option value="${p}" ${f.equipo===p?'selected':''}>${p}</option>`).join('')}</optgroup>`;
+  const inpStyle = 'width:100%;padding:7px;border:1px solid #dde;border-radius:6px;font-size:12px;box-sizing:border-box';
+  return `
+  <div style="background:#F8F9FA;border-radius:10px;padding:12px;margin-bottom:10px">
+    <div style="font-size:11px;font-weight:800;color:#1565C0;margin-bottom:10px">${editId?'✏️ EDITANDO COSTO':'➕ NUEVO COSTO'}</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+      <div>
+        <div style="font-size:9px;font-weight:700;color:#888;margin-bottom:3px">FECHA</div>
+        <input type="text" placeholder="DD-MM-YYYY" value="${f.fecha||''}" oninput="uiState.costoForm={...uiState.costoForm||{},fecha:this.value}" style="${inpStyle}">
       </div>
-      <div style="background:${margenBruto>=0?'#E8F5E9':'#FFEBEE'};border-radius:8px;padding:8px 10px;text-align:center">
-        <div style="font-size:9px;font-weight:700;color:${margenBruto>=0?'#2E7D32':'#C62828'};margin-bottom:2px">MARGEN BRUTO</div>
-        <div style="font-size:14px;font-weight:900;color:${margenBruto>=0?'#2E7D32':'#C62828'}">$${margenBruto.toLocaleString('es-CL')}</div>
+      <div>
+        <div style="font-size:9px;font-weight:700;color:#888;margin-bottom:3px">EMPRESA EMISORA</div>
+        <input type="text" placeholder="Razón social" value="${f.empresa||''}" oninput="uiState.costoForm={...uiState.costoForm||{},empresa:this.value}" style="${inpStyle}">
       </div>
     </div>
-    <div style="font-size:9px;font-weight:700;color:#888;letter-spacing:0.5px;margin-bottom:6px">DESGLOSE MES ACTUAL</div>
-    ${filas.filter(f=>f.monto>0).map(f=>`
-      <div style="display:flex;justify-content:space-between;align-items:center;padding:7px 10px;background:#F8F9FA;border-radius:7px;margin-bottom:4px;border-left:3px solid ${f.color}">
-        <span style="font-size:11px;color:#555">${f.label}</span>
-        <span style="font-size:12px;font-weight:700;color:${f.color}">$${f.monto.toLocaleString('es-CL')}</span>
-      </div>`).join('')}
-    ${filas.every(f=>f.monto===0)?'<div style="text-align:center;color:#aaa;font-size:11px;padding:12px">Sin costos registrados en el mes actual</div>':''}
-  </div>`;
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:8px">
+      <div>
+        <div style="font-size:9px;font-weight:700;color:#888;margin-bottom:3px">MONTO NETO ($)</div>
+        <input type="number" placeholder="0" value="${f.monto_neto||''}" oninput="uiState.costoForm={...uiState.costoForm||{},monto_neto:this.value};render()" style="${inpStyle}">
+      </div>
+      <div>
+        <div style="font-size:9px;font-weight:700;color:#888;margin-bottom:3px">IVA 19%</div>
+        <div style="padding:7px;background:#EEE;border-radius:6px;font-size:12px;color:#666">${iva>0?'$'+iva.toLocaleString('es-CL'):'-'}</div>
+      </div>
+      <div>
+        <div style="font-size:9px;font-weight:700;color:#2E7D32;margin-bottom:3px">TOTAL c/IVA</div>
+        <div style="padding:7px;background:#E8F5E9;border-radius:6px;font-size:12px;font-weight:700;color:#2E7D32">${total>0?'$'+total.toLocaleString('es-CL'):'-'}</div>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+      <div>
+        <div style="font-size:9px;font-weight:700;color:#888;margin-bottom:3px">EQUIPO</div>
+        <select onchange="uiState.costoForm={...uiState.costoForm||{},equipo:this.value}" style="${inpStyle}">${eqOpts}</select>
+      </div>
+      <div>
+        <div style="font-size:9px;font-weight:700;color:#888;margin-bottom:3px">CATEGORÍA</div>
+        <select onchange="uiState.costoForm={...uiState.costoForm||{},categoria:this.value,tipo_costo:''};render()" style="${inpStyle}">
+          ${Object.entries(CATS).map(([v,l])=>`<option value="${v}" ${cat===v?'selected':''}>${l}</option>`).join('')}
+        </select>
+      </div>
+    </div>
+    ${TIPOS[cat]?`<div style="margin-bottom:8px"><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:3px">TIPO</div><select onchange="uiState.costoForm={...uiState.costoForm||{},tipo_costo:this.value}" style="${inpStyle}"><option value="">— Seleccionar —</option>${TIPOS[cat].map(t=>`<option value="${t}" ${f.tipo_costo===t?'selected':''}>${t}</option>`).join('')}</select></div>`:''}
+    <div style="margin-bottom:10px">
+      <div style="font-size:9px;font-weight:700;color:#888;margin-bottom:3px">DESCRIPCIÓN (opcional)</div>
+      <input type="text" placeholder="Detalle adicional..." value="${f.descripcion||''}" oninput="uiState.costoForm={...uiState.costoForm||{},descripcion:this.value}" style="${inpStyle}">
+    </div>
+    <div style="display:grid;grid-template-columns:${editId?'1fr 1fr 1fr':'1fr'};gap:6px">
+      ${editId
+        ? `<button onclick="guardarEdicionCosto()" style="padding:10px;background:#1565C0;color:white;border:none;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer">💾 Guardar</button>
+           <button onclick="cancelarEdicionCosto()" style="padding:10px;background:#EEE;color:#555;border:1px solid #dde;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer">✕ Cancelar</button>
+           <button onclick="eliminarCosto('${editId}')" style="padding:10px;background:#FFEBEE;color:#C62828;border:1px solid #FFCDD2;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer">🗑️ Eliminar</button>`
+        : `<button onclick="agregarCosto()" style="padding:10px;background:#1565C0;color:white;border:none;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer">✓ Registrar costo</button>`}
+    </div>
+  </div>
+  ${_costoListaMes(mes, anio)}`;
+}
+
+function _costoListaMes(mes, anio) {
+  const costos = (appData.costos||[]).filter(c=>c.mes===mes&&c.anio===anio);
+  if (!costos.length) return '<div style="text-align:center;color:#aaa;font-size:11px;padding:12px">Sin costos registrados este mes</div>';
+  const total = costos.reduce((a,c)=>a+c.total,0);
+  return `<div style="font-size:9px;font-weight:700;color:#888;margin-bottom:6px">COSTOS DEL MES — $${total.toLocaleString('es-CL')}</div>
+  ${costos.slice().reverse().map(c=>`
+  <div style="background:white;border:1px solid #eee;border-radius:8px;padding:8px 10px;margin-bottom:5px;display:flex;justify-content:space-between;align-items:flex-start">
+    <div style="flex:1;min-width:0">
+      <div style="font-size:11px;font-weight:700;color:#333">${c.empresa}</div>
+      <div style="font-size:10px;color:#888">${c.fecha} · ${c.equipo==='flota_completa'?'Flota completa':c.equipo} · ${c.tipo_costo||c.categoria}</div>
+      ${c.descripcion?`<div style="font-size:10px;color:#aaa">${c.descripcion}</div>`:''}
+    </div>
+    <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;margin-left:8px;flex-shrink:0">
+      <div style="font-size:13px;font-weight:900;color:#C62828">$${c.total.toLocaleString('es-CL')}</div>
+      <div style="font-size:9px;color:#aaa">neto $${c.monto_neto.toLocaleString('es-CL')}</div>
+      <button onclick="editarCosto('${c.id}')" style="font-size:10px;padding:3px 8px;background:#E3F2FD;color:#1565C0;border:1px solid #BBDEFB;border-radius:5px;cursor:pointer">✏️ Editar</button>
+    </div>
+  </div>`).join('')}`;
+}
+
+// ─── RENDER PRINCIPAL ─────────────────────────────────────────────────────────
+function renderCostos() {
+  const tab = uiState.costoTab || 'manual';
+  const hoy = new Date();
+  const mes = String(hoy.getMonth()+1).padStart(2,'0');
+  const anio = String(hoy.getFullYear());
+  const flota = getFlota();
+  const tabs = [['manual','✏️ Manual'],['copec','⛽ COPEC'],['cartola','🏦 Cartola'],['historial','📋 Historial']];
+  const nav = `<div style="display:flex;gap:4px;margin-bottom:10px;overflow-x:auto">${tabs.map(([id,lbl])=>`<button onclick="uiState.costoTab='${id}';render()" style="padding:7px 12px;border-radius:7px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;flex-shrink:0;${tab===id?'background:#1565C0;color:white;border:none':'background:#F5F5F5;color:#555;border:1px solid #dde'}">${lbl}</button>`).join('')}</div>`;
+  let body = '';
+  if (tab==='manual') body = _costoTabManual(mes, anio, flota);
+  else if (tab==='copec') body = _costoTabCopec(mes, anio, flota);
+  else if (tab==='cartola') body = _costoTabCartola(mes, anio);
+  else if (tab==='historial') body = _costoTabHistorial(mes, anio, flota);
+  return `<div style="padding:2px">${nav}${body}</div>`;
 }
 
 function renderCaja() {
