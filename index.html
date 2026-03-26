@@ -699,7 +699,7 @@ document.addEventListener('keydown', (e) => {
 // ── RENDIMIENTO COMBUSTIBLE v36 ───────────────────────────
 function renderRendimientoComb() {
   if (!appData.rendimientoComb) appData.rendimientoComb = [];
-  const FLOTA = appData.patentes || ['WR9192','GKFD84','XR8555','GCFF12','BPBL35','XA1114'];
+  const FLOTA = appData.patentes || ['WR9192','GKFD84','XR8555','GCFF12','BPBL35','XA1114','DSDV36'];
   const hoyISO = (()=>{const h=new Date();return `${h.getFullYear()}-${String(h.getMonth()+1).padStart(2,'0')}-${String(h.getDate()).padStart(2,'0')}`;})();
   const pendientes = appData.rendimientoComb.filter(r=>!r.odometroFin);
   const completados = appData.rendimientoComb.filter(r=>r.odometroFin).slice(-8).reverse();
@@ -1162,7 +1162,7 @@ function pdfRendicion(id) {
 
 function renderRendiciones() {
   if (!appData.rendiciones) appData.rendiciones = [];
-  const patentesLista = appData.patentes||['WR9192','GKFD84','XR8555','GCFF12','BPBL35','XA1114'];
+  const patentesLista = appData.patentes||['WR9192','GKFD84','XR8555','GCFF12','BPBL35','XA1114','DSDV36'];
   const hoyISO = (()=>{const h=new Date();return h.getFullYear()+'-'+String(h.getMonth()+1).padStart(2,'0')+'-'+String(h.getDate()).padStart(2,'0');})();
   if (!uiState.ren_lineas||!uiState.ren_lineas.length) uiState.ren_lineas=[{fecha:'',categoria:'Combustible',descripcion:'',patente:'',monto:''}];
 
@@ -2228,7 +2228,7 @@ function renderEditarServicio(id) {
   const hoyISO=(()=>{const h=new Date();return h.getFullYear()+'-'+String(h.getMonth()+1).padStart(2,'0')+'-'+String(h.getDate()).padStart(2,'0');})();
   const fechaISO = s.fecha?(()=>{const p=s.fecha.split('-');return p.length===3&&p[0].length===2?`${p[2]}-${p[1]}-${p[0]}`:s.fecha;})():hoyISO;
   const conductoresLista = appData.conductores||['Manuel Madrid','Felipe Vidal','Felipe Madariaga','Sebastián Zúñiga','Pablo Riquelme','Tercero'];
-  const patentesLista = appData.patentes||['WR9192','GKFD84','XR8555','GCFF12','BPBL35','XA1114'];
+  const patentesLista = appData.patentes||['WR9192','GKFD84','XR8555','GCFF12','BPBL35','XA1114','DSDV36'];
   const clientesDefault = (window.DEFAULT_DATA||{pipeline:[]}).pipeline.filter(c=>c.etapa==='activo').map(c=>c.cliente);
   const clientesLocal = (appData.pipeline||[]).filter(c=>c.etapa==='activo').map(c=>c.cliente);
   const clientesActivos = [...new Set([...clientesDefault,...clientesLocal])].sort();
@@ -2642,7 +2642,7 @@ function mostrarAgregarConductor() {
 function mostrarAgregarPatente() {
   const pat = prompt('Patente nueva (ej: AB1234):');
   if (!pat || !pat.trim()) return;
-  if (!appData.patentes) appData.patentes = ['WR9192','GKFD84','XR8555','GCFF12','BPBL35','XA1114'];
+  if (!appData.patentes) appData.patentes = ['WR9192','GKFD84','XR8555','GCFF12','BPBL35','XA1114','DSDV36'];
   if (!appData.patentes.includes(pat.trim().toUpperCase())) {
     appData.patentes.push(pat.trim().toUpperCase());
     saveData(); render();
@@ -3346,7 +3346,7 @@ function renderFase(fase) {
           if(!appData.conductores||appData.conductores.length<2){appData.conductores=conductoresDefault;saveData();}
           if(!appData.conductores.includes('Tercero')){appData.conductores.push('Tercero');saveData();}
           const conductoresLista=appData.conductores;
-          const patentesLista=appData.patentes||['WR9192','GKFD84','XR8555','GCFF12','BPBL35','XA1114'];
+          const patentesLista=appData.patentes||['WR9192','GKFD84','XR8555','GCFF12','BPBL35','XA1114','DSDV36'];
           const conductorPresel=(sessionRol&&sessionRol.acceso==='conductor'&&sessionConductor)?sessionConductor:'';
           if(!uiState.srv_puntos||!uiState.srv_puntos.length){uiState.srv_puntos=[{origen:'Casablanca',destino:'',guia:'',fecha_guia:'',fecha_descarga:'',kg:'',imagenes:[],puntosDescarga:1}];}
           const puntos=uiState.srv_puntos;
@@ -4494,7 +4494,7 @@ function renderInformes() {
   }
 
   function contenidoOperacional() {
-    const FLOTA = appData.patentes || ['WR9192','GKFD84','XR8555','GCFF12','BPBL35','XA1114'];
+    const FLOTA = appData.patentes || ['WR9192','GKFD84','XR8555','GCFF12','BPBL35','XA1114','DSDV36'];
 
     // Por equipo (flota completa)
     const porPatente = {};
@@ -4605,7 +4605,7 @@ function renderInformes() {
 
   function contenidoDisponibilidad() {
     const disponibilidad = appData.disponibilidad || {};
-    const FLOTA = ['WR9192','GKFD84','XR8555','GCFF12','BPBL35','XA1114'];
+    const FLOTA = ['WR9192','GKFD84','XR8555','GCFF12','BPBL35','XA1114','DSDV36'];
     const ESTADO_COLOR = {
       'Disponible':      { bg:'#E8F5E9', text:'#2E7D32' },
       'En servicio':     { bg:'#E3F2FD', text:'#1565C0' },
@@ -4940,7 +4940,7 @@ function renderCierreLiquidacion() {
 
 function renderDisponibilidad() {
   if (!appData.disponibilidad) appData.disponibilidad = {};
-  const FLOTA = appData.patentes || ['WR9192','GKFD84','XR8555','GCFF12','BPBL35','XA1114'];
+  const FLOTA = appData.patentes || ['WR9192','GKFD84','XR8555','GCFF12','BPBL35','XA1114','DSDV36'];
   const conductores = appData.conductores || ['Manuel Madrid','Felipe Vidal','Felipe Madariaga','Sebastián Zúñiga','Pablo Riquelme','Tercero'];
   const ESTADOS = ['Disponible','En servicio','Mantención'];
   const TIPOS_MANT = ['Frenos','Caja de cambios','Motor','Suspensión','Eléctrico','Neumáticos','Diferencial','Embrague','Dirección','Preventivo','Puesta en marcha','Otro'];
@@ -5315,7 +5315,7 @@ function renderMiDia() {
   const hoyStr = `${String(hoy.getDate()).padStart(2,'0')}-${String(hoy.getMonth()+1).padStart(2,'0')}-${hoy.getFullYear()}`;
   const dispHoy = Object.values(appData.disponibilidad||{}).flat().filter(d => d.fecha===hoyStr);
   const patentesCubiertas = [...new Set(dispHoy.map(d=>d.patente))];
-  const FLOTA = appData.patentes || ['WR9192','GKFD84','XR8555','GCFF12','BPBL35','XA1114'];
+  const FLOTA = appData.patentes || ['WR9192','GKFD84','XR8555','GCFF12','BPBL35','XA1114','DSDV36'];
   const sinDisp = FLOTA.filter(p => !patentesCubiertas.includes(p));
   if (sinDisp.length) prioSistema.push({
     tipo: 'info', ambito: 'OPERACIONAL',
