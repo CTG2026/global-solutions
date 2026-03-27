@@ -5,11 +5,11 @@
   <meta http-equiv="cache-control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="pragma" content="no-cache">
   <meta http-equiv="expires" content="0">
-  <meta name="version" content="1774614635">
+  <meta name="version" content="1774654686">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <script>
 (function() {
-  var VERSION = '1774614635';
+  var VERSION = '1774654686';
   var stored = localStorage.getItem('gs_app_version');
   if (stored !== VERSION) {
     var session = localStorage.getItem('gs_session');
@@ -707,7 +707,6 @@ document.addEventListener('keydown', (e) => {
 // ── RENDIMIENTO COMBUSTIBLE ────────────────────────────────
 function _rcHoy() { const h=new Date(); return `${h.getFullYear()}-${String(h.getMonth()+1).padStart(2,'0')}-${String(h.getDate()).padStart(2,'0')}`; }
 function _rcFmtISO(iso) { if(!iso)return ''; const p=iso.split('-'); return `${p[2]}-${p[1]}-${p[0]}`; }
-function _rcParseDD(dd) { if(!dd)return null; const p=dd.split('-'); return new Date(+p[2],+p[1]-1,+p[0]); }
 function _rcNextId() {
   const n=(appData.rendimientoComb||[]).length+1;
   return 'RC-'+String(n).padStart(3,'0');
@@ -718,118 +717,136 @@ function renderRendimientoComb() {
   const FLOTA = appData.patentes || ['WR9192','GKFD84','XR8555','GCFF12','BPBL35','XA1114','DSDV36'];
   const conductores = (appData.remuneraciones||[]).filter(e=>e.activo).map(e=>e.nombre);
   const hoyISO = _rcHoy();
-  const abiertos  = appData.rendimientoComb.filter(r=>r.estado==='abierto');
-  const cerrados  = appData.rendimientoComb.filter(r=>r.estado==='cerrado').slice().reverse();
-  const inpSt = 'width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit;background:white';
+  const abiertos = appData.rendimientoComb.filter(r=>r.estado==='abierto');
+  const cerrados = appData.rendimientoComb.filter(r=>r.estado==='cerrado').slice().reverse().slice(0,15);
+  const inp = 'width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit;background:white';
 
-  const condOpts = `<option value="">Seleccionar...</option>${conductores.map(c=>`<option value="${c}">${c}</option>`).join('')}<option value="__otro__">Otro...</option>`;
-
-  const formHTML = `<div style="padding:10px 12px;background:#f4f6f8;border-radius:10px;border:1px solid #dde4e8;margin-bottom:10px">
-    <div style="font-size:10px;font-weight:700;color:#455A64;letter-spacing:1px;margin-bottom:8px;padding-bottom:5px;border-bottom:2px solid #CFD8DC">🚛 REGISTRAR TURNO</div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px">
-      <div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">FECHA</div>
-        <input id="rc_fecha" type="date" value="${hoyISO}" style="${inpSt}"></div>
-      <div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">PATENTE</div>
-        <select id="rc_patente" style="${inpSt};-webkit-appearance:auto">
-          <option value="">Seleccionar...</option>${FLOTA.map(p=>`<option value="${p}">${p}</option>`).join('')}</select></div>
-      <div style="grid-column:1/-1"><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">CONDUCTOR</div>
-        <select id="rc_conductor_sel" onchange="(function(v){var o=document.getElementById('rc_conductor_txt');if(v==='__otro__'){o.style.display='block';o.focus();}else{o.style.display='none';o.value='';}})(this.value)" style="${inpSt};-webkit-appearance:auto">
-          ${condOpts}</select>
-        <input id="rc_conductor_txt" type="text" placeholder="Nombre del conductor" style="${inpSt};display:none;margin-top:4px"></div>
-      <div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">LITROS CARGADOS</div>
-        <input id="rc_litros" type="number" placeholder="ej: 120" style="${inpSt}"></div>
-      <div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">ODÓ SALIDA (km) <span style="font-weight:400;color:#aaa">opcional</span></div>
-        <input id="rc_odo_ini" type="number" placeholder="ej: 125430" style="${inpSt}"></div>
-      <div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">KM RECORRIDOS <span style="font-weight:400;color:#aaa">opcional</span></div>
-        <input id="rc_km" type="number" placeholder="ej: 320" style="${inpSt}"></div>
-      <div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">TIEMPO RALENTÍ (min)</div>
-        <input id="rc_relenti" type="number" placeholder="ej: 45" style="${inpSt}"></div>
+  // ── SECCIÓN 1: FORMULARIO NUEVA CARGA ──
+  const sec1 = `<div style="background:#F4F6F8;border-radius:10px;padding:12px;margin-bottom:10px;border:1px solid #DDE4E8">
+    <div style="font-size:10px;font-weight:800;color:#455A64;letter-spacing:1px;margin-bottom:10px;padding-bottom:6px;border-bottom:2px solid #CFD8DC">⛽ DÍA 1 — REGISTRAR CARGA</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+      <div>
+        <div style="font-size:9px;font-weight:700;color:#888;margin-bottom:3px">FECHA</div>
+        <input id="rc_fecha" type="date" value="${hoyISO}" style="${inp}">
+      </div>
+      <div>
+        <div style="font-size:9px;font-weight:700;color:#888;margin-bottom:3px">PATENTE</div>
+        <select id="rc_patente" style="${inp};-webkit-appearance:auto">
+          <option value="">Seleccionar...</option>
+          ${FLOTA.map(p=>`<option value="${p}">${p}</option>`).join('')}
+        </select>
+      </div>
+      <div style="grid-column:1/-1">
+        <div style="font-size:9px;font-weight:700;color:#888;margin-bottom:3px">CONDUCTOR</div>
+        <select id="rc_conductor" style="${inp};-webkit-appearance:auto">
+          <option value="">Seleccionar...</option>
+          ${conductores.map(c=>`<option value="${c}">${c}</option>`).join('')}
+        </select>
+      </div>
+      <div style="grid-column:1/-1">
+        <div style="font-size:9px;font-weight:700;color:#888;margin-bottom:3px">LITROS CARGADOS</div>
+        <input id="rc_litros" type="number" placeholder="ej: 120" style="${inp}">
+      </div>
     </div>
-    <div style="font-size:9px;color:#888;margin-bottom:8px;padding:4px 8px;background:#E8EDF3;border-radius:5px">Ingresa odómetro salida + llegada <strong>o</strong> km recorridos directamente. Puedes completar el km al cierre.</div>
-    <button onclick="registrarSalidaComb()" style="width:100%;padding:10px;background:#455A64;color:white;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer">🚛 Registrar turno</button>
+    <button onclick="crearRegistroRC()" style="width:100%;padding:10px;background:#0B2545;color:white;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer">⛽ Registrar carga</button>
   </div>`;
 
-  const pendHTML = pendientes.length ? `<div style="margin-bottom:10px">
-    <div style="font-size:9px;font-weight:700;color:#E65100;letter-spacing:0.5px;margin-bottom:6px">⏳ TURNOS ABIERTOS (${pendientes.length})</div>
-    ${pendientes.map((r,ri)=>{
-      const idx=appData.rendimientoComb.indexOf(r);
-      return `<div style="padding:10px 12px;background:#FFF3E0;border:1px solid #FFCC80;border-radius:8px;margin-bottom:6px">
-        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px">
+  // ── SECCIÓN 2: TURNOS ABIERTOS ──
+  const sec2 = abiertos.length ? `<div style="margin-bottom:10px">
+    <div style="font-size:9px;font-weight:800;color:#E65100;letter-spacing:0.5px;margin-bottom:8px">● TURNOS ABIERTOS (${abiertos.length})</div>
+    ${abiertos.map(r=>{
+      const idx = appData.rendimientoComb.indexOf(r);
+      return `<div style="background:#FFF8E1;border:1px solid #FFCC80;border-left:4px solid #E65100;border-radius:10px;padding:10px 12px;margin-bottom:8px">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">
           <div>
-            <span style="font-size:12px;font-weight:700;color:#E65100">${r.patente}</span>
-            ${r.conductor?`<span style="font-size:10px;color:#555;margin-left:6px">· ${r.conductor}</span>`:''}
-          </div>
-          <span style="font-size:10px;color:#777;text-align:right">${r.fecha}${r.odometroIni?'<br>Odo salida: '+r.odometroIni.toLocaleString('es-CL')+' km':''}${r.litros?'<br>'+r.litros+'L':''}</span>
-        </div>
-        ${r.kmRecorridos?`<div style="font-size:10px;color:#1565C0;font-weight:700;margin-bottom:6px">✓ ${r.kmRecorridos} km ya registrados</div>`:''}
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:6px">
-          ${r.odometroIni?`<div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">ODÓ LLEGADA (km)</div>
-            <input id="rc_fin_${idx}" type="number" placeholder="ej: 125750" style="width:100%;border:1px solid #FFCC80;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit"></div>`:''}
-          <div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">KM RECORRIDOS</div>
-            <input id="rc_km_fin_${idx}" type="number" placeholder="ej: 320" value="${r.kmRecorridos||''}" style="width:100%;border:1px solid #FFCC80;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit"></div>
-          <div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">RALENTÍ (min)</div>
-            <input id="rc_rel_fin_${idx}" type="number" placeholder="ej: 30" value="${r.tiempoRelenti||''}" style="width:100%;border:1px solid #FFCC80;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit"></div>
-        </div>
-        <button onclick="cerrarRendComb(${idx})" style="width:100%;padding:8px;background:#E65100;color:white;border:none;border-radius:7px;font-size:11px;font-weight:700;cursor:pointer">✓ Cerrar turno</button>
-      </div>`;
-    }).join('')}
-  </div>` : '';
-
-  const histHTML = completados.length ? `<div>
-    <div style="font-size:9px;font-weight:700;color:#455A64;letter-spacing:0.5px;margin-bottom:6px">ÚLTIMOS RENDIMIENTOS</div>
-    ${completados.map(r=>{
-      const km = r.kmRecorridos || (r.odometroFin&&r.odometroIni ? r.odometroFin-r.odometroIni : 0);
-      const rend = (r.litros>0&&km>0) ? (km/r.litros).toFixed(1) : '—';
-      return `<div style="padding:8px 12px;background:white;border:1px solid #dde;border-radius:8px;margin-bottom:4px">
-        <div style="display:flex;justify-content:space-between;align-items:flex-start">
-          <div>
-            <span style="font-size:12px;font-weight:700;color:#455A64">${r.patente}</span>
-            <span style="font-size:10px;color:#aaa;margin-left:6px">${r.fecha}</span>
-            ${r.conductor?`<div style="font-size:10px;color:#546E7A;margin-top:1px">👤 ${r.conductor}</div>`:''}
+            <div style="font-size:13px;font-weight:800;color:#E65100">${r.patente}</div>
+            <div style="font-size:10px;color:#555">${r.conductor||'—'}</div>
           </div>
           <div style="text-align:right">
-            <div style="font-size:10px;color:#777">${km>0?km.toLocaleString('es-CL')+' km':'—'} · ${r.litros||0}L</div>
-            <div style="font-size:13px;font-weight:800;color:#2E7D32">${rend} km/L</div>
-            ${r.tiempoRelenti?`<div style="font-size:9px;color:#E65100">⏱ ${r.tiempoRelenti} min ralentí</div>`:''}
+            <div style="font-size:10px;color:#777">${r.fecha}</div>
+            <div style="font-size:11px;font-weight:700;color:#0B2545">${r.litros}L cargados</div>
           </div>
+        </div>
+        <div style="font-size:9px;font-weight:700;color:#888;margin-bottom:4px">DÍA 2 — KM RECORRIDOS</div>
+        <input id="rc_km_${idx}" type="number" placeholder="ej: 320" style="${inp};border-color:#FFCC80;margin-bottom:8px">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+          <button onclick="cerrarTurnoRC(${idx})" style="padding:9px;background:#E65100;color:white;border:none;border-radius:7px;font-size:11px;font-weight:700;cursor:pointer">✓ Cerrar turno</button>
+          <button onclick="eliminarTurnoRC(${idx})" style="padding:9px;background:#FFEBEE;color:#C62828;border:1px solid #EF9A9A;border-radius:7px;font-size:11px;font-weight:700;cursor:pointer">✕ Eliminar</button>
         </div>
       </div>`;
     }).join('')}
   </div>` : '';
 
-  return `<div style="padding:2px">${formHTML}${pendHTML}${histHTML}</div>`;
+  // ── SECCIÓN 3: HISTORIAL ──
+  const mostrarHist = uiState.rcMostrarHist;
+  const sec3 = cerrados.length ? `<div style="margin-bottom:10px">
+    <div onclick="uiState.rcMostrarHist=!uiState.rcMostrarHist;render()" style="font-size:9px;font-weight:800;color:#455A64;letter-spacing:0.5px;margin-bottom:6px;cursor:pointer;display:flex;justify-content:space-between;align-items:center">
+      <span>HISTORIAL (${cerrados.length})</span>
+      <span>${mostrarHist?'▲':'▼'}</span>
+    </div>
+    ${mostrarHist ? `<div style="overflow-x:auto">
+      <table style="width:100%;border-collapse:collapse;font-size:11px">
+        <thead>
+          <tr style="background:#0B2545;color:white">
+            <th style="padding:6px 8px;text-align:left;font-size:9px">Fecha</th>
+            <th style="padding:6px 8px;text-align:left;font-size:9px">Patente</th>
+            <th style="padding:6px 8px;text-align:left;font-size:9px">Conductor</th>
+            <th style="padding:6px 8px;text-align:right;font-size:9px">Litros</th>
+            <th style="padding:6px 8px;text-align:right;font-size:9px">Km</th>
+            <th style="padding:6px 8px;text-align:right;font-size:9px">Km/L</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${cerrados.map((r,i)=>`<tr style="background:${i%2?'#F4F6F8':'white'};border-bottom:1px solid #eee">
+            <td style="padding:6px 8px">${r.fecha}</td>
+            <td style="padding:6px 8px;font-weight:700">${r.patente}</td>
+            <td style="padding:6px 8px">${r.conductor||'—'}</td>
+            <td style="padding:6px 8px;text-align:right">${r.litros}L</td>
+            <td style="padding:6px 8px;text-align:right">${r.km} km</td>
+            <td style="padding:6px 8px;text-align:right;font-weight:800;color:#2E7D32">${r.rendimiento} km/L</td>
+          </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>` : ''}
+  </div>` : '';
+
+  return `<div style="padding:2px">${sec1}${sec2}${sec3}</div>`;
 }
 
-function registrarSalidaComb() {
-  const fecha    = document.getElementById('rc_fecha')?.value;
-  const patente  = document.getElementById('rc_patente')?.value;
-  const sel      = document.getElementById('rc_conductor_sel')?.value;
-  const conductor= sel==='__otro__' ? (document.getElementById('rc_conductor_txt')?.value||'').trim() : sel;
-  const litros   = parseFloat(document.getElementById('rc_litros')?.value)||0;
-  const odometroIni = parseInt(document.getElementById('rc_odo_ini')?.value)||0;
-  const kmRecorridos= parseInt(document.getElementById('rc_km')?.value)||0;
-  const tiempoRelenti= parseInt(document.getElementById('rc_relenti')?.value)||0;
-  if (!patente) return alert('Selecciona la patente del equipo');
-  if (!appData.rendimientoComb) appData.rendimientoComb=[];
-  const p=fecha.split('-'); const fechaStr=`${p[2]}-${p[1]}-${p[0]}`;
-  appData.rendimientoComb.push({ fecha:fechaStr, patente, conductor, litros, odometroIni:odometroIni||null,
-    kmRecorridos:kmRecorridos||null, tiempoRelenti:tiempoRelenti||null, cerrado:false });
+function crearRegistroRC() {
+  const fechaISO  = document.getElementById('rc_fecha')?.value;
+  const patente   = document.getElementById('rc_patente')?.value;
+  const conductor = document.getElementById('rc_conductor')?.value;
+  const litros    = parseFloat(document.getElementById('rc_litros')?.value)||0;
+  if (!patente) return alert('Selecciona la patente');
+  if (!litros)  return alert('Ingresa los litros cargados');
+  if (!appData.rendimientoComb) appData.rendimientoComb = [];
+  const fecha = _rcFmtISO(fechaISO);
+  const p = fechaISO.split('-');
+  appData.rendimientoComb.push({
+    id: _rcNextId(), fecha, patente, conductor, litros,
+    km: 0, rendimiento: 0, estado: 'abierto',
+    mes: p[1], anio: p[0], fechaCierre: ''
+  });
   saveData(); render();
 }
 
-function cerrarRendComb(idx) {
+function cerrarTurnoRC(idx) {
   const r = appData.rendimientoComb[idx];
   if (!r) return;
-  const odFin   = parseInt(document.getElementById(`rc_fin_${idx}`)?.value)||0;
-  const kmFin   = parseInt(document.getElementById(`rc_km_fin_${idx}`)?.value)||0;
-  const relFin  = parseInt(document.getElementById(`rc_rel_fin_${idx}`)?.value)||0;
-  // Calcular km: desde odómetros si hay, o desde campo km
-  const km = odFin && r.odometroIni ? odFin - r.odometroIni : kmFin || r.kmRecorridos || 0;
-  if (!km && !odFin) return alert('Ingresa el odómetro de llegada o los km recorridos');
-  r.odometroFin   = odFin || null;
-  r.kmRecorridos  = km || r.kmRecorridos || null;
-  r.tiempoRelenti = relFin || r.tiempoRelenti || null;
-  r.cerrado = true;
+  const km = parseInt(document.getElementById('rc_km_'+idx)?.value)||0;
+  if (!km) return alert('Ingresa los km recorridos');
+  const hoy = new Date();
+  r.km = km;
+  r.rendimiento = +(km / r.litros).toFixed(2);
+  r.estado = 'cerrado';
+  r.fechaCierre = `${String(hoy.getDate()).padStart(2,'0')}-${String(hoy.getMonth()+1).padStart(2,'0')}-${hoy.getFullYear()}`;
+  saveData(); render();
+}
+
+function eliminarTurnoRC(idx) {
+  if (!confirm('¿Eliminar este registro?')) return;
+  appData.rendimientoComb.splice(idx, 1);
   saveData(); render();
 }
 
