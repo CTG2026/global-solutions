@@ -4879,168 +4879,307 @@ function renderInformes() {
   function informeRegistroServicios() {
     const MNOMBRES_L = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
     const MNOMBRES_C = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+    const hoyObj = new Date();
+
+    // ── Filtro: tipo de período ──
+    const tipoPeriodo = uiState.inf1_tipo || 'mes';
+
+    // ── Semana: lunes de la semana seleccionada (ISO date string YYYY-MM-DD) ──
+    function lunesDeHoy() {
+      const d = new Date(hoyObj); const dow = d.getDay();
+      d.setDate(d.getDate() - (dow===0?6:dow-1)); return d.toISOString().split('T')[0];
+    }
+    const lunesISO = uiState.inf1_lunes || lunesDeHoy();
+    const lunesObj = new Date(lunesISO+'T00:00:00');
+    const domingoObj = new Date(lunesObj); domingoObj.setDate(lunesObj.getDate()+6);
+    function fmtISO(d){ return `${String(d.getDate()).padStart(2,'0')}-${String(d.getMonth()+1).padStart(2,'0')}-${d.getFullYear()}`; }
+    function isoToDate(s){ const p=s.split('-'); return new Date(parseInt(p[0]),parseInt(p[1])-1,parseInt(p[2])); }
+    function moverSemana(n){ const d=isoToDate(lunesISO); d.setDate(d.getDate()+n*7); uiState.inf1_lunes=d.toISOString().split('T')[0]; render(); }
+    window.moverSemanaInf=moverSemana;
+
+    // ── Mes selector ──
     const mesesDisp = [...new Set(servicios.map(s=>`${s.anio}-${s.mes}`))].filter(m=>m&&!m.includes('undefined')).sort().reverse();
-    const hoyFallback = new Date();
-    const defMes = `${hoyFallback.getFullYear()}-${String(hoyFallback.getMonth()+1).padStart(2,'0')}`;
-    const mesSel = uiState.inf1_mes || (mesesDisp[0] || defMes);
+    const defMes = `${hoyObj.getFullYear()}-${String(hoyObj.getMonth()+1).padStart(2,'0')}`;
+    const mesSel = uiState.inf1_mes || (mesesDisp[0]||defMes);
     const [anioSel, mesSelPad] = mesSel.split('-');
-    const estadoFiltro = uiState.inf1_estado || 'todos';
 
-    let svcs = servicios.filter(s => s.anio===anioSel && s.mes===mesSelPad);
-    if (estadoFiltro==='cerrados') svcs = svcs.filter(s => s.cerrado);
-    else if (estadoFiltro==='pendientes') svcs = svcs.filter(s => !s.cerrado);
-    svcs = svcs.slice().sort((a,b)=>{
-      const pa=a.fecha.split('-'), pb=b.fecha.split('-');
-      return new Date(parseInt(pa[2]),parseInt(pa[1])-1,parseInt(pa[0])) - new Date(parseInt(pb[2]),parseInt(pb[1])-1,parseInt(pb[0]));
-    });
+    // ── Período libre ──
+    const desde = uiState.inf1_desde || '';
+    const hasta = uiState.inf1_hasta || '';
 
+    // ── Otros filtros ──
+    const clienteFiltro = uiState.inf1_cliente || 'todos';
+    const patenteFiltro = uiState.inf1_patente || 'todos';
+    const estadoFiltro  = uiState.inf1_estado  || 'todos';
+
+    // ── Aplicar filtro de período ──
+    function parseFecha(f){ if(!f)return null; const p=f.split('-'); if(p.length!==3)return null; return p[0].length===4?new Date(parseInt(p[0]),parseInt(p[1])-1,parseInt(p[2])):new Date(parseInt(p[2]),parseInt(p[1])-1,parseInt(p[0])); }
+    let svcs = servicios.slice();
+    if (tipoPeriodo==='semana') {
+      svcs = svcs.filter(s=>{ const d=parseFecha(s.fecha); return d&&d>=lunesObj&&d<=domingoObj; });
+    } else if (tipoPeriodo==='mes') {
+      svcs = svcs.filter(s=>s.anio===anioSel&&s.mes===mesSelPad);
+    } else if (tipoPeriodo==='libre') {
+      if (desde) { const dObj=new Date(desde+'T00:00:00'); svcs=svcs.filter(s=>{ const d=parseFecha(s.fecha); return d&&d>=dObj; }); }
+      if (hasta) { const hObj=new Date(hasta+'T23:59:59'); svcs=svcs.filter(s=>{ const d=parseFecha(s.fecha); return d&&d<=hObj; }); }
+    }
+    // ── Aplicar filtros secundarios ──
+    if (clienteFiltro!=='todos') svcs=svcs.filter(s=>s.cliente===clienteFiltro);
+    if (patenteFiltro!=='todos') svcs=svcs.filter(s=>s.patente===patenteFiltro);
+    if (estadoFiltro==='cerrados') svcs=svcs.filter(s=>s.cerrado);
+    else if (estadoFiltro==='pendientes') svcs=svcs.filter(s=>!s.cerrado);
+
+    // ── Ordenar por fecha ──
+    svcs=svcs.slice().sort((a,b)=>{ const da=parseFecha(a.fecha),db=parseFecha(b.fecha); return (da||0)-(db||0); });
+
+    // ── Totales ──
     const totalKmInf = svcs.reduce((a,s)=>a+(s.km||0),0);
     const totalIngInf = svcs.filter(s=>s.cerrado).reduce((a,s)=>a+(s.precio||0),0);
-    const mesNombre = MNOMBRES_L[parseInt(mesSelPad)-1] || mesSelPad;
+    const promIngKm = totalKmInf>0 ? Math.round(totalIngInf/totalKmInf) : 0;
 
-    // Guardar snapshot para PDF
-    window._inf1_snapshot = { svcs, anioSel, mesNombre, estadoFiltro, totalKmInf, totalIngInf };
+    // ── Listas para dropdowns ──
+    const clientesDisp = [...new Set(servicios.map(s=>s.cliente).filter(Boolean))].sort();
+    const flota = typeof getFlota==='function' ? getFlota().todas : (appData.patentes||[]);
 
+    // ── Label período para display y PDF ──
+    function labelPeriodo() {
+      if (tipoPeriodo==='semana') return `Semana ${fmtISO(lunesObj)} — ${fmtISO(domingoObj)}`;
+      if (tipoPeriodo==='mes') return `${MNOMBRES_L[parseInt(mesSelPad)-1]} ${anioSel}`;
+      if (desde||hasta) return `${desde||'inicio'} al ${hasta||'hoy'}`;
+      return 'Período libre';
+    }
+    function labelFiltros() {
+      const f=[]; if(clienteFiltro!=='todos')f.push('Cliente: '+clienteFiltro); if(patenteFiltro!=='todos')f.push('Equipo: '+patenteFiltro); if(estadoFiltro!=='todos')f.push('Estado: '+estadoFiltro); return f.join(' | ')||'Sin filtros adicionales';
+    }
+
+    // ── Guardar snapshot para PDF ──
+    window._inf1_snapshot = { svcs, labelPeriodo:labelPeriodo(), labelFiltros:labelFiltros(), totalKmInf, totalIngInf, promIngKm };
+
+    // ── Selector de período ──
+    const selStyle = 'padding:6px 8px;border:1px solid #dde;border-radius:6px;font-size:11px;outline:none;background:white';
+    const btnBase = (act)=>`padding:6px 10px;border-radius:6px;border:none;cursor:pointer;font-size:10px;font-weight:700;background:${act?'#0B2545':'#ECEFF1'};color:${act?'white':'#455A64'}`;
+
+    const periodoControls = tipoPeriodo==='semana' ? `
+      <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+        <button onclick="moverSemanaInf(-1)" style="${btnBase(false)}">← Anterior</button>
+        <span style="font-size:11px;font-weight:700;color:#0B2545;white-space:nowrap">${fmtISO(lunesObj)} — ${fmtISO(domingoObj)}</span>
+        <button onclick="moverSemanaInf(1)" style="${btnBase(false)}">Siguiente →</button>
+      </div>` :
+    tipoPeriodo==='mes' ? `
+      <select onchange="uiState.inf1_mes=this.value;render()" style="${selStyle}">
+        ${mesesDisp.map(m=>{const[a,mm]=m.split('-');return`<option value="${m}" ${mesSel===m?'selected':''}>${MNOMBRES_C[parseInt(mm)-1]} ${a}</option>`;}).join('')}
+      </select>` :
+    `<input type="date" value="${desde}" onchange="uiState.inf1_desde=this.value;render()" style="${selStyle};width:120px">
+     <span style="font-size:11px;color:#888">al</span>
+     <input type="date" value="${hasta}" onchange="uiState.inf1_hasta=this.value;render()" style="${selStyle};width:120px">`;
+
+    // ── Filas tabla ──
     const rowsHTML = svcs.length===0
-      ? `<tr><td colspan="10" style="text-align:center;padding:20px;color:#aaa;font-size:11px">Sin servicios para este período</td></tr>`
-      : svcs.map((s,i) => {
-          const puntos = s.puntos||s.guias||[];
-          const origen = (puntos[0]?.origen || s.origen || '—');
-          const destino = (puntos[puntos.length-1]?.destino || '—');
-          const guias = puntos.map(g=>g.num||g.guia).filter(Boolean).join(', ')||'—';
-          const estado = s.cerrado ? 'Cerrado' : (s.estado==='borrador'?'Borrador':'Pendiente');
-          const estadoColor = s.cerrado ? '#2E7D32' : (s.estado==='borrador'?'#1565C0':'#888');
-          return `<tr style="background:${i%2===0?'#fafafa':'white'};border-bottom:1px solid #f0f0f0">
-            <td style="padding:6px 8px;font-size:10px;font-weight:700;color:#1565C0;white-space:nowrap">${s.id}</td>
+      ? `<tr><td colspan="10" style="text-align:center;padding:24px;color:#aaa;font-size:11px">Sin servicios para los filtros seleccionados</td></tr>`
+      : svcs.map((s,i)=>{
+          const puntos=s.puntos||s.guias||[];
+          const origen=puntos[0]?.origen||s.origen||'—';
+          const destino=puntos[puntos.length-1]?.destino||'—';
+          const guias=puntos.map(g=>g.num||g.guia).filter(Boolean).join(', ')||'—';
+          const estado=s.cerrado?'Cerrado':(s.estado==='borrador'?'Borrador':'Pendiente');
+          const ec=s.cerrado?'#2E7D32':(s.estado==='borrador'?'#1565C0':'#888');
+          return `<tr style="background:${i%2===0?'#fafbfc':'white'};border-bottom:1px solid #eee">
+            <td style="padding:6px 8px;font-size:10px;font-weight:700;color:#0B2545;white-space:nowrap">${s.id}</td>
             <td style="padding:6px 8px;font-size:10px;white-space:nowrap">${s.fecha||'—'}</td>
             <td style="padding:6px 8px;font-size:10px;font-weight:600">${s.cliente||'—'}</td>
             <td style="padding:6px 8px;font-size:10px">${s.conductor||'—'}</td>
             <td style="padding:6px 8px;font-size:10px;font-weight:700">${s.patente||'—'}</td>
-            <td style="padding:6px 8px;font-size:10px;max-width:120px">${origen} → ${destino}</td>
+            <td style="padding:6px 8px;font-size:10px">${origen} → ${destino}</td>
             <td style="padding:6px 8px;font-size:10px">${guias}</td>
             <td style="padding:6px 8px;font-size:10px;text-align:right">${(s.km||0).toLocaleString('es-CL')}</td>
             <td style="padding:6px 8px;font-size:10px;text-align:right;font-weight:700;color:${s.cerrado?'#2E7D32':'#999'}">${s.precio?'$'+s.precio.toLocaleString('es-CL'):'—'}</td>
-            <td style="padding:6px 8px;font-size:10px;font-weight:700;color:${estadoColor}">${estado}</td>
+            <td style="padding:6px 8px;font-size:10px;font-weight:700;color:${ec}">${estado}</td>
           </tr>`;
         }).join('');
 
     return `
-    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;align-items:center">
-      <select onchange="uiState.inf1_mes=this.value;render()" style="padding:7px 10px;border:1px solid #dde;border-radius:7px;font-size:12px;outline:none">
-        ${mesesDisp.map(m=>{const[a,mm]=m.split('-');return`<option value="${m}" ${mesSel===m?'selected':''}>${MNOMBRES_C[parseInt(mm)-1]} ${a}</option>`;}).join('')}
-      </select>
-      <div style="display:flex;gap:4px;flex-wrap:wrap">
-        ${[['todos','Todos'],['cerrados','Cerrados'],['pendientes','Pendientes']].map(([v,l])=>`
-          <button onclick="uiState.inf1_estado='${v}';render()" style="padding:6px 10px;border-radius:6px;border:none;cursor:pointer;font-size:10px;font-weight:700;background:${estadoFiltro===v?'#37474F':'#ECEFF1'};color:${estadoFiltro===v?'white':'#455A64'}">${l}</button>
-        `).join('')}
+    <!-- FILTROS -->
+    <div style="background:#F5F7FA;border:1px solid #E0E4EA;border-radius:10px;padding:10px 12px;margin-bottom:10px">
+      <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end">
+        <!-- Período -->
+        <div style="min-width:140px">
+          <div style="font-size:9px;font-weight:700;color:#888;margin-bottom:4px">PERÍODO</div>
+          <div style="display:flex;gap:3px">
+            ${[['semana','Semana'],['mes','Mes'],['libre','Libre']].map(([v,l])=>`<button onclick="uiState.inf1_tipo='${v}';render()" style="${btnBase(tipoPeriodo===v)}">${l}</button>`).join('')}
+          </div>
+        </div>
+        <!-- Selector del período -->
+        <div style="flex:1;min-width:200px">
+          <div style="font-size:9px;font-weight:700;color:#888;margin-bottom:4px">&nbsp;</div>
+          <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">${periodoControls}</div>
+        </div>
+        <!-- Cliente -->
+        <div>
+          <div style="font-size:9px;font-weight:700;color:#888;margin-bottom:4px">CLIENTE</div>
+          <select onchange="uiState.inf1_cliente=this.value;render()" style="${selStyle};max-width:150px">
+            <option value="todos" ${clienteFiltro==='todos'?'selected':''}>Todos</option>
+            ${clientesDisp.map(c=>`<option value="${c}" ${clienteFiltro===c?'selected':''}>${c}</option>`).join('')}
+          </select>
+        </div>
+        <!-- Equipo -->
+        <div>
+          <div style="font-size:9px;font-weight:700;color:#888;margin-bottom:4px">EQUIPO</div>
+          <select onchange="uiState.inf1_patente=this.value;render()" style="${selStyle}">
+            <option value="todos" ${patenteFiltro==='todos'?'selected':''}>Todos</option>
+            ${flota.map(p=>`<option value="${p}" ${patenteFiltro===p?'selected':''}>${p}</option>`).join('')}
+          </select>
+        </div>
+        <!-- Estado -->
+        <div>
+          <div style="font-size:9px;font-weight:700;color:#888;margin-bottom:4px">ESTADO</div>
+          <div style="display:flex;gap:3px">
+            ${[['todos','Todos'],['cerrados','Cerrados'],['pendientes','Pendientes']].map(([v,l])=>`<button onclick="uiState.inf1_estado='${v}';render()" style="${btnBase(estadoFiltro===v)}">${l}</button>`).join('')}
+          </div>
+        </div>
+        <!-- PDF -->
+        <div style="margin-left:auto">
+          <div style="font-size:9px;font-weight:700;color:transparent;margin-bottom:4px">·</div>
+          <button onclick="imprimirInforme1()" style="padding:8px 16px;background:#0B2545;color:white;border:none;border-radius:7px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap">🖨️ Generar PDF</button>
+        </div>
       </div>
-      <button onclick="imprimirInforme1()" style="margin-left:auto;padding:7px 14px;background:#1565C0;color:white;border:none;border-radius:7px;font-size:11px;font-weight:700;cursor:pointer">🖨️ Exportar PDF</button>
     </div>
-    <div style="font-size:11px;font-weight:700;color:#37474F;margin-bottom:8px">${mesNombre} ${anioSel} · ${svcs.length} servicio${svcs.length!==1?'s':''}${estadoFiltro!=='todos'?' — solo '+estadoFiltro:''}</div>
-    <div style="overflow-x:auto;border-radius:8px;border:1px solid #e0e0e0">
-      <table style="width:100%;border-collapse:collapse;font-family:inherit;min-width:680px">
+
+    <!-- RESUMEN -->
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:10px">
+      <div style="background:#E3F2FD;border-radius:8px;padding:8px 10px;text-align:center">
+        <div style="font-size:9px;font-weight:700;color:#888">SERVICIOS</div>
+        <div style="font-size:20px;font-weight:900;color:#0B2545">${svcs.length}</div>
+      </div>
+      <div style="background:#E8F5E9;border-radius:8px;padding:8px 10px;text-align:center">
+        <div style="font-size:9px;font-weight:700;color:#888">INGRESOS (cerr.)</div>
+        <div style="font-size:14px;font-weight:900;color:#2E7D32">$${totalIngInf.toLocaleString('es-CL')}</div>
+      </div>
+      <div style="background:#EDE7F6;border-radius:8px;padding:8px 10px;text-align:center">
+        <div style="font-size:9px;font-weight:700;color:#888">KM TOTALES</div>
+        <div style="font-size:16px;font-weight:900;color:#4527A0">${totalKmInf.toLocaleString('es-CL')}</div>
+      </div>
+      <div style="background:#FFF8E1;border-radius:8px;padding:8px 10px;text-align:center">
+        <div style="font-size:9px;font-weight:700;color:#888">PROM $/KM</div>
+        <div style="font-size:14px;font-weight:900;color:#E65100">${promIngKm>0?'$'+promIngKm.toLocaleString('es-CL'):'—'}</div>
+      </div>
+    </div>
+
+    <!-- TABLA -->
+    <div style="overflow-x:auto;border-radius:8px;border:1px solid #dde">
+      <table style="width:100%;border-collapse:collapse;font-family:inherit;min-width:700px">
         <thead>
-          <tr style="background:#37474F;color:white">
-            <th style="padding:8px;font-size:9px;font-weight:800;text-align:left;white-space:nowrap">ID</th>
-            <th style="padding:8px;font-size:9px;font-weight:800;text-align:left;white-space:nowrap">FECHA</th>
-            <th style="padding:8px;font-size:9px;font-weight:800;text-align:left">CLIENTE</th>
-            <th style="padding:8px;font-size:9px;font-weight:800;text-align:left">CONDUCTOR</th>
-            <th style="padding:8px;font-size:9px;font-weight:800;text-align:left">PATENTE</th>
-            <th style="padding:8px;font-size:9px;font-weight:800;text-align:left">RUTA</th>
-            <th style="padding:8px;font-size:9px;font-weight:800;text-align:left">N° GUÍA</th>
-            <th style="padding:8px;font-size:9px;font-weight:800;text-align:right">KM</th>
-            <th style="padding:8px;font-size:9px;font-weight:800;text-align:right">PRECIO NETO</th>
-            <th style="padding:8px;font-size:9px;font-weight:800;text-align:left">ESTADO</th>
+          <tr style="background:#0B2545;color:white;position:sticky;top:0">
+            <th style="padding:9px 8px;font-size:9px;font-weight:800;text-align:left">ID</th>
+            <th style="padding:9px 8px;font-size:9px;font-weight:800;text-align:left">FECHA</th>
+            <th style="padding:9px 8px;font-size:9px;font-weight:800;text-align:left">CLIENTE</th>
+            <th style="padding:9px 8px;font-size:9px;font-weight:800;text-align:left">CONDUCTOR</th>
+            <th style="padding:9px 8px;font-size:9px;font-weight:800;text-align:left">PATENTE</th>
+            <th style="padding:9px 8px;font-size:9px;font-weight:800;text-align:left">RUTA</th>
+            <th style="padding:9px 8px;font-size:9px;font-weight:800;text-align:left">N° GUÍA</th>
+            <th style="padding:9px 8px;font-size:9px;font-weight:800;text-align:right">KM</th>
+            <th style="padding:9px 8px;font-size:9px;font-weight:800;text-align:right">PRECIO NETO</th>
+            <th style="padding:9px 8px;font-size:9px;font-weight:800;text-align:left">ESTADO</th>
           </tr>
         </thead>
         <tbody>${rowsHTML}</tbody>
         <tfoot>
-          <tr style="background:#ECEFF1">
-            <td colspan="7" style="padding:8px 10px;font-size:10px;font-weight:700;color:#37474F">TOTALES — ${svcs.length} servicios · ${svcs.filter(s=>s.cerrado).length} cerrados</td>
-            <td style="padding:8px;font-size:11px;font-weight:900;text-align:right;color:#1565C0">${totalKmInf.toLocaleString('es-CL')}</td>
+          <tr style="background:#E8EDF3;border-top:2px solid #0B2545">
+            <td colspan="7" style="padding:8px 10px;font-size:10px;font-weight:700;color:#0B2545">${svcs.length} servicios · ${svcs.filter(s=>s.cerrado).length} cerrados · ${svcs.filter(s=>!s.cerrado).length} pendientes</td>
+            <td style="padding:8px;font-size:11px;font-weight:900;text-align:right;color:#4527A0">${totalKmInf.toLocaleString('es-CL')}</td>
             <td style="padding:8px;font-size:11px;font-weight:900;text-align:right;color:#2E7D32">$${totalIngInf.toLocaleString('es-CL')}</td>
-            <td></td>
+            <td style="padding:8px;font-size:10px;color:#E65100;font-weight:700">${promIngKm>0?'$'+promIngKm.toLocaleString('es-CL')+'/km':''}</td>
           </tr>
         </tfoot>
       </table>
     </div>`;
   }
 
-  // Función global para imprimir informe 1
+  // ── PDF: Informe 1 ────────────────────────────────────────────────────────
   window.imprimirInforme1 = function() {
     const snap = window._inf1_snapshot;
     if (!snap) return;
-    const { svcs, anioSel, mesNombre, estadoFiltro, totalKmInf, totalIngInf } = snap;
+    const { svcs, labelPeriodo, labelFiltros, totalKmInf, totalIngInf, promIngKm } = snap;
+    const hoyFmt = new Date().toLocaleDateString('es-CL',{day:'2-digit',month:'long',year:'numeric'});
     const filas = svcs.map((s,i)=>{
       const puntos=s.puntos||s.guias||[];
       const origen=puntos[0]?.origen||s.origen||'—';
       const destino=puntos[puntos.length-1]?.destino||'—';
       const guias=puntos.map(g=>g.num||g.guia).filter(Boolean).join(', ')||'—';
       const estado=s.cerrado?'Cerrado':(s.estado==='borrador'?'Borrador':'Pendiente');
-      return `<tr style="background:${i%2===0?'#f9fafa':'white'}">
-        <td style="padding:5px 7px;font-size:9px;font-weight:700;color:#1a3d6b">${s.id}</td>
-        <td style="padding:5px 7px;font-size:9px;white-space:nowrap">${s.fecha||'—'}</td>
-        <td style="padding:5px 7px;font-size:9px">${s.cliente||'—'}</td>
-        <td style="padding:5px 7px;font-size:9px">${s.conductor||'—'}</td>
-        <td style="padding:5px 7px;font-size:9px;font-weight:700">${s.patente||'—'}</td>
-        <td style="padding:5px 7px;font-size:9px">${origen} → ${destino}</td>
-        <td style="padding:5px 7px;font-size:9px">${guias}</td>
-        <td style="padding:5px 7px;font-size:9px;text-align:right">${(s.km||0).toLocaleString('es-CL')}</td>
-        <td style="padding:5px 7px;font-size:9px;text-align:right;font-weight:700;color:${s.cerrado?'#1a7a3a':'#777'}">${s.precio?'$'+s.precio.toLocaleString('es-CL'):'—'}</td>
-        <td style="padding:5px 7px;font-size:9px;font-weight:700;color:${s.cerrado?'#1a7a3a':'#555'}">${estado}</td>
+      return `<tr style="background:${i%2===0?'#f5f7fa':'white'}">
+        <td>${s.id}</td>
+        <td style="white-space:nowrap">${s.fecha||'—'}</td>
+        <td>${s.cliente||'—'}</td>
+        <td>${s.conductor||'—'}</td>
+        <td style="font-weight:700">${s.patente||'—'}</td>
+        <td>${origen} → ${destino}</td>
+        <td>${guias}</td>
+        <td style="text-align:right">${(s.km||0).toLocaleString('es-CL')}</td>
+        <td style="text-align:right;font-weight:700;color:${s.cerrado?'#1a6b3a':'#555'}">${s.precio?'$'+s.precio.toLocaleString('es-CL'):'—'}</td>
+        <td style="font-weight:700;color:${s.cerrado?'#1a6b3a':'#555'}">${estado}</td>
       </tr>`;
     }).join('');
-    const hoyFmt = new Date().toLocaleDateString('es-CL',{day:'2-digit',month:'long',year:'numeric'});
     const html = `<!DOCTYPE html><html><head><meta charset="UTF-8">
-      <title>Registro de Servicios — ${mesNombre} ${anioSel}</title>
+      <title>Informe de Servicios — Global Solutions SpA</title>
       <style>
-        body{font-family:Arial,sans-serif;margin:0;padding:16px;color:#222;font-size:10px}
-        @page{size:A4 landscape;margin:15mm}
-        @media print{body{padding:0}}
-        table{width:100%;border-collapse:collapse;margin-top:10px}
-        th{background:#1a3d6b;color:white;padding:6px 8px;font-size:9px;text-align:left;font-weight:800}
-        td{padding:5px 7px;border-bottom:1px solid #e8e8e8;vertical-align:top}
-        tfoot td{background:#e8ecef;font-weight:800;border-top:2px solid #1a3d6b}
-        .header{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #1a3d6b;padding-bottom:10px;margin-bottom:14px}
-        .logo{font-size:20px;font-weight:900;color:#1a3d6b;letter-spacing:1px}
-        .logo span{font-size:11px;display:block;color:#888;font-weight:400;letter-spacing:0}
-        .meta{text-align:right;font-size:10px;color:#555}
-        .meta strong{font-size:13px;color:#1a3d6b;display:block}
-        .kpis{display:flex;gap:16px;margin-bottom:14px}
-        .kpi{background:#f4f6f9;border-left:3px solid #1a3d6b;padding:6px 12px;flex:1}
-        .kpi .v{font-size:16px;font-weight:900;color:#1a3d6b}
-        .kpi .l{font-size:8px;color:#888;font-weight:700;text-transform:uppercase}
+        *{box-sizing:border-box}
+        body{font-family:Arial,sans-serif;margin:0;padding:18px;color:#1a1a1a;font-size:9.5px;line-height:1.4}
+        @page{size:A4 landscape;margin:12mm 14mm}
+        @media print{body{padding:0}.no-print{display:none}}
+        .header-wrap{border-bottom:4px solid #0B2545;padding-bottom:12px;margin-bottom:14px;display:flex;justify-content:space-between;align-items:flex-start}
+        .logo-block .logo{font-size:22px;font-weight:900;color:#0B2545;letter-spacing:0.5px}
+        .logo-block .sub{font-size:10px;color:#607D8B;margin-top:2px}
+        .meta-block{text-align:right}
+        .meta-block .title{font-size:16px;font-weight:900;color:#0B2545;margin-bottom:4px}
+        .meta-block .row{font-size:9px;color:#546E7A;margin-bottom:2px}
+        .meta-block .row strong{color:#0B2545}
+        .kpis{display:flex;gap:10px;margin-bottom:14px}
+        .kpi{flex:1;background:#f0f4f8;border-left:3px solid #0B2545;padding:7px 10px;border-radius:3px}
+        .kpi .lbl{font-size:8px;color:#607D8B;font-weight:700;text-transform:uppercase;letter-spacing:0.3px}
+        .kpi .val{font-size:15px;font-weight:900;color:#0B2545;margin-top:2px}
+        table{width:100%;border-collapse:collapse}
+        thead th{background:#0B2545;color:white;padding:7px 8px;font-size:8.5px;font-weight:800;text-align:left;letter-spacing:0.3px}
+        thead th.r{text-align:right}
+        tbody td{padding:5px 8px;font-size:8.5px;border-bottom:1px solid #e8ecf0;vertical-align:top}
+        tfoot td{background:#e8edf3;font-weight:800;font-size:9px;padding:6px 8px;border-top:2px solid #0B2545}
+        tfoot td.r{text-align:right}
+        .footer{margin-top:14px;font-size:8px;color:#aaa;text-align:center;border-top:1px solid #eee;padding-top:6px}
       </style>
     </head><body>
-      <div class="header">
-        <div class="logo">Global Solutions<span>Transporte de Carga · Informe Operacional</span></div>
-        <div class="meta">
-          <strong>Registro de Servicios</strong>
-          ${mesNombre} ${anioSel}${estadoFiltro!=='todos'?' — '+estadoFiltro:''}<br>
-          Emitido: ${hoyFmt}
+      <div class="header-wrap">
+        <div class="logo-block">
+          <div class="logo">Global Solutions SpA</div>
+          <div class="sub">Transporte de Carga — Informe de Servicios</div>
+        </div>
+        <div class="meta-block">
+          <div class="title">Informe de Servicios</div>
+          <div class="row"><strong>Período:</strong> ${labelPeriodo}</div>
+          <div class="row"><strong>Filtros:</strong> ${labelFiltros}</div>
+          <div class="row"><strong>Emisión:</strong> ${hoyFmt}</div>
         </div>
       </div>
       <div class="kpis">
-        <div class="kpi"><div class="l">Total servicios</div><div class="v">${svcs.length}</div></div>
-        <div class="kpi"><div class="l">Servicios cerrados</div><div class="v">${svcs.filter(s=>s.cerrado).length}</div></div>
-        <div class="kpi"><div class="l">Total km</div><div class="v">${totalKmInf.toLocaleString('es-CL')}</div></div>
-        <div class="kpi"><div class="l">Ingresos (cerrados)</div><div class="v">$${totalIngInf.toLocaleString('es-CL')}</div></div>
+        <div class="kpi"><div class="lbl">Servicios</div><div class="val">${svcs.length}</div></div>
+        <div class="kpi"><div class="lbl">Cerrados</div><div class="val">${svcs.filter(s=>s.cerrado).length}</div></div>
+        <div class="kpi"><div class="lbl">Km Totales</div><div class="val">${totalKmInf.toLocaleString('es-CL')}</div></div>
+        <div class="kpi"><div class="lbl">Ingresos (cerrados)</div><div class="val">$${totalIngInf.toLocaleString('es-CL')}</div></div>
+        <div class="kpi"><div class="lbl">Promedio $/km</div><div class="val">${promIngKm>0?'$'+promIngKm.toLocaleString('es-CL'):'—'}</div></div>
       </div>
       <table>
         <thead><tr>
           <th>ID</th><th>Fecha</th><th>Cliente</th><th>Conductor</th><th>Patente</th>
-          <th>Ruta</th><th>N° Guía</th><th style="text-align:right">Km</th>
-          <th style="text-align:right">Precio Neto</th><th>Estado</th>
+          <th>Ruta</th><th>N° Guía</th><th class="r">Km</th><th class="r">Precio Neto</th><th>Estado</th>
         </tr></thead>
-        <tbody>${filas}</tbody>
+        <tbody>${filas||'<tr><td colspan="10" style="text-align:center;padding:16px;color:#aaa">Sin registros</td></tr>'}</tbody>
         <tfoot><tr>
-          <td colspan="7">TOTALES — ${svcs.length} servicios · ${svcs.filter(s=>s.cerrado).length} cerrados</td>
-          <td style="text-align:right">${totalKmInf.toLocaleString('es-CL')}</td>
-          <td style="text-align:right">$${totalIngInf.toLocaleString('es-CL')}</td>
-          <td></td>
+          <td colspan="7">${svcs.length} servicios · ${svcs.filter(s=>s.cerrado).length} cerrados · ${svcs.filter(s=>!s.cerrado).length} pendientes</td>
+          <td class="r">${totalKmInf.toLocaleString('es-CL')}</td>
+          <td class="r">$${totalIngInf.toLocaleString('es-CL')}</td>
+          <td>${promIngKm>0?'$'+promIngKm.toLocaleString('es-CL')+'/km':''}</td>
         </tr></tfoot>
       </table>
-      <script>window.onload=()=>{window.print();}<\/script>
+      <div class="footer">Global Solutions SpA · Generado el ${hoyFmt} · Sistema de Gestión Interno</div>
+      <script>window.onload=function(){window.print();}<\/script>
     </body></html>`;
     const w = window.open('','_blank');
     if (w) { w.document.write(html); w.document.close(); }
