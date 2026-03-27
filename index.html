@@ -704,14 +704,22 @@ document.addEventListener('keydown', (e) => {
 });
 
 
-// ── RENDIMIENTO COMBUSTIBLE v36 ───────────────────────────
+// ── RENDIMIENTO COMBUSTIBLE ────────────────────────────────
+function _rcHoy() { const h=new Date(); return `${h.getFullYear()}-${String(h.getMonth()+1).padStart(2,'0')}-${String(h.getDate()).padStart(2,'0')}`; }
+function _rcFmtISO(iso) { if(!iso)return ''; const p=iso.split('-'); return `${p[2]}-${p[1]}-${p[0]}`; }
+function _rcParseDD(dd) { if(!dd)return null; const p=dd.split('-'); return new Date(+p[2],+p[1]-1,+p[0]); }
+function _rcNextId() {
+  const n=(appData.rendimientoComb||[]).length+1;
+  return 'RC-'+String(n).padStart(3,'0');
+}
+
 function renderRendimientoComb() {
   if (!appData.rendimientoComb) appData.rendimientoComb = [];
   const FLOTA = appData.patentes || ['WR9192','GKFD84','XR8555','GCFF12','BPBL35','XA1114','DSDV36'];
-  const conductores = (appData.remuneraciones||[]).filter(e=>e.activo&&e.cargo==='Conductor').map(e=>e.nombre);
-  const hoyISO = (()=>{const h=new Date();return `${h.getFullYear()}-${String(h.getMonth()+1).padStart(2,'0')}-${String(h.getDate()).padStart(2,'0')}`;})();
-  const pendientes = appData.rendimientoComb.filter(r=>!r.cerrado);
-  const completados = appData.rendimientoComb.filter(r=>r.cerrado).slice(-10).reverse();
+  const conductores = (appData.remuneraciones||[]).filter(e=>e.activo).map(e=>e.nombre);
+  const hoyISO = _rcHoy();
+  const abiertos  = appData.rendimientoComb.filter(r=>r.estado==='abierto');
+  const cerrados  = appData.rendimientoComb.filter(r=>r.estado==='cerrado').slice().reverse();
   const inpSt = 'width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit;background:white';
 
   const condOpts = `<option value="">Seleccionar...</option>${conductores.map(c=>`<option value="${c}">${c}</option>`).join('')}<option value="__otro__">Otro...</option>`;
