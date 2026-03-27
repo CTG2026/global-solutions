@@ -5,11 +5,11 @@
   <meta http-equiv="cache-control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="pragma" content="no-cache">
   <meta http-equiv="expires" content="0">
-  <meta name="version" content="1774654686">
+  <meta name="version" content="1774655852">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <script>
 (function() {
-  var VERSION = '1774654686';
+  var VERSION = '1774655852';
   var stored = localStorage.getItem('gs_app_version');
   if (stored !== VERSION) {
     var session = localStorage.getItem('gs_session');
@@ -454,7 +454,7 @@ const DEFAULT_DATA = {
         { titulo: "Registro de servicio diario", proc: "Completar al ejecutar o coordinar cada servicio del día. Registrar los datos del equipo, conductor, cliente, ruta y precio. Esta información alimenta el dashboard de ventas y caja.", subtareas: ["Verificar datos del servicio con conductor","Confirmar precio neto con cliente o broker","Registrar en sistema al cierre del servicio"], registroServicio: true },
         { titulo: "Coordinar y ejecutar ruta", proc: "Confirmar hora de carga en origen con el cliente o broker. Monitorear que el camión salga a tiempo. Si hay demora en la carga, avisar al broker ANTES de que el camión llegue al punto. Registrar km e incidencias al término.", subtareas: ["Confirmar hora de carga con cliente","Monitorear salida y avance del servicio","Avisar al broker si hay demoras en carga","Registrar km e incidencias al término"] },
         { titulo: "Gestión de flota", proc: "Revisar estado de los 5 camiones operativos. Registrar km por litro para controlar eficiencia. Programar mantenciones preventivas. Cargar costos directos de cada servicio en el sistema.", subtareas: ["Revisar estado operativo de los 5 camiones","Gestionar mantenciones programadas","Registrar km por litro y eficiencia","Cargar costos directos de cada servicio"] },
-        { titulo: "Rendimiento Combustible", proc: "Registrar odómetro al inicio del día por equipo. Al día siguiente registrar nuevo odómetro y litros cargados para calcular rendimiento (km/litro).", subtareas: [], rendimientoCombTask: true, done: false },
+        { titulo: "Rendimiento Combustible", proc: "Día 1: registrar carga de combustible (patente, conductor, litros). Día 2: ingresar km recorridos para calcular rendimiento (km/L).", subtareas: [], rendimientoCombTask: true, done: false },
       ],
       pendientes: [
         { texto: "Trasladar tracto Mussam a base — deuda pendiente", badge: "hoy", done: false },
@@ -810,7 +810,23 @@ function renderRendimientoComb() {
     </div>` : ''}
   </div>` : '';
 
-  return `<div style="padding:2px">${sec1}${sec2}${sec3}</div>`;
+  // ── SECCIÓN 4: INFORMES ──
+  const sec4 = `<div style="background:#E3F2FD;border-radius:10px;padding:12px;margin-bottom:10px">
+    <div style="font-size:10px;font-weight:800;color:#1565C0;letter-spacing:0.5px;margin-bottom:10px">📊 INFORME POR PERÍODO</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px">
+      <div>
+        <div style="font-size:9px;font-weight:700;color:#888;margin-bottom:3px">DESDE</div>
+        <input id="rci_desde" type="date" style="${inp};background:white">
+      </div>
+      <div>
+        <div style="font-size:9px;font-weight:700;color:#888;margin-bottom:3px">HASTA</div>
+        <input id="rci_hasta" type="date" value="${hoyISO}" style="${inp};background:white">
+      </div>
+    </div>
+    <button onclick="imprimirInformeRC()" style="width:100%;padding:10px;background:#1565C0;color:white;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer">🖨️ Generar informe PDF</button>
+  </div>`;
+
+  return `<div style="padding:2px">${sec1}${sec2}${sec3}${sec4}</div>`;
 }
 
 function crearRegistroRC() {
@@ -848,6 +864,165 @@ function eliminarTurnoRC(idx) {
   if (!confirm('¿Eliminar este registro?')) return;
   appData.rendimientoComb.splice(idx, 1);
   saveData(); render();
+}
+
+function imprimirInformeRC() {
+  const desdeISO = document.getElementById('rci_desde')?.value;
+  const hastaISO = document.getElementById('rci_hasta')?.value;
+  const hoyFmt = new Date().toLocaleDateString('es-CL',{day:'2-digit',month:'long',year:'numeric'});
+
+  function parseISO(s){ if(!s)return null; const p=s.split('-'); return new Date(+p[0],+p[1]-1,+p[2]); }
+  function parseDD(s){ if(!s)return null; const p=s.split('-'); return new Date(+p[2],+p[1]-1,+p[0]); }
+
+  const dDesde = parseISO(desdeISO);
+  const dHasta = parseISO(hastaISO);
+
+  const registros = (appData.rendimientoComb||[])
+    .filter(r => r.estado==='cerrado')
+    .filter(r => {
+      const d = parseDD(r.fecha);
+      if (!d) return false;
+      if (dDesde && d < dDesde) return false;
+      if (dHasta && d > dHasta) return false;
+      return true;
+    })
+    .sort((a,b) => { const da=parseDD(a.fecha),db=parseDD(b.fecha); return da-db; });
+
+  if (!registros.length) return alert('No hay registros cerrados en el período seleccionado');
+
+  const totalLitros = registros.reduce((s,r)=>s+(r.litros||0),0);
+  const totalKm     = registros.reduce((s,r)=>s+(r.km||0),0);
+  const rendProm    = totalKm>0&&totalLitros>0 ? (totalKm/totalLitros).toFixed(2) : '—';
+
+  // Subtotales por equipo
+  const porPatente = {};
+  registros.forEach(r=>{
+    if(!porPatente[r.patente]) porPatente[r.patente]={regs:0,litros:0,km:0};
+    porPatente[r.patente].regs++;
+    porPatente[r.patente].litros += r.litros||0;
+    porPatente[r.patente].km    += r.km||0;
+  });
+
+  // Subtotales por conductor
+  const porConductor = {};
+  registros.forEach(r=>{
+    const c = r.conductor||'Sin asignar';
+    if(!porConductor[c]) porConductor[c]={regs:0,litros:0,km:0};
+    porConductor[c].regs++;
+    porConductor[c].litros += r.litros||0;
+    porConductor[c].km    += r.km||0;
+  });
+
+  const periodoLabel = (desdeISO?_rcFmtISO(desdeISO):'inicio')+' al '+(hastaISO?_rcFmtISO(hastaISO):'hoy');
+
+  const filasDetalle = registros.map((r,i)=>`
+    <tr style="background:${i%2===0?'white':'#F4F6F8'}">
+      <td style="padding:6px 8px">${r.fecha}</td>
+      <td style="padding:6px 8px;font-weight:700">${r.patente}</td>
+      <td style="padding:6px 8px">${r.conductor||'—'}</td>
+      <td style="padding:6px 8px;text-align:right">${r.litros}</td>
+      <td style="padding:6px 8px;text-align:right">${r.km}</td>
+      <td style="padding:6px 8px;text-align:right;font-weight:800;color:#1B5E20">${r.rendimiento} km/L</td>
+    </tr>`).join('');
+
+  const filasPatente = Object.entries(porPatente).map(([p,d])=>`
+    <tr>
+      <td style="padding:6px 8px;font-weight:700">${p}</td>
+      <td style="padding:6px 8px;text-align:right">${d.regs}</td>
+      <td style="padding:6px 8px;text-align:right">${d.litros}</td>
+      <td style="padding:6px 8px;text-align:right">${d.km}</td>
+      <td style="padding:6px 8px;text-align:right;font-weight:800;color:#1B5E20">${d.km>0&&d.litros>0?(d.km/d.litros).toFixed(2)+' km/L':'—'}</td>
+    </tr>`).join('');
+
+  const filasConductor = Object.entries(porConductor).map(([c,d])=>`
+    <tr>
+      <td style="padding:6px 8px">${c}</td>
+      <td style="padding:6px 8px;text-align:right">${d.regs}</td>
+      <td style="padding:6px 8px;text-align:right">${d.litros}</td>
+      <td style="padding:6px 8px;text-align:right">${d.km}</td>
+      <td style="padding:6px 8px;text-align:right;font-weight:800;color:#1B5E20">${d.km>0&&d.litros>0?(d.km/d.litros).toFixed(2)+' km/L':'—'}</td>
+    </tr>`).join('');
+
+  const th = 'padding:7px 8px;text-align:left;font-size:9px;font-weight:800';
+  const thr = th+';text-align:right';
+
+  const html = `<!DOCTYPE html><html><head><meta charset="UTF-8">
+  <title>Informe Rendimiento Combustible</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:Arial,sans-serif;font-size:10px;color:#1a1a1a;padding:20px}
+    @page{size:A4 portrait;margin:12mm 14mm}
+    @media print{body{padding:0}}
+    .header{border-bottom:4px solid #0B2545;padding-bottom:12px;margin-bottom:14px;display:flex;justify-content:space-between;align-items:flex-start}
+    .logo{font-size:20px;font-weight:900;color:#0B2545}.logo .sub{font-size:9px;color:#546E7A;font-weight:400;display:block}
+    .meta .title{font-size:15px;font-weight:900;color:#0B2545;text-align:right}.meta .row{font-size:9px;color:#546E7A;margin-top:2px;text-align:right}
+    .resumen{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:14px}
+    .res-box{background:#0B2545;color:white;padding:10px;border-radius:6px;text-align:center}
+    .res-box .rl{font-size:8px;opacity:0.7;font-weight:700;text-transform:uppercase}.res-box .rv{font-size:18px;font-weight:900}
+    .sec-title{font-size:10px;font-weight:900;color:#0B2545;letter-spacing:0.5px;margin:12px 0 6px;text-transform:uppercase}
+    table{width:100%;border-collapse:collapse;margin-bottom:10px}
+    thead tr{background:#0B2545;color:white}
+    th{${th}}
+    td{padding:6px 8px;border-bottom:1px solid #E8EDF3;font-size:9.5px}
+    tfoot tr{background:#E8EDF3;font-weight:800}
+    .footer{text-align:center;font-size:8px;color:#aaa;border-top:1px solid #eee;padding-top:8px;margin-top:16px}
+  </style>
+  </head><body>
+  <div class="header">
+    <div class="logo">Global Solutions SpA<span class="sub">Transporte de Carga</span></div>
+    <div class="meta">
+      <div class="title">INFORME RENDIMIENTO COMBUSTIBLE</div>
+      <div class="row">Período: ${periodoLabel}</div>
+      <div class="row">Registros: ${registros.length}</div>
+      <div class="row">Emisión: ${hoyFmt}</div>
+    </div>
+  </div>
+
+  <div class="resumen">
+    <div class="res-box"><div class="rl">Total km</div><div class="rv">${totalKm.toLocaleString('es-CL')}</div></div>
+    <div class="res-box"><div class="rl">Total litros</div><div class="rv">${totalLitros}L</div></div>
+    <div class="res-box" style="background:#1B5E20"><div class="rl">Rendimiento prom.</div><div class="rv">${rendProm!=='—'?rendProm+' km/L':rendProm}</div></div>
+  </div>
+
+  <div class="sec-title">Detalle de registros</div>
+  <table>
+    <thead><tr>
+      <th style="${th}">Fecha</th><th style="${th}">Patente</th><th style="${th}">Conductor</th>
+      <th style="${thr}">Litros</th><th style="${thr}">Km</th><th style="${thr}">Km/L</th>
+    </tr></thead>
+    <tbody>${filasDetalle}</tbody>
+    <tfoot><tr>
+      <td colspan="3" style="padding:6px 8px">TOTALES</td>
+      <td style="padding:6px 8px;text-align:right">${totalLitros}L</td>
+      <td style="padding:6px 8px;text-align:right">${totalKm.toLocaleString('es-CL')} km</td>
+      <td style="padding:6px 8px;text-align:right;color:#1B5E20">${rendProm!=='—'?rendProm+' km/L':rendProm}</td>
+    </tr></tfoot>
+  </table>
+
+  <div class="sec-title">Resumen por equipo</div>
+  <table>
+    <thead><tr>
+      <th style="${th}">Patente</th><th style="${thr}">Registros</th>
+      <th style="${thr}">Litros</th><th style="${thr}">Km</th><th style="${thr}">Km/L prom.</th>
+    </tr></thead>
+    <tbody>${filasPatente}</tbody>
+  </table>
+
+  <div class="sec-title">Resumen por conductor</div>
+  <table>
+    <thead><tr>
+      <th style="${th}">Conductor</th><th style="${thr}">Registros</th>
+      <th style="${thr}">Litros</th><th style="${thr}">Km</th><th style="${thr}">Km/L prom.</th>
+    </tr></thead>
+    <tbody>${filasConductor}</tbody>
+  </table>
+
+  <div class="footer">Global Solutions SpA · Rendimiento de Combustible · Generado el ${hoyFmt}</div>
+  <script>window.onload=function(){window.print();}<\/script>
+  </body></html>`;
+
+  const w = window.open('','_blank');
+  if(w){w.document.write(html);w.document.close();}
 }
 
 // ── CIERRE DE SERVICIOS v36 ───────────────────────────────
@@ -3519,7 +3694,7 @@ function loadData() {
   if (!appData.fases || !Array.isArray(appData.fases)) appData.fases = JSON.parse(JSON.stringify(DEFAULT_DATA.fases));
   const _opF = appData.fases.find(f=>f.id==='operacional');
   if (_opF && !_opF.rutinarias.some(r=>r.rendimientoCombTask)) {
-    _opF.rutinarias.push({titulo:'Rendimiento Combustible',proc:'Registrar odómetro inicio/fin del día para calcular km/litro.',subtareas:[],rendimientoCombTask:true,done:false});
+    _opF.rutinarias.push({titulo:'Rendimiento Combustible',proc:'Día 1: registrar carga (patente, conductor, litros). Día 2: ingresar km recorridos para calcular rendimiento (km/L).',subtareas:[],rendimientoCombTask:true,done:false});
   }
   // Cierre de Servicios y Liquidaciones en Financiero
   const _finF = appData.fases.find(f=>f.id==='financiero');
@@ -4154,7 +4329,7 @@ function renderFase(fase) {
   }
   // v36: Rendimiento Combustible en operacional
   if (fase.id==='operacional' && !fase.rutinarias.some(r=>r.rendimientoCombTask)) {
-    fase.rutinarias.push({titulo:'Rendimiento Combustible',proc:'Registrar odómetro inicio/fin del día.',subtareas:[],rendimientoCombTask:true,done:false});
+    fase.rutinarias.push({titulo:'Rendimiento Combustible',proc:'Día 1: registrar carga (patente, conductor, litros). Día 2: ingresar km recorridos para calcular rendimiento (km/L).',subtareas:[],rendimientoCombTask:true,done:false});
     saveData();
   }
   // v36: Cotización PDF en comercial
