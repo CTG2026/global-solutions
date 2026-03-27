@@ -393,6 +393,14 @@ const DEFAULT_DATA = {
   costos: [],
   copec: [],
   cartola: [],
+  remuneraciones: [
+    { id:'EMP-001', nombre:'Manuel Madrid',    cargo:'Conductor',           area:'Operaciones',    activo:true, liquidaciones:[] },
+    { id:'EMP-002', nombre:'Felipe Madariaga', cargo:'Conductor',           area:'Operaciones',    activo:true, liquidaciones:[] },
+    { id:'EMP-003', nombre:'Felipe Vidal',     cargo:'Conductor',           area:'Operaciones',    activo:true, liquidaciones:[] },
+    { id:'EMP-004', nombre:'Sebastián Zúñiga', cargo:'Ayudante Operaciones',area:'Operaciones',    activo:true, liquidaciones:[] },
+    { id:'EMP-005', nombre:'Pablo Riquelme',   cargo:'Jefe Operaciones',    area:'Administración', activo:true, liquidaciones:[] },
+    { id:'EMP-006', nombre:'Carlos Torres',    cargo:'Control de Gestión',  area:'Administración', activo:true, liquidaciones:[] }
+  ],
   camionetas: ['BWGH46','KSRC78','JYJV21'],
   conductores: ['Manuel Madrid','Felipe Vidal','Felipe Madariaga','Sebastián Zúñiga','Pablo Riquelme'],
   midia_foco: [],
@@ -1515,6 +1523,41 @@ async function syncCostosDesdeSupabase() {
   } catch(e) { console.warn('Error sync costos desde Supabase:', e); }
 }
 
+// ─── SUPABASE REMUNERACIONES ───────────────────────────────────────────────────
+async function upsertRemuneracionSupabase(liq, empleadoId) {
+  if (!supa || !supaConectado) return;
+  try {
+    await supa.from('remuneraciones').upsert({
+      id: liq.id,
+      empleado_id: empleadoId,
+      mes: liq.mes,
+      anio: liq.anio,
+      datos: liq,
+      estado: liq.estado || 'pendiente',
+      fecha_pago: liq.fechaPago || ''
+    }, { onConflict: 'id' });
+  } catch(e) { console.warn('Error upsert remuneración Supabase:', e); }
+}
+async function syncRemuneracionesDesdeSupabase() {
+  if (!supa || !supaConectado) return;
+  try {
+    const { data, error } = await supa.from('remuneraciones').select('*');
+    if (!error && data && data.length > 0) {
+      if (!appData.remuneraciones) appData.remuneraciones = JSON.parse(JSON.stringify(DEFAULT_DATA.remuneraciones));
+      data.forEach(row => {
+        const emp = (appData.remuneraciones||[]).find(e => e.id === row.empleado_id);
+        if (emp) {
+          if (!emp.liquidaciones) emp.liquidaciones = [];
+          const idx = emp.liquidaciones.findIndex(l => l.id === row.id);
+          if (idx >= 0) emp.liquidaciones[idx] = row.datos;
+          else emp.liquidaciones.push(row.datos);
+        }
+      });
+      saveData();
+    }
+  } catch(e) { console.warn('Error sync remuneraciones desde Supabase:', e); }
+}
+
 // ─── CRUD COSTOS MANUALES ─────────────────────────────────────────────────────
 function agregarCosto() {
   const f = uiState.costoForm || {};
@@ -1817,6 +1860,413 @@ function _costoTabHistorial(mes, anio) {
   </div>`).join('')}`:''}`;
 }
 
+// ─── TAB REMUNERACIONES ───────────────────────────────────────────────────────
+function _genIdLiqRem(empId, mes, anio) { return `${empId}-${mes}-${anio}`; }
+
+function _getLiqRem(empId, mes, anio) {
+  const emp = (appData.remuneraciones||[]).find(e=>e.id===empId);
+  if (!emp) return null;
+  return (emp.liquidaciones||[]).find(l=>l.mes===mes&&l.anio===anio) || null;
+}
+
+function _getOrCreateLiqRem(empId, mes, anio) {
+  const emp = (appData.remuneraciones||[]).find(e=>e.id===empId);
+  if (!emp) return null;
+  if (!emp.liquidaciones) emp.liquidaciones = [];
+  let liq = emp.liquidaciones.find(l=>l.mes===mes&&l.anio===anio);
+  if (!liq) {
+    liq = { id:_genIdLiqRem(empId,mes,anio), mes, anio, sueldoBase:0, horasExtra:0, bono:0, comision:0, descuentos:0, afp:0, salud:0,
+      anticipos:[{numero:1,fecha:'',monto:0},{numero:2,fecha:'',monto:0},{numero:3,fecha:'',monto:0},{numero:4,fecha:'',monto:0}],
+      totalAnticipos:0, totalHaberes:0, totalDescuentos:0, liquidoAPagar:0, estado:'pendiente', fechaPago:'', observaciones:'' };
+    emp.liquidaciones.push(liq);
+  }
+  return liq;
+}
+
+function guardarLiquidacionRem() {
+  const empId = uiState.remEmpId;
+  const mes   = uiState.remMes  || String(new Date().getMonth()+1).padStart(2,'0');
+  const anio  = uiState.remAnio || String(new Date().getFullYear());
+  const f     = uiState.remForm || {};
+  const emp   = (appData.remuneraciones||[]).find(e=>e.id===empId);
+  if (!emp) return;
+  if (!emp.liquidaciones) emp.liquidaciones = [];
+  const sueldoBase  = parseInt(f.sueldoBase)||0;
+  const horasExtra  = parseInt(f.horasExtra)||0;
+  const bono        = parseInt(f.bono)||0;
+  const comision    = parseInt(f.comision)||0;
+  const afp         = parseInt(f.afp)||0;
+  const salud       = parseInt(f.salud)||0;
+  const descuentos  = parseInt(f.descuentos)||0;
+  const ants = [1,2,3,4].map(n=>({ numero:n, fecha:(f['ant'+n+'fecha']||''), monto:parseInt(f['ant'+n+'monto'])||0 }));
+  const totalHaberes    = sueldoBase + horasExtra + bono + comision;
+  const totalDescuentos = afp + salud + descuentos;
+  const totalAnticipos  = ants.reduce((a,x)=>a+x.monto,0);
+  const liquidoAPagar   = totalHaberes - totalDescuentos;
+  const liqId = _genIdLiqRem(empId, mes, anio);
+  const idx = emp.liquidaciones.findIndex(l=>l.id===liqId);
+  const liq = { id:liqId, mes, anio, sueldoBase, horasExtra, bono, comision, afp, salud, descuentos,
+    anticipos:ants, totalAnticipos, totalHaberes, totalDescuentos, liquidoAPagar,
+    estado: f.estado||'pendiente', fechaPago: f.fechaPago||'', observaciones: f.observaciones||'' };
+  if (idx>=0) emp.liquidaciones[idx]=liq; else emp.liquidaciones.push(liq);
+  saveData();
+  upsertRemuneracionSupabase(liq, empId);
+  showToastGeneral('✅ Liquidación guardada','#2E7D32');
+  render();
+}
+
+function marcarPagadaRem(empId, mes, anio) {
+  const emp=(appData.remuneraciones||[]).find(e=>e.id===empId); if(!emp)return;
+  const liq=emp.liquidaciones.find(l=>l.mes===mes&&l.anio===anio); if(!liq)return;
+  liq.estado='pagado'; liq.fechaPago=new Date().toLocaleDateString('es-CL');
+  saveData(); upsertRemuneracionSupabase(liq,empId);
+  showToastGeneral('✅ Marcada como pagada','#2E7D32'); render();
+}
+
+function abrirFormRem(empId) {
+  const mes  = uiState.remMes  || String(new Date().getMonth()+1).padStart(2,'0');
+  const anio = uiState.remAnio || String(new Date().getFullYear());
+  const liq  = _getLiqRem(empId, mes, anio);
+  uiState.remEmpId = empId;
+  if (liq) {
+    uiState.remForm = { sueldoBase:liq.sueldoBase, horasExtra:liq.horasExtra, bono:liq.bono, comision:liq.comision,
+      afp:liq.afp, salud:liq.salud, descuentos:liq.descuentos,
+      ant1fecha:liq.anticipos[0]?.fecha||'', ant1monto:liq.anticipos[0]?.monto||0,
+      ant2fecha:liq.anticipos[1]?.fecha||'', ant2monto:liq.anticipos[1]?.monto||0,
+      ant3fecha:liq.anticipos[2]?.fecha||'', ant3monto:liq.anticipos[2]?.monto||0,
+      ant4fecha:liq.anticipos[3]?.fecha||'', ant4monto:liq.anticipos[3]?.monto||0,
+      estado:liq.estado, fechaPago:liq.fechaPago, observaciones:liq.observaciones };
+  } else {
+    uiState.remForm = {};
+  }
+  render();
+}
+
+function cerrarFormRem() { uiState.remEmpId=null; uiState.remForm={}; render(); }
+
+function _costoTabRemuneraciones(mes, anio) {
+  const MNOMBRES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+  const remMes  = uiState.remMes  || mes;
+  const remAnio = uiState.remAnio || anio;
+  const empleados = appData.remuneraciones || [];
+  const inpStyle = 'width:100%;padding:7px 9px;border:1px solid #dde;border-radius:6px;font-size:12px;box-sizing:border-box;outline:none';
+  const selStyle = `padding:6px 8px;border:1px solid #dde;border-radius:6px;font-size:11px;outline:none`;
+
+  // ── SELECTOR DE MES/AÑO ──
+  const mesSel = `<div style="display:flex;gap:6px;margin-bottom:10px;align-items:center">
+    <div style="font-size:9px;font-weight:700;color:#888">PERÍODO</div>
+    <select onchange="uiState.remMes=this.value;uiState.remForm={};render()" style="${selStyle}">
+      ${['01','02','03','04','05','06','07','08','09','10','11','12'].map((m,i)=>`<option value="${m}" ${remMes===m?'selected':''}>${MNOMBRES[i]}</option>`).join('')}
+    </select>
+    <select onchange="uiState.remAnio=this.value;uiState.remForm={};render()" style="${selStyle}">
+      ${['2025','2026','2027'].map(y=>`<option value="${y}" ${remAnio===y?'selected':''}>${y}</option>`).join('')}
+    </select>
+  </div>`;
+
+  // ── VISTA FORMULARIO ──
+  if (uiState.remEmpId) {
+    const empId = uiState.remEmpId;
+    const emp   = empleados.find(e=>e.id===empId);
+    if (!emp) { uiState.remEmpId=null; return _costoTabRemuneraciones(mes,anio); }
+    const f = uiState.remForm || {};
+
+    // Auto-calcular comisión (10% servicios cerrados del mes por conductor)
+    const svcsEmp = (appData.servicios||[]).filter(s=>s.cerrado&&s.conductor===emp.nombre&&s.mes===remMes&&s.anio===remAnio);
+    const totalSvcs = svcsEmp.reduce((a,s)=>a+(s.precio||0),0);
+    const comisionSug = Math.round(totalSvcs*0.10);
+
+    const sueldoBase  = parseInt(f.sueldoBase)||0;
+    const horasExtra  = parseInt(f.horasExtra)||0;
+    const bono        = parseInt(f.bono)||0;
+    const comision    = parseInt(f.comision)>=0 ? parseInt(f.comision) : comisionSug;
+    const afp         = parseInt(f.afp)||0;
+    const salud       = parseInt(f.salud)||0;
+    const descuentos  = parseInt(f.descuentos)||0;
+    const totalHaberes    = sueldoBase + horasExtra + bono + comision;
+    const totalDescuentos = afp + salud + descuentos;
+    const liquidoAPagar   = totalHaberes - totalDescuentos;
+    const ants = [1,2,3,4].map(n=>parseInt(f['ant'+n+'monto'])||0);
+    const totalAnticipos  = ants.reduce((a,x)=>a+x,0);
+    const saldoFinal      = liquidoAPagar - totalAnticipos;
+    const estadoVal = f.estado||'pendiente';
+
+    function inp(key, val, placeholder, type='number') {
+      return `<input type="${type}" placeholder="${placeholder}" value="${val||''}"
+        oninput="uiState.remForm={...uiState.remForm||{},${key}:${type==='number'?'parseInt(this.value)||0':'this.value'}}"
+        style="${inpStyle}">`;
+    }
+
+    return `
+    ${mesSel}
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+      <button onclick="cerrarFormRem()" style="padding:6px 10px;background:#ECEFF1;border:none;border-radius:6px;font-size:11px;cursor:pointer">← Volver</button>
+      <div>
+        <div style="font-size:13px;font-weight:800;color:#0B2545">${emp.nombre}</div>
+        <div style="font-size:10px;color:#777">${emp.cargo} · ${emp.area}</div>
+      </div>
+    </div>
+
+    <!-- HABERES -->
+    <div style="background:#F4F6F8;border-radius:10px;padding:12px;margin-bottom:8px">
+      <div style="font-size:10px;font-weight:800;color:#0B2545;letter-spacing:0.5px;margin-bottom:8px;border-bottom:2px solid #0B2545;padding-bottom:4px">HABERES</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <div><div style="font-size:9px;font-weight:700;color:#546E7A;margin-bottom:3px">SUELDO BASE</div>${inp('sueldoBase',f.sueldoBase,'$0')}</div>
+        <div><div style="font-size:9px;font-weight:700;color:#546E7A;margin-bottom:3px">HORAS EXTRA</div>${inp('horasExtra',f.horasExtra,'$0')}</div>
+        <div><div style="font-size:9px;font-weight:700;color:#546E7A;margin-bottom:3px">BONO</div>${inp('bono',f.bono,'$0')}</div>
+        <div>
+          <div style="font-size:9px;font-weight:700;color:#546E7A;margin-bottom:3px">COMISIÓN</div>
+          ${inp('comision', f.comision!==undefined?f.comision:comisionSug,'$0')}
+          ${svcsEmp.length>0?`<div style="font-size:9px;color:#2E7D32;margin-top:2px">${svcsEmp.length} servicios · $${totalSvcs.toLocaleString('es-CL')} · Sugerida: $${comisionSug.toLocaleString('es-CL')}</div>`:'<div style="font-size:9px;color:#aaa;margin-top:2px">Sin servicios este mes</div>'}
+        </div>
+      </div>
+      <div style="margin-top:8px;padding:6px 10px;background:#E3F2FD;border-radius:7px;display:flex;justify-content:space-between">
+        <span style="font-size:10px;font-weight:700;color:#1565C0">TOTAL HABERES</span>
+        <span style="font-size:13px;font-weight:900;color:#1565C0">$${totalHaberes.toLocaleString('es-CL')}</span>
+      </div>
+    </div>
+
+    <!-- DESCUENTOS -->
+    <div style="background:#FFF5F5;border-radius:10px;padding:12px;margin-bottom:8px">
+      <div style="font-size:10px;font-weight:800;color:#C62828;letter-spacing:0.5px;margin-bottom:8px;border-bottom:2px solid #EF9A9A;padding-bottom:4px">DESCUENTOS</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
+        <div><div style="font-size:9px;font-weight:700;color:#546E7A;margin-bottom:3px">AFP</div>${inp('afp',f.afp,'$0')}</div>
+        <div><div style="font-size:9px;font-weight:700;color:#546E7A;margin-bottom:3px">SALUD</div>${inp('salud',f.salud,'$0')}</div>
+        <div><div style="font-size:9px;font-weight:700;color:#546E7A;margin-bottom:3px">OTROS DESC.</div>${inp('descuentos',f.descuentos,'$0')}</div>
+      </div>
+      <div style="margin-top:8px;padding:6px 10px;background:#FFEBEE;border-radius:7px;display:flex;justify-content:space-between">
+        <span style="font-size:10px;font-weight:700;color:#C62828">TOTAL DESCUENTOS</span>
+        <span style="font-size:13px;font-weight:900;color:#C62828">$${totalDescuentos.toLocaleString('es-CL')}</span>
+      </div>
+    </div>
+
+    <!-- ANTICIPOS -->
+    <div style="background:#FFF8E1;border-radius:10px;padding:12px;margin-bottom:8px">
+      <div style="font-size:10px;font-weight:800;color:#E65100;letter-spacing:0.5px;margin-bottom:8px;border-bottom:2px solid #FFE082;padding-bottom:4px">ANTICIPOS</div>
+      ${[1,2,3,4].map(n=>`
+      <div style="display:grid;grid-template-columns:auto 1fr 1fr;gap:6px;align-items:center;margin-bottom:6px">
+        <div style="font-size:9px;font-weight:700;color:#E65100;width:20px">A${n}</div>
+        <input type="date" value="${f['ant'+n+'fecha']||''}" oninput="uiState.remForm={...uiState.remForm||{},ant${n}fecha:this.value}" style="${inpStyle};font-size:11px">
+        <input type="number" placeholder="$0" value="${f['ant'+n+'monto']||''}" oninput="uiState.remForm={...uiState.remForm||{},ant${n}monto:parseInt(this.value)||0}" style="${inpStyle}">
+      </div>`).join('')}
+      <div style="margin-top:4px;padding:6px 10px;background:#FFF3E0;border-radius:7px;display:flex;justify-content:space-between">
+        <span style="font-size:10px;font-weight:700;color:#E65100">TOTAL ANTICIPOS</span>
+        <span style="font-size:13px;font-weight:900;color:#E65100">$${totalAnticipos.toLocaleString('es-CL')}</span>
+      </div>
+    </div>
+
+    <!-- RESUMEN -->
+    <div style="background:#0B2545;border-radius:10px;padding:12px;margin-bottom:8px;color:white">
+      <div style="font-size:10px;font-weight:800;letter-spacing:1px;margin-bottom:8px;opacity:0.7">RESUMEN</div>
+      <div style="display:flex;justify-content:space-between;margin-bottom:4px"><span style="font-size:11px;opacity:0.8">Total haberes</span><span style="font-size:12px;font-weight:700">$${totalHaberes.toLocaleString('es-CL')}</span></div>
+      <div style="display:flex;justify-content:space-between;margin-bottom:4px"><span style="font-size:11px;opacity:0.8">Total descuentos</span><span style="font-size:12px;font-weight:700;color:#EF9A9A">−$${totalDescuentos.toLocaleString('es-CL')}</span></div>
+      <div style="border-top:1px solid rgba(255,255,255,0.2);padding-top:6px;margin-bottom:6px;display:flex;justify-content:space-between"><span style="font-size:12px;font-weight:700">Líquido a pagar</span><span style="font-size:16px;font-weight:900;color:#81C784">$${liquidoAPagar.toLocaleString('es-CL')}</span></div>
+      <div style="display:flex;justify-content:space-between;margin-bottom:4px"><span style="font-size:11px;opacity:0.8">Anticipos</span><span style="font-size:12px;font-weight:700;color:#FFD54F">−$${totalAnticipos.toLocaleString('es-CL')}</span></div>
+      <div style="border-top:1px solid rgba(255,255,255,0.3);padding-top:6px;display:flex;justify-content:space-between"><span style="font-size:13px;font-weight:800">SALDO FINAL</span><span style="font-size:20px;font-weight:900;color:${saldoFinal>=0?'#81C784':'#EF9A9A'}">${saldoFinal>=0?'':'−'}$${Math.abs(saldoFinal).toLocaleString('es-CL')}</span></div>
+    </div>
+
+    <!-- ESTADO + OBS -->
+    <div style="background:#F4F6F8;border-radius:10px;padding:12px;margin-bottom:10px">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+        <div>
+          <div style="font-size:9px;font-weight:700;color:#546E7A;margin-bottom:3px">ESTADO</div>
+          <select onchange="uiState.remForm={...uiState.remForm||{},estado:this.value}" style="width:100%;${inpStyle}">
+            <option value="pendiente" ${estadoVal==='pendiente'?'selected':''}>⏳ Pendiente</option>
+            <option value="pagado"    ${estadoVal==='pagado'   ?'selected':''}>✅ Pagado</option>
+          </select>
+        </div>
+        <div>
+          <div style="font-size:9px;font-weight:700;color:#546E7A;margin-bottom:3px">FECHA PAGO</div>
+          <input type="date" value="${f.fechaPago||''}" oninput="uiState.remForm={...uiState.remForm||{},fechaPago:this.value}" style="${inpStyle}">
+        </div>
+      </div>
+      <div style="font-size:9px;font-weight:700;color:#546E7A;margin-bottom:3px">OBSERVACIONES</div>
+      <textarea placeholder="Notas u observaciones..." oninput="uiState.remForm={...uiState.remForm||{},observaciones:this.value}" style="width:100%;min-height:50px;padding:7px 9px;border:1px solid #dde;border-radius:6px;font-size:11px;box-sizing:border-box;outline:none;font-family:inherit;resize:vertical">${f.observaciones||''}</textarea>
+    </div>
+
+    <!-- BOTONES -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+      <button onclick="guardarLiquidacionRem()" style="padding:11px;background:#0B2545;color:white;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer">💾 Guardar</button>
+      <button onclick="imprimirLiquidacionRem('${empId}','${remMes}','${remAnio}')" style="padding:11px;background:#546E7A;color:white;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer">🖨️ PDF</button>
+    </div>`;
+  }
+
+  // ── VISTA LISTA ──
+  const totalMes = empleados.filter(e=>e.activo).reduce((a,emp)=>{
+    const liq=_getLiqRem(emp.id,remMes,remAnio); return a+(liq?liq.liquidoAPagar:0); }, 0);
+  const mesLabel = `${MNOMBRES[parseInt(remMes)-1]} ${remAnio}`;
+
+  return `
+  ${mesSel}
+  <div style="padding:6px 10px;background:#E3F2FD;border-radius:8px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center">
+    <span style="font-size:10px;font-weight:700;color:#1565C0">${mesLabel} · ${empleados.filter(e=>e.activo).length} empleados activos</span>
+    <span style="font-size:12px;font-weight:900;color:#0B2545">Total: $${totalMes.toLocaleString('es-CL')}</span>
+  </div>
+  ${empleados.filter(e=>e.activo).map(emp=>{
+    const liq = _getLiqRem(emp.id, remMes, remAnio);
+    const liquido  = liq ? liq.liquidoAPagar  : 0;
+    const anticipos= liq ? liq.totalAnticipos : 0;
+    const saldo    = liquido - anticipos;
+    const pagado   = liq && liq.estado==='pagado';
+    return `<div style="background:white;border:1px solid ${pagado?'#A5D6A7':'#e0e0e0'};border-left:4px solid ${pagado?'#2E7D32':'#0B2545'};border-radius:10px;padding:10px 12px;margin-bottom:8px">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px">
+        <div>
+          <div style="font-size:12px;font-weight:800;color:#0B2545">${emp.nombre}</div>
+          <div style="font-size:10px;color:#777">${emp.cargo} · ${emp.area}</div>
+        </div>
+        <span style="font-size:9px;font-weight:700;padding:3px 8px;border-radius:10px;background:${pagado?'#E8F5E9':'#FFF3E0'};color:${pagado?'#2E7D32':'#E65100'}">${pagado?'✅ Pagado':'⏳ Pendiente'}</span>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:8px">
+        <div style="background:#F4F6F8;border-radius:7px;padding:6px;text-align:center">
+          <div style="font-size:8px;font-weight:700;color:#888">LÍQUIDO</div>
+          <div style="font-size:12px;font-weight:900;color:#0B2545">${liquido>0?'$'+liquido.toLocaleString('es-CL'):'—'}</div>
+        </div>
+        <div style="background:#FFF3E0;border-radius:7px;padding:6px;text-align:center">
+          <div style="font-size:8px;font-weight:700;color:#888">ANTICIPOS</div>
+          <div style="font-size:12px;font-weight:900;color:#E65100">${anticipos>0?'$'+anticipos.toLocaleString('es-CL'):'—'}</div>
+        </div>
+        <div style="background:${saldo>=0?'#E8F5E9':'#FFEBEE'};border-radius:7px;padding:6px;text-align:center">
+          <div style="font-size:8px;font-weight:700;color:#888">SALDO</div>
+          <div style="font-size:12px;font-weight:900;color:${saldo>=0?'#2E7D32':'#C62828'}">${liq?(saldo>=0?'$'+saldo.toLocaleString('es-CL'):'−$'+Math.abs(saldo).toLocaleString('es-CL')):'—'}</div>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+        <button onclick="abrirFormRem('${emp.id}')" style="padding:8px;background:#0B2545;color:white;border:none;border-radius:7px;font-size:11px;font-weight:700;cursor:pointer">✏️ Ver / Editar</button>
+        <button onclick="imprimirLiquidacionRem('${emp.id}','${remMes}','${remAnio}')" style="padding:8px;background:#546E7A;color:white;border:none;border-radius:7px;font-size:11px;font-weight:700;cursor:pointer">🖨️ PDF</button>
+      </div>
+    </div>`;
+  }).join('')}`;
+}
+
+// ─── PDF LIQUIDACIÓN REMUNERACIÓN ─────────────────────────────────────────────
+function imprimirLiquidacionRem(empId, remMes, remAnio) {
+  const MNOMBRES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+  const emp = (appData.remuneraciones||[]).find(e=>e.id===empId);
+  if (!emp) return alert('Empleado no encontrado');
+  const liq = _getLiqRem(empId, remMes, remAnio);
+  if (!liq) return alert('Guarda la liquidación antes de generar el PDF');
+  const mesLabel = `${MNOMBRES[parseInt(remMes)-1]} ${remAnio}`;
+  const hoyFmt = new Date().toLocaleDateString('es-CL',{day:'2-digit',month:'long',year:'numeric'});
+  const nCorr = `LIQ-REM-${remMes}-${remAnio}-${empId}`;
+  const ants = (liq.anticipos||[]).filter(a=>a.monto>0);
+  const antFilas = ants.map(a=>`<tr><td>Anticipo ${a.numero}${a.fecha?' — '+a.fecha:''}</td><td class="r">$${a.monto.toLocaleString('es-CL')}</td></tr>`).join('');
+  const html = `<!DOCTYPE html><html><head><meta charset="UTF-8">
+    <title>Liquidación ${emp.nombre} — ${mesLabel}</title>
+    <style>
+      *{box-sizing:border-box;margin:0;padding:0}
+      body{font-family:Arial,sans-serif;font-size:10px;color:#1a1a1a;padding:20px}
+      @page{size:A4 portrait;margin:12mm 14mm}
+      @media print{body{padding:0}}
+      .header{border-bottom:4px solid #0B2545;padding-bottom:12px;margin-bottom:14px;display:flex;justify-content:space-between;align-items:flex-start}
+      .logo{font-size:22px;font-weight:900;color:#0B2545;letter-spacing:0.5px}
+      .logo .sub{font-size:10px;color:#546E7A;font-weight:400;display:block;margin-top:2px}
+      .meta{text-align:right}
+      .meta .title{font-size:18px;font-weight:900;color:#0B2545}
+      .meta .row{font-size:9px;color:#546E7A;margin-top:2px}
+      .emp-box{background:#F4F6F8;border-left:4px solid #0B2545;padding:8px 12px;margin-bottom:14px;border-radius:3px}
+      .emp-box .nm{font-size:14px;font-weight:900;color:#0B2545}
+      .emp-box .inf{font-size:9px;color:#546E7A;margin-top:2px}
+      .section-title{font-size:10px;font-weight:900;color:#0B2545;letter-spacing:0.5px;margin-bottom:6px;text-transform:uppercase}
+      table{width:100%;border-collapse:collapse;margin-bottom:12px}
+      th{background:#0B2545;color:white;padding:7px 10px;font-size:9px;font-weight:800;text-align:left}
+      th.r{text-align:right}
+      td{padding:6px 10px;border-bottom:1px solid #E8EDF3;font-size:9.5px}
+      td.r{text-align:right;font-weight:700}
+      tr.total td{background:#E8EDF3;font-weight:800;font-size:10px}
+      tr.total td.r{color:#0B2545}
+      .hab-desc{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px}
+      .resumen{background:#0B2545;color:white;padding:14px 16px;border-radius:6px;margin-bottom:14px}
+      .resumen .row{display:flex;justify-content:space-between;margin-bottom:5px;font-size:10px}
+      .resumen .row span:last-child{font-weight:700}
+      .resumen .sep{border-top:1px solid rgba(255,255,255,0.2);margin:8px 0}
+      .resumen .big{font-size:15px;font-weight:900}
+      .resumen .saldo{font-size:22px;font-weight:900}
+      .obs{background:#F4F6F8;padding:10px 12px;border-radius:4px;font-size:9.5px;color:#546E7A;margin-bottom:14px}
+      .firmas{display:grid;grid-template-columns:1fr 1fr;gap:30px;margin-top:20px}
+      .firma-box{text-align:center}
+      .firma-line{border-top:1px solid #0B2545;padding-top:6px;margin-top:30px}
+      .firma-line .label{font-size:9px;font-weight:700;color:#0B2545}
+      .firma-line .name{font-size:10px;color:#333;margin-top:2px}
+      .firma-line .sub{font-size:8.5px;color:#777;margin-top:1px}
+      .footer{text-align:center;font-size:8px;color:#aaa;border-top:1px solid #eee;padding-top:8px;margin-top:16px}
+    </style>
+  </head><body>
+    <div class="header">
+      <div class="logo">Global Solutions SpA<span class="sub">Transporte de Carga · RUT: ___________</span></div>
+      <div class="meta">
+        <div class="title">LIQUIDACIÓN DE SUELDO</div>
+        <div class="row">N° ${nCorr}</div>
+        <div class="row">Período: ${mesLabel}</div>
+        <div class="row">Emisión: ${hoyFmt}</div>
+      </div>
+    </div>
+    <div class="emp-box">
+      <div class="nm">${emp.nombre}</div>
+      <div class="inf">${emp.cargo} · ${emp.area} · RUT: ___________________</div>
+    </div>
+    <div class="hab-desc">
+      <div>
+        <div class="section-title">Haberes</div>
+        <table>
+          <thead><tr><th>Concepto</th><th class="r">Monto</th></tr></thead>
+          <tbody>
+            <tr><td>Sueldo base</td><td class="r">$${liq.sueldoBase.toLocaleString('es-CL')}</td></tr>
+            ${liq.horasExtra>0?`<tr><td>Horas extra</td><td class="r">$${liq.horasExtra.toLocaleString('es-CL')}</td></tr>`:''}
+            ${liq.bono>0?`<tr><td>Bono</td><td class="r">$${liq.bono.toLocaleString('es-CL')}</td></tr>`:''}
+            ${liq.comision>0?`<tr><td>Comisión</td><td class="r">$${liq.comision.toLocaleString('es-CL')}</td></tr>`:''}
+            <tr class="total"><td>TOTAL HABERES</td><td class="r">$${liq.totalHaberes.toLocaleString('es-CL')}</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div>
+        <div class="section-title">Descuentos</div>
+        <table>
+          <thead><tr><th>Concepto</th><th class="r">Monto</th></tr></thead>
+          <tbody>
+            <tr><td>AFP</td><td class="r">$${liq.afp.toLocaleString('es-CL')}</td></tr>
+            <tr><td>Salud</td><td class="r">$${liq.salud.toLocaleString('es-CL')}</td></tr>
+            ${liq.descuentos>0?`<tr><td>Otros descuentos</td><td class="r">$${liq.descuentos.toLocaleString('es-CL')}</td></tr>`:''}
+            <tr class="total"><td>TOTAL DESCUENTOS</td><td class="r">$${liq.totalDescuentos.toLocaleString('es-CL')}</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    ${ants.length>0?`<div class="section-title">Anticipos</div>
+    <table><thead><tr><th>Detalle</th><th class="r">Monto</th></tr></thead>
+    <tbody>${antFilas}<tr class="total"><td>TOTAL ANTICIPOS</td><td class="r">$${liq.totalAnticipos.toLocaleString('es-CL')}</td></tr></tbody></table>`:''}
+    <div class="resumen">
+      <div class="row"><span>Total haberes</span><span>$${liq.totalHaberes.toLocaleString('es-CL')}</span></div>
+      <div class="row"><span>Total descuentos</span><span style="color:#EF9A9A">−$${liq.totalDescuentos.toLocaleString('es-CL')}</span></div>
+      <div class="sep"></div>
+      <div class="row"><span class="big">Líquido a pagar</span><span class="big" style="color:#81C784">$${liq.liquidoAPagar.toLocaleString('es-CL')}</span></div>
+      <div class="row"><span>Total anticipos</span><span style="color:#FFD54F">−$${liq.totalAnticipos.toLocaleString('es-CL')}</span></div>
+      <div class="sep"></div>
+      <div class="row"><span class="saldo">SALDO FINAL A PAGAR</span><span class="saldo" style="color:${(liq.liquidoAPagar-liq.totalAnticipos)>=0?'#81C784':'#EF9A9A'}">$${Math.abs(liq.liquidoAPagar-liq.totalAnticipos).toLocaleString('es-CL')}</span></div>
+      ${liq.estado==='pagado'?`<div class="row" style="margin-top:8px"><span style="opacity:0.7">Fecha de pago</span><span style="color:#81C784">${liq.fechaPago}</span></div>`:''}
+    </div>
+    ${liq.observaciones?`<div class="obs"><strong>Observaciones:</strong> ${liq.observaciones}</div>`:''}
+    <div class="firmas">
+      <div class="firma-box">
+        <div class="firma-line">
+          <div class="label">Firma Empleado</div>
+          <div class="name">${emp.nombre}</div>
+          <div class="sub">RUT: ___________________</div>
+        </div>
+      </div>
+      <div class="firma-box">
+        <div class="firma-line">
+          <div class="label">Firma Empleador</div>
+          <div class="name">Global Solutions SpA</div>
+          <div class="sub">Fecha: ${hoyFmt}</div>
+        </div>
+      </div>
+    </div>
+    <div class="footer">Global Solutions SpA · Transporte de Carga · Documento generado el ${hoyFmt}</div>
+    <script>window.onload=function(){window.print();}<\/script>
+  </body></html>`;
+  const w = window.open('','_blank');
+  if (w) { w.document.write(html); w.document.close(); }
+}
+
 // ─── TAB COPEC ────────────────────────────────────────────────────────────────
 function _costoTabCopec(mes, anio, flota) {
   const f = uiState.copecForm || {};
@@ -2010,13 +2460,14 @@ function renderCostos() {
   const mes = String(hoy.getMonth()+1).padStart(2,'0');
   const anio = String(hoy.getFullYear());
   const flota = getFlota();
-  const tabs = [['manual','🔧 Mantención'],['copec','⛽ Combustible'],['cartola','🏦 Cartola'],['historial','📋 Historial']];
+  const tabs = [['manual','🔧 Mantención'],['copec','⛽ Combustible'],['cartola','🏦 Cartola'],['historial','📋 Historial'],['remuneraciones','👥 Remuneraciones']];
   const nav = `<div style="display:flex;gap:4px;margin-bottom:10px;overflow-x:auto">${tabs.map(([id,lbl])=>`<button onclick="uiState.costoTab='${id}';render()" style="padding:7px 12px;border-radius:7px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;flex-shrink:0;${tab===id?'background:#1565C0;color:white;border:none':'background:#F5F5F5;color:#555;border:1px solid #dde'}">${lbl}</button>`).join('')}</div>`;
   let body = '';
   if (tab==='manual') body = _costoTabManual(mes, anio, flota);
   else if (tab==='copec') body = _costoTabCopec(mes, anio, flota);
   else if (tab==='cartola') body = _costoTabCartola(mes, anio);
   else if (tab==='historial') body = _costoTabHistorial(mes, anio, flota);
+  else if (tab==='remuneraciones') body = _costoTabRemuneraciones(mes, anio);
   return `<div style="padding:2px">${nav}${body}</div>`;
 }
 
@@ -2831,6 +3282,7 @@ function loadData() {
         costos: viejos.costos || [],
         copec: viejos.copec || [],
         cartola: viejos.cartola || [],
+        remuneraciones: (viejos.remuneraciones && viejos.remuneraciones.length > 0) ? viejos.remuneraciones : JSON.parse(JSON.stringify(DEFAULT_DATA.remuneraciones)),
         clientesRut: viejos.clientesRut || {},
         cotizaciones: viejos.cotizaciones || [],
         rendimientoComb: viejos.rendimientoComb || [],
@@ -4158,6 +4610,7 @@ async function initSupabase() {
       await syncFacturasDesdeSupabase();
       await syncLiquidacionesDesdeSupabase();
       await syncCostosDesdeSupabase();
+      await syncRemuneracionesDesdeSupabase();
       await syncConfigPanel();
       render();
     } else {
