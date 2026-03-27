@@ -1587,10 +1587,10 @@ function agregarCopec() {
   appData.copec.push({ id:_genIdCopec(), fecha:f.fecha, patente:f.patente, litros:parseFloat(f.litros)||0, monto:parseInt(f.monto)||0, id_manual:(f.id_manual||'').trim(), mes, anio });
   uiState.copecForm = {};
   saveData(); pushCostosSupabase();
-  showToastGeneral('✅ Carga COPEC registrada','#2E7D32'); render();
+  showToastGeneral('✅ Combustible registrado','#2E7D32'); render();
 }
 function eliminarCopec(id) {
-  if (!confirm('¿Eliminar esta carga COPEC?')) return;
+  if (!confirm('¿Eliminar este registro de combustible?')) return;
   appData.copec = (appData.copec||[]).filter(x=>x.id!==id);
   saveData(); pushCostosSupabase();
   showToastGeneral('🗑️ Carga eliminada','#E65100'); render();
@@ -1784,7 +1784,7 @@ function _costoTabHistorial(mes, anio) {
       <div style="font-size:14px;font-weight:900;color:#C62828">$${tCostos.toLocaleString('es-CL')}</div>
     </div>
     <div style="background:#FFF8E1;border-radius:8px;padding:8px;text-align:center">
-      <div style="font-size:9px;font-weight:700;color:#E65100">COPEC</div>
+      <div style="font-size:9px;font-weight:700;color:#E65100">COMBUSTIBLE</div>
       <div style="font-size:14px;font-weight:900;color:#E65100">$${tCopec.toLocaleString('es-CL')}</div>
     </div>
     <div style="background:#EDE7F6;border-radius:8px;padding:8px;text-align:center">
@@ -1806,7 +1806,7 @@ function _costoTabHistorial(mes, anio) {
       <button onclick="editarCosto('${c.id}');uiState.costoTab='manual';render()" style="font-size:10px;padding:3px 8px;background:#E3F2FD;color:#1565C0;border:1px solid #BBDEFB;border-radius:5px;cursor:pointer">✏️</button>
     </div>
   </div>`).join('')}`:''}
-  ${copec.length?`<div style="font-size:9px;font-weight:700;color:#E65100;margin-top:8px;margin-bottom:5px">CARGAS COPEC (${copec.length})</div>
+  ${copec.length?`<div style="font-size:9px;font-weight:700;color:#E65100;margin-top:8px;margin-bottom:5px">COMBUSTIBLE (${copec.length})</div>
   ${copec.slice().reverse().map(c=>`
   <div style="background:white;border:1px solid #FFE082;border-radius:8px;padding:8px 10px;margin-bottom:4px;display:flex;justify-content:space-between;align-items:center">
     <div>
@@ -1828,7 +1828,7 @@ function _costoTabCopec(mes, anio, flota) {
   return `
   <div style="background:#FFF8E1;border:1px solid #FFE082;border-radius:10px;padding:10px;margin-bottom:10px">
     ${!apiKey?`<div style="font-size:10px;color:#E65100;font-weight:700;margin-bottom:8px">⚠️ Lectura automática requiere API key — agrégala en Configuración</div>`:''}
-    <div style="font-size:11px;font-weight:800;color:#E65100;margin-bottom:8px">📷 LEER IMAGEN COPEC</div>
+    <div style="font-size:11px;font-weight:800;color:#E65100;margin-bottom:8px">📷 LEER IMAGEN COMBUSTIBLE</div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
       <button onclick="document.getElementById('copec_img_cam').click()" style="padding:9px;background:#E3F2FD;color:#1565C0;border:1px solid #BBDEFB;border-radius:7px;font-size:11px;font-weight:700;cursor:pointer">📷 Tomar foto</button>
       <button onclick="document.getElementById('copec_img_lib').click()" style="padding:9px;background:#F3E5F5;color:#6A1B9A;border:1px solid #E1BEE7;border-radius:7px;font-size:11px;font-weight:700;cursor:pointer">🖼️ Elegir imagen</button>
@@ -1837,7 +1837,7 @@ function _costoTabCopec(mes, anio, flota) {
     <input type="file" id="copec_img_lib" accept="image/*" style="display:none" onchange="leerImagenCopec(this)">
   </div>
   <div style="background:#F8F9FA;border-radius:10px;padding:12px;margin-bottom:10px">
-    <div style="font-size:11px;font-weight:800;color:#E65100;margin-bottom:10px">⛽ REGISTRAR CARGA</div>
+    <div style="font-size:11px;font-weight:800;color:#E65100;margin-bottom:10px">⛽ REGISTRAR COMBUSTIBLE</div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
       <div>
         <div style="font-size:9px;font-weight:700;color:#888;margin-bottom:3px">FECHA</div>
@@ -1862,10 +1862,10 @@ function _costoTabCopec(mes, anio, flota) {
         <input type="text" placeholder="Opcional" value="${f.id_manual||''}" oninput="uiState.copecForm={...uiState.copecForm||{},id_manual:this.value}" style="${inpStyle}">
       </div>
     </div>
-    <button onclick="agregarCopec()" style="width:100%;padding:10px;background:#E65100;color:white;border:none;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer">✓ Registrar carga</button>
+    <button onclick="agregarCopec()" style="width:100%;padding:10px;background:#E65100;color:white;border:none;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer">✓ Registrar combustible</button>
   </div>
   ${copecMes.length?`
-  <div style="font-size:9px;font-weight:700;color:#888;margin-bottom:6px">CARGAS DEL MES — $${totalCopec.toLocaleString('es-CL')}</div>
+  <div style="font-size:9px;font-weight:700;color:#888;margin-bottom:6px">COMBUSTIBLE DEL MES — $${totalCopec.toLocaleString('es-CL')}</div>
   ${copecMes.slice().reverse().map(c=>`
   <div style="background:white;border:1px solid #FFE082;border-radius:8px;padding:8px 10px;margin-bottom:5px;display:flex;justify-content:space-between;align-items:center">
     <div>
@@ -1880,7 +1880,7 @@ function _costoTabCopec(mes, anio, flota) {
       <button onclick="eliminarCopec('${c.id}')" style="font-size:10px;padding:3px 8px;background:#FFEBEE;color:#C62828;border:1px solid #FFCDD2;border-radius:5px;cursor:pointer">🗑️</button>
     </div>
   </div>`).join('')}`
-  :'<div style="text-align:center;color:#aaa;font-size:11px;padding:12px">Sin cargas COPEC este mes</div>'}`;
+  :'<div style="text-align:center;color:#aaa;font-size:11px;padding:12px">Sin registros de combustible este mes</div>'}`;
 }
 
 // ─── TAB CARTOLA ──────────────────────────────────────────────────────────────
@@ -2010,7 +2010,7 @@ function renderCostos() {
   const mes = String(hoy.getMonth()+1).padStart(2,'0');
   const anio = String(hoy.getFullYear());
   const flota = getFlota();
-  const tabs = [['manual','✏️ Manual'],['copec','⛽ COPEC'],['cartola','🏦 Cartola'],['historial','📋 Historial']];
+  const tabs = [['manual','✏️ Manual'],['copec','⛽ Combustible'],['cartola','🏦 Cartola'],['historial','📋 Historial']];
   const nav = `<div style="display:flex;gap:4px;margin-bottom:10px;overflow-x:auto">${tabs.map(([id,lbl])=>`<button onclick="uiState.costoTab='${id}';render()" style="padding:7px 12px;border-radius:7px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;flex-shrink:0;${tab===id?'background:#1565C0;color:white;border:none':'background:#F5F5F5;color:#555;border:1px solid #dde'}">${lbl}</button>`).join('')}</div>`;
   let body = '';
   if (tab==='manual') body = _costoTabManual(mes, anio, flota);
