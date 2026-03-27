@@ -4870,9 +4870,181 @@ async function delPipeline(ci) {
 }
 
 function renderInformes() {
+  const informesVista = uiState.informes_vista || 'kpis';
   const periodo = uiState.informe_periodo || 'mes';
   const ambitoSel = uiState.informe_ambito || 'comercial';
   const servicios = appData.servicios || [];
+
+  // ── INFORME 1: REGISTRO DE SERVICIOS ──────────────────────────────────────
+  function informeRegistroServicios() {
+    const MNOMBRES_L = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+    const MNOMBRES_C = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+    const mesesDisp = [...new Set(servicios.map(s=>`${s.anio}-${s.mes}`))].filter(m=>m&&!m.includes('undefined')).sort().reverse();
+    const hoyFallback = new Date();
+    const defMes = `${hoyFallback.getFullYear()}-${String(hoyFallback.getMonth()+1).padStart(2,'0')}`;
+    const mesSel = uiState.inf1_mes || (mesesDisp[0] || defMes);
+    const [anioSel, mesSelPad] = mesSel.split('-');
+    const estadoFiltro = uiState.inf1_estado || 'todos';
+
+    let svcs = servicios.filter(s => s.anio===anioSel && s.mes===mesSelPad);
+    if (estadoFiltro==='cerrados') svcs = svcs.filter(s => s.cerrado);
+    else if (estadoFiltro==='pendientes') svcs = svcs.filter(s => !s.cerrado);
+    svcs = svcs.slice().sort((a,b)=>{
+      const pa=a.fecha.split('-'), pb=b.fecha.split('-');
+      return new Date(parseInt(pa[2]),parseInt(pa[1])-1,parseInt(pa[0])) - new Date(parseInt(pb[2]),parseInt(pb[1])-1,parseInt(pb[0]));
+    });
+
+    const totalKmInf = svcs.reduce((a,s)=>a+(s.km||0),0);
+    const totalIngInf = svcs.filter(s=>s.cerrado).reduce((a,s)=>a+(s.precio||0),0);
+    const mesNombre = MNOMBRES_L[parseInt(mesSelPad)-1] || mesSelPad;
+
+    // Guardar snapshot para PDF
+    window._inf1_snapshot = { svcs, anioSel, mesNombre, estadoFiltro, totalKmInf, totalIngInf };
+
+    const rowsHTML = svcs.length===0
+      ? `<tr><td colspan="10" style="text-align:center;padding:20px;color:#aaa;font-size:11px">Sin servicios para este período</td></tr>`
+      : svcs.map((s,i) => {
+          const puntos = s.puntos||s.guias||[];
+          const origen = (puntos[0]?.origen || s.origen || '—');
+          const destino = (puntos[puntos.length-1]?.destino || '—');
+          const guias = puntos.map(g=>g.num||g.guia).filter(Boolean).join(', ')||'—';
+          const estado = s.cerrado ? 'Cerrado' : (s.estado==='borrador'?'Borrador':'Pendiente');
+          const estadoColor = s.cerrado ? '#2E7D32' : (s.estado==='borrador'?'#1565C0':'#888');
+          return `<tr style="background:${i%2===0?'#fafafa':'white'};border-bottom:1px solid #f0f0f0">
+            <td style="padding:6px 8px;font-size:10px;font-weight:700;color:#1565C0;white-space:nowrap">${s.id}</td>
+            <td style="padding:6px 8px;font-size:10px;white-space:nowrap">${s.fecha||'—'}</td>
+            <td style="padding:6px 8px;font-size:10px;font-weight:600">${s.cliente||'—'}</td>
+            <td style="padding:6px 8px;font-size:10px">${s.conductor||'—'}</td>
+            <td style="padding:6px 8px;font-size:10px;font-weight:700">${s.patente||'—'}</td>
+            <td style="padding:6px 8px;font-size:10px;max-width:120px">${origen} → ${destino}</td>
+            <td style="padding:6px 8px;font-size:10px">${guias}</td>
+            <td style="padding:6px 8px;font-size:10px;text-align:right">${(s.km||0).toLocaleString('es-CL')}</td>
+            <td style="padding:6px 8px;font-size:10px;text-align:right;font-weight:700;color:${s.cerrado?'#2E7D32':'#999'}">${s.precio?'$'+s.precio.toLocaleString('es-CL'):'—'}</td>
+            <td style="padding:6px 8px;font-size:10px;font-weight:700;color:${estadoColor}">${estado}</td>
+          </tr>`;
+        }).join('');
+
+    return `
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;align-items:center">
+      <select onchange="uiState.inf1_mes=this.value;render()" style="padding:7px 10px;border:1px solid #dde;border-radius:7px;font-size:12px;outline:none">
+        ${mesesDisp.map(m=>{const[a,mm]=m.split('-');return`<option value="${m}" ${mesSel===m?'selected':''}>${MNOMBRES_C[parseInt(mm)-1]} ${a}</option>`;}).join('')}
+      </select>
+      <div style="display:flex;gap:4px;flex-wrap:wrap">
+        ${[['todos','Todos'],['cerrados','Cerrados'],['pendientes','Pendientes']].map(([v,l])=>`
+          <button onclick="uiState.inf1_estado='${v}';render()" style="padding:6px 10px;border-radius:6px;border:none;cursor:pointer;font-size:10px;font-weight:700;background:${estadoFiltro===v?'#37474F':'#ECEFF1'};color:${estadoFiltro===v?'white':'#455A64'}">${l}</button>
+        `).join('')}
+      </div>
+      <button onclick="imprimirInforme1()" style="margin-left:auto;padding:7px 14px;background:#1565C0;color:white;border:none;border-radius:7px;font-size:11px;font-weight:700;cursor:pointer">🖨️ Exportar PDF</button>
+    </div>
+    <div style="font-size:11px;font-weight:700;color:#37474F;margin-bottom:8px">${mesNombre} ${anioSel} · ${svcs.length} servicio${svcs.length!==1?'s':''}${estadoFiltro!=='todos'?' — solo '+estadoFiltro:''}</div>
+    <div style="overflow-x:auto;border-radius:8px;border:1px solid #e0e0e0">
+      <table style="width:100%;border-collapse:collapse;font-family:inherit;min-width:680px">
+        <thead>
+          <tr style="background:#37474F;color:white">
+            <th style="padding:8px;font-size:9px;font-weight:800;text-align:left;white-space:nowrap">ID</th>
+            <th style="padding:8px;font-size:9px;font-weight:800;text-align:left;white-space:nowrap">FECHA</th>
+            <th style="padding:8px;font-size:9px;font-weight:800;text-align:left">CLIENTE</th>
+            <th style="padding:8px;font-size:9px;font-weight:800;text-align:left">CONDUCTOR</th>
+            <th style="padding:8px;font-size:9px;font-weight:800;text-align:left">PATENTE</th>
+            <th style="padding:8px;font-size:9px;font-weight:800;text-align:left">RUTA</th>
+            <th style="padding:8px;font-size:9px;font-weight:800;text-align:left">N° GUÍA</th>
+            <th style="padding:8px;font-size:9px;font-weight:800;text-align:right">KM</th>
+            <th style="padding:8px;font-size:9px;font-weight:800;text-align:right">PRECIO NETO</th>
+            <th style="padding:8px;font-size:9px;font-weight:800;text-align:left">ESTADO</th>
+          </tr>
+        </thead>
+        <tbody>${rowsHTML}</tbody>
+        <tfoot>
+          <tr style="background:#ECEFF1">
+            <td colspan="7" style="padding:8px 10px;font-size:10px;font-weight:700;color:#37474F">TOTALES — ${svcs.length} servicios · ${svcs.filter(s=>s.cerrado).length} cerrados</td>
+            <td style="padding:8px;font-size:11px;font-weight:900;text-align:right;color:#1565C0">${totalKmInf.toLocaleString('es-CL')}</td>
+            <td style="padding:8px;font-size:11px;font-weight:900;text-align:right;color:#2E7D32">$${totalIngInf.toLocaleString('es-CL')}</td>
+            <td></td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>`;
+  }
+
+  // Función global para imprimir informe 1
+  window.imprimirInforme1 = function() {
+    const snap = window._inf1_snapshot;
+    if (!snap) return;
+    const { svcs, anioSel, mesNombre, estadoFiltro, totalKmInf, totalIngInf } = snap;
+    const filas = svcs.map((s,i)=>{
+      const puntos=s.puntos||s.guias||[];
+      const origen=puntos[0]?.origen||s.origen||'—';
+      const destino=puntos[puntos.length-1]?.destino||'—';
+      const guias=puntos.map(g=>g.num||g.guia).filter(Boolean).join(', ')||'—';
+      const estado=s.cerrado?'Cerrado':(s.estado==='borrador'?'Borrador':'Pendiente');
+      return `<tr style="background:${i%2===0?'#f9fafa':'white'}">
+        <td style="padding:5px 7px;font-size:9px;font-weight:700;color:#1a3d6b">${s.id}</td>
+        <td style="padding:5px 7px;font-size:9px;white-space:nowrap">${s.fecha||'—'}</td>
+        <td style="padding:5px 7px;font-size:9px">${s.cliente||'—'}</td>
+        <td style="padding:5px 7px;font-size:9px">${s.conductor||'—'}</td>
+        <td style="padding:5px 7px;font-size:9px;font-weight:700">${s.patente||'—'}</td>
+        <td style="padding:5px 7px;font-size:9px">${origen} → ${destino}</td>
+        <td style="padding:5px 7px;font-size:9px">${guias}</td>
+        <td style="padding:5px 7px;font-size:9px;text-align:right">${(s.km||0).toLocaleString('es-CL')}</td>
+        <td style="padding:5px 7px;font-size:9px;text-align:right;font-weight:700;color:${s.cerrado?'#1a7a3a':'#777'}">${s.precio?'$'+s.precio.toLocaleString('es-CL'):'—'}</td>
+        <td style="padding:5px 7px;font-size:9px;font-weight:700;color:${s.cerrado?'#1a7a3a':'#555'}">${estado}</td>
+      </tr>`;
+    }).join('');
+    const hoyFmt = new Date().toLocaleDateString('es-CL',{day:'2-digit',month:'long',year:'numeric'});
+    const html = `<!DOCTYPE html><html><head><meta charset="UTF-8">
+      <title>Registro de Servicios — ${mesNombre} ${anioSel}</title>
+      <style>
+        body{font-family:Arial,sans-serif;margin:0;padding:16px;color:#222;font-size:10px}
+        @page{size:A4 landscape;margin:15mm}
+        @media print{body{padding:0}}
+        table{width:100%;border-collapse:collapse;margin-top:10px}
+        th{background:#1a3d6b;color:white;padding:6px 8px;font-size:9px;text-align:left;font-weight:800}
+        td{padding:5px 7px;border-bottom:1px solid #e8e8e8;vertical-align:top}
+        tfoot td{background:#e8ecef;font-weight:800;border-top:2px solid #1a3d6b}
+        .header{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #1a3d6b;padding-bottom:10px;margin-bottom:14px}
+        .logo{font-size:20px;font-weight:900;color:#1a3d6b;letter-spacing:1px}
+        .logo span{font-size:11px;display:block;color:#888;font-weight:400;letter-spacing:0}
+        .meta{text-align:right;font-size:10px;color:#555}
+        .meta strong{font-size:13px;color:#1a3d6b;display:block}
+        .kpis{display:flex;gap:16px;margin-bottom:14px}
+        .kpi{background:#f4f6f9;border-left:3px solid #1a3d6b;padding:6px 12px;flex:1}
+        .kpi .v{font-size:16px;font-weight:900;color:#1a3d6b}
+        .kpi .l{font-size:8px;color:#888;font-weight:700;text-transform:uppercase}
+      </style>
+    </head><body>
+      <div class="header">
+        <div class="logo">Global Solutions<span>Transporte de Carga · Informe Operacional</span></div>
+        <div class="meta">
+          <strong>Registro de Servicios</strong>
+          ${mesNombre} ${anioSel}${estadoFiltro!=='todos'?' — '+estadoFiltro:''}<br>
+          Emitido: ${hoyFmt}
+        </div>
+      </div>
+      <div class="kpis">
+        <div class="kpi"><div class="l">Total servicios</div><div class="v">${svcs.length}</div></div>
+        <div class="kpi"><div class="l">Servicios cerrados</div><div class="v">${svcs.filter(s=>s.cerrado).length}</div></div>
+        <div class="kpi"><div class="l">Total km</div><div class="v">${totalKmInf.toLocaleString('es-CL')}</div></div>
+        <div class="kpi"><div class="l">Ingresos (cerrados)</div><div class="v">$${totalIngInf.toLocaleString('es-CL')}</div></div>
+      </div>
+      <table>
+        <thead><tr>
+          <th>ID</th><th>Fecha</th><th>Cliente</th><th>Conductor</th><th>Patente</th>
+          <th>Ruta</th><th>N° Guía</th><th style="text-align:right">Km</th>
+          <th style="text-align:right">Precio Neto</th><th>Estado</th>
+        </tr></thead>
+        <tbody>${filas}</tbody>
+        <tfoot><tr>
+          <td colspan="7">TOTALES — ${svcs.length} servicios · ${svcs.filter(s=>s.cerrado).length} cerrados</td>
+          <td style="text-align:right">${totalKmInf.toLocaleString('es-CL')}</td>
+          <td style="text-align:right">$${totalIngInf.toLocaleString('es-CL')}</td>
+          <td></td>
+        </tr></tfoot>
+      </table>
+      <script>window.onload=()=>{window.print();}<\/script>
+    </body></html>`;
+    const w = window.open('','_blank');
+    if (w) { w.document.write(html); w.document.close(); }
+  };
 
   // Filtrar por período
   const hoy = new Date();
@@ -5233,7 +5405,18 @@ function renderInformes() {
                     ambitoSel==='rrhh' ? contenidoRRHH() :
                     contenidoScalingUp();
 
+  // ── TOP SELECTOR: vista principal ──
+  const topNav = `<div style="display:flex;gap:6px;margin-bottom:12px;border-bottom:2px solid #ECEFF1;padding-bottom:10px">
+    <button onclick="uiState.informes_vista='kpis';render()" style="padding:7px 14px;border-radius:7px;border:none;cursor:pointer;font-size:11px;font-weight:700;background:${informesVista==='kpis'?'#455A64':'#ECEFF1'};color:${informesVista==='kpis'?'white':'#455A64'}">📊 Indicadores</button>
+    <button onclick="uiState.informes_vista='registro';render()" style="padding:7px 14px;border-radius:7px;border:none;cursor:pointer;font-size:11px;font-weight:700;background:${informesVista==='registro'?'#1565C0':'#ECEFF1'};color:${informesVista==='registro'?'white':'#1565C0'}">📋 Reg. de Servicios</button>
+  </div>`;
+
+  if (informesVista === 'registro') {
+    return `<div style="padding:12px">${topNav}${informeRegistroServicios()}</div>`;
+  }
+
   return `<div style="padding:12px">
+    ${topNav}
     ${periodoHTML}
     ${kpisHTML}
     ${ambitoHTML}
