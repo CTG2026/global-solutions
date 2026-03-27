@@ -2010,7 +2010,7 @@ function renderCostos() {
   const mes = String(hoy.getMonth()+1).padStart(2,'0');
   const anio = String(hoy.getFullYear());
   const flota = getFlota();
-  const tabs = [['manual','✏️ Manual'],['copec','⛽ Combustible'],['cartola','🏦 Cartola'],['historial','📋 Historial']];
+  const tabs = [['manual','🔧 Mantención'],['copec','⛽ Combustible'],['cartola','🏦 Cartola'],['historial','📋 Historial']];
   const nav = `<div style="display:flex;gap:4px;margin-bottom:10px;overflow-x:auto">${tabs.map(([id,lbl])=>`<button onclick="uiState.costoTab='${id}';render()" style="padding:7px 12px;border-radius:7px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;flex-shrink:0;${tab===id?'background:#1565C0;color:white;border:none':'background:#F5F5F5;color:#555;border:1px solid #dde'}">${lbl}</button>`).join('')}</div>`;
   let body = '';
   if (tab==='manual') body = _costoTabManual(mes, anio, flota);
