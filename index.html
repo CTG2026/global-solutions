@@ -5000,48 +5000,48 @@ function renderInformes() {
     return `
     <!-- FILTROS -->
     <div style="background:#F5F7FA;border:1px solid #E0E4EA;border-radius:10px;padding:10px 12px;margin-bottom:10px">
-      <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end">
-        <!-- Período -->
-        <div style="min-width:140px">
-          <div style="font-size:9px;font-weight:700;color:#888;margin-bottom:4px">PERÍODO</div>
-          <div style="display:flex;gap:3px">
-            ${[['semana','Semana'],['mes','Mes'],['libre','Libre']].map(([v,l])=>`<button onclick="uiState.inf1_tipo='${v}';render()" style="${btnBase(tipoPeriodo===v)}">${l}</button>`).join('')}
-          </div>
+
+      <!-- Fila 1: PERÍODO tipo -->
+      <div style="margin-bottom:8px">
+        <div style="font-size:9px;font-weight:700;color:#607D8B;letter-spacing:0.5px;margin-bottom:5px">PERÍODO</div>
+        <div style="display:flex;gap:4px">
+          ${[['semana','Semana'],['mes','Mes'],['libre','Libre']].map(([v,l])=>`<button onclick="uiState.inf1_tipo='${v}';render()" style="${btnBase(tipoPeriodo===v)}">${l}</button>`).join('')}
         </div>
-        <!-- Selector del período -->
-        <div style="flex:1;min-width:200px">
-          <div style="font-size:9px;font-weight:700;color:#888;margin-bottom:4px">&nbsp;</div>
-          <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">${periodoControls}</div>
-        </div>
-        <!-- Cliente -->
+      </div>
+
+      <!-- Fila 2: selector según tipo -->
+      <div style="margin-bottom:8px">
+        ${periodoControls}
+      </div>
+
+      <!-- Fila 3: CLIENTE -->
+      <div style="margin-bottom:8px">
+        <div style="font-size:9px;font-weight:700;color:#607D8B;letter-spacing:0.5px;margin-bottom:5px">CLIENTE</div>
+        <select onchange="uiState.inf1_cliente=this.value;render()" style="width:100%;${selStyle}">
+          <option value="todos" ${clienteFiltro==='todos'?'selected':''}>Todos los clientes</option>
+          ${clientesDisp.map(c=>`<option value="${c}" ${clienteFiltro===c?'selected':''}>${c}</option>`).join('')}
+        </select>
+      </div>
+
+      <!-- Fila 4: EQUIPO + ESTADO en dos columnas -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
         <div>
-          <div style="font-size:9px;font-weight:700;color:#888;margin-bottom:4px">CLIENTE</div>
-          <select onchange="uiState.inf1_cliente=this.value;render()" style="${selStyle};max-width:150px">
-            <option value="todos" ${clienteFiltro==='todos'?'selected':''}>Todos</option>
-            ${clientesDisp.map(c=>`<option value="${c}" ${clienteFiltro===c?'selected':''}>${c}</option>`).join('')}
-          </select>
-        </div>
-        <!-- Equipo -->
-        <div>
-          <div style="font-size:9px;font-weight:700;color:#888;margin-bottom:4px">EQUIPO</div>
-          <select onchange="uiState.inf1_patente=this.value;render()" style="${selStyle}">
+          <div style="font-size:9px;font-weight:700;color:#607D8B;letter-spacing:0.5px;margin-bottom:5px">EQUIPO</div>
+          <select onchange="uiState.inf1_patente=this.value;render()" style="width:100%;${selStyle}">
             <option value="todos" ${patenteFiltro==='todos'?'selected':''}>Todos</option>
             ${flota.map(p=>`<option value="${p}" ${patenteFiltro===p?'selected':''}>${p}</option>`).join('')}
           </select>
         </div>
-        <!-- Estado -->
         <div>
-          <div style="font-size:9px;font-weight:700;color:#888;margin-bottom:4px">ESTADO</div>
-          <div style="display:flex;gap:3px">
-            ${[['todos','Todos'],['cerrados','Cerrados'],['pendientes','Pendientes']].map(([v,l])=>`<button onclick="uiState.inf1_estado='${v}';render()" style="${btnBase(estadoFiltro===v)}">${l}</button>`).join('')}
+          <div style="font-size:9px;font-weight:700;color:#607D8B;letter-spacing:0.5px;margin-bottom:5px">ESTADO</div>
+          <div style="display:flex;gap:3px;flex-wrap:wrap">
+            ${[['todos','Todos'],['cerrados','Cerr.'],['pendientes','Pend.']].map(([v,l])=>`<button onclick="uiState.inf1_estado='${v}';render()" style="${btnBase(estadoFiltro===v)};font-size:9px;padding:5px 7px">${l}</button>`).join('')}
           </div>
         </div>
-        <!-- PDF -->
-        <div style="margin-left:auto">
-          <div style="font-size:9px;font-weight:700;color:transparent;margin-bottom:4px">·</div>
-          <button onclick="imprimirInforme1()" style="padding:8px 16px;background:#0B2545;color:white;border:none;border-radius:7px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap">🖨️ Generar PDF</button>
-        </div>
       </div>
+
+      <!-- Fila 5: PDF -->
+      <button onclick="imprimirInforme1()" style="width:100%;padding:9px;background:#0B2545;color:white;border:none;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer">🖨️ Generar PDF</button>
     </div>
 
     <!-- RESUMEN -->
