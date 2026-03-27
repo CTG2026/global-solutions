@@ -1905,7 +1905,9 @@ function guardarLiquidacionRem() {
   const liquidoAPagar   = totalHaberes - totalDescuentos;
   const liqId = _genIdLiqRem(empId, mes, anio);
   const idx = emp.liquidaciones.findIndex(l=>l.id===liqId);
-  const liq = { id:liqId, mes, anio, sueldoBase, horasExtra, bono, comision, afp, salud, descuentos,
+  const correlativo = (idx>=0 && emp.liquidaciones[idx].correlativo) ? emp.liquidaciones[idx].correlativo : _genCorrelativoRem(mes, anio);
+  uiState.remCreando = true;
+  const liq = { id:liqId, correlativo, mes, anio, sueldoBase, horasExtra, bono, comision, afp, salud, descuentos,
     anticipos:ants, totalAnticipos, totalHaberes, totalDescuentos, liquidoAPagar,
     estado: f.estado||'pendiente', fechaPago: f.fechaPago||'', observaciones: f.observaciones||'' };
   if (idx>=0) emp.liquidaciones[idx]=liq; else emp.liquidaciones.push(liq);
@@ -1928,6 +1930,7 @@ function abrirFormRem(empId) {
   const anio = uiState.remAnio || String(new Date().getFullYear());
   const liq  = _getLiqRem(empId, mes, anio);
   uiState.remEmpId = empId;
+  uiState.remCreando = !!liq;
   if (liq) {
     uiState.remForm = { sueldoBase:liq.sueldoBase, horasExtra:liq.horasExtra, bono:liq.bono, comision:liq.comision,
       afp:liq.afp, salud:liq.salud, descuentos:liq.descuentos,
@@ -1942,7 +1945,55 @@ function abrirFormRem(empId) {
   render();
 }
 
-function cerrarFormRem() { uiState.remEmpId=null; uiState.remForm={}; render(); }
+function cerrarFormRem() { uiState.remEmpId=null; uiState.remForm={}; uiState.remCreando=false; render(); }
+
+function _onRemMesChange(tipo, valor) {
+  if (tipo==='mes') uiState.remMes=valor; else uiState.remAnio=valor;
+  uiState.remCreando = false;
+  if (uiState.remEmpId) {
+    const mes  = uiState.remMes  || String(new Date().getMonth()+1).padStart(2,'0');
+    const anio = uiState.remAnio || String(new Date().getFullYear());
+    const liq  = _getLiqRem(uiState.remEmpId, mes, anio);
+    if (liq) {
+      uiState.remCreando = true;
+      uiState.remForm = { sueldoBase:liq.sueldoBase, horasExtra:liq.horasExtra, bono:liq.bono, comision:liq.comision,
+        afp:liq.afp, salud:liq.salud, descuentos:liq.descuentos,
+        ant1fecha:liq.anticipos[0]?.fecha||'', ant1monto:liq.anticipos[0]?.monto||0,
+        ant2fecha:liq.anticipos[1]?.fecha||'', ant2monto:liq.anticipos[1]?.monto||0,
+        ant3fecha:liq.anticipos[2]?.fecha||'', ant3monto:liq.anticipos[2]?.monto||0,
+        ant4fecha:liq.anticipos[3]?.fecha||'', ant4monto:liq.anticipos[3]?.monto||0,
+        estado:liq.estado, fechaPago:liq.fechaPago, observaciones:liq.observaciones };
+    } else {
+      uiState.remForm = {};
+    }
+  } else {
+    uiState.remForm = {};
+  }
+  render();
+}
+
+function _cargarMesHistorial(empId, mes, anio) {
+  uiState.remMes = mes; uiState.remAnio = anio; uiState.remCreando = true;
+  const liq = _getLiqRem(empId, mes, anio);
+  if (liq) {
+    uiState.remForm = { sueldoBase:liq.sueldoBase, horasExtra:liq.horasExtra, bono:liq.bono, comision:liq.comision,
+      afp:liq.afp, salud:liq.salud, descuentos:liq.descuentos,
+      ant1fecha:liq.anticipos[0]?.fecha||'', ant1monto:liq.anticipos[0]?.monto||0,
+      ant2fecha:liq.anticipos[1]?.fecha||'', ant2monto:liq.anticipos[1]?.monto||0,
+      ant3fecha:liq.anticipos[2]?.fecha||'', ant3monto:liq.anticipos[2]?.monto||0,
+      ant4fecha:liq.anticipos[3]?.fecha||'', ant4monto:liq.anticipos[3]?.monto||0,
+      estado:liq.estado, fechaPago:liq.fechaPago, observaciones:liq.observaciones };
+  } else { uiState.remForm = {}; }
+  render();
+}
+
+function _genCorrelativoRem(mes, anio) {
+  let total = 0;
+  (appData.remuneraciones||[]).forEach(emp=>{
+    (emp.liquidaciones||[]).forEach(l=>{ if(l.correlativo) total++; });
+  });
+  return 'LIQ-REM-'+mes+'-'+anio+'-'+String(total+1).padStart(3,'0');
+}
 
 function _costoTabRemuneraciones(mes, anio) {
   const MNOMBRES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
@@ -1955,10 +2006,10 @@ function _costoTabRemuneraciones(mes, anio) {
   // ── SELECTOR DE MES/AÑO ──
   const mesSel = `<div style="display:flex;gap:6px;margin-bottom:10px;align-items:center">
     <div style="font-size:9px;font-weight:700;color:#888">PERÍODO</div>
-    <select onchange="uiState.remMes=this.value;uiState.remForm={};render()" style="${selStyle}">
+    <select onchange="_onRemMesChange('mes',this.value)" style="${selStyle}">
       ${['01','02','03','04','05','06','07','08','09','10','11','12'].map((m,i)=>`<option value="${m}" ${remMes===m?'selected':''}>${MNOMBRES[i]}</option>`).join('')}
     </select>
-    <select onchange="uiState.remAnio=this.value;uiState.remForm={};render()" style="${selStyle}">
+    <select onchange="_onRemMesChange('anio',this.value)" style="${selStyle}">
       ${['2025','2026','2027'].map(y=>`<option value="${y}" ${remAnio===y?'selected':''}>${y}</option>`).join('')}
     </select>
   </div>`;
@@ -1969,6 +2020,8 @@ function _costoTabRemuneraciones(mes, anio) {
     const emp   = empleados.find(e=>e.id===empId);
     if (!emp) { uiState.remEmpId=null; return _costoTabRemuneraciones(mes,anio); }
     const f = uiState.remForm || {};
+    const liqExistente = _getLiqRem(empId, remMes, remAnio);
+    const mesLabelRem = MNOMBRES[parseInt(remMes)-1]+' '+remAnio;
 
     // Auto-calcular comisión (10% servicios cerrados del mes por conductor)
     const svcsEmp = (appData.servicios||[]).filter(s=>s.cerrado&&s.conductor===emp.nombre&&s.mes===remMes&&s.anio===remAnio);
@@ -1994,6 +2047,27 @@ function _costoTabRemuneraciones(mes, anio) {
       return `<input type="${type}" placeholder="${placeholder}" value="${val||''}"
         oninput="uiState.remForm={...uiState.remForm||{},${key}:${type==='number'?'parseInt(this.value)||0':'this.value'}}"
         style="${inpStyle}">`;
+    }
+
+    // Historial: all liquidaciones except current month, sorted desc
+    const _histRows = ((emp.liquidaciones||[]).slice().sort((a,b)=>(parseInt(b.anio)*100+parseInt(b.mes))-(parseInt(a.anio)*100+parseInt(a.mes)))).filter(l=>!(l.mes===remMes&&l.anio===remAnio));
+    const _histHtml = _histRows.length ? `<div style="margin-top:14px"><div style="font-size:10px;font-weight:800;color:#0B2545;letter-spacing:0.5px;margin-bottom:8px;border-bottom:2px solid #0B2545;padding-bottom:4px">HISTORIAL</div>${_histRows.map(l=>{const sl=(l.liquidoAPagar||0)-(l.totalAnticipos||0);const pa=l.estado==='pagado';return `<div style="background:white;border:1px solid #e0e0e0;border-radius:8px;padding:8px 10px;margin-bottom:6px"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px"><div><div style="font-size:11px;font-weight:800;color:#0B2545">${MNOMBRES[parseInt(l.mes)-1]} ${l.anio}</div><div style="font-size:9px;color:#888">${l.correlativo||''}</div></div><span style="font-size:9px;font-weight:700;padding:2px 7px;border-radius:8px;background:${pa?'#E8F5E9':'#FFF3E0'};color:${pa?'#2E7D32':'#E65100'}">${pa?'✅ Pagado':'⏳ Pendiente'}</span></div><div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:5px;margin-bottom:6px"><div style="background:#F4F6F8;border-radius:6px;padding:5px;text-align:center"><div style="font-size:8px;font-weight:700;color:#888">LÍQUIDO</div><div style="font-size:11px;font-weight:900;color:#0B2545">$${(l.liquidoAPagar||0).toLocaleString('es-CL')}</div></div><div style="background:#FFF3E0;border-radius:6px;padding:5px;text-align:center"><div style="font-size:8px;font-weight:700;color:#888">ANTICIPOS</div><div style="font-size:11px;font-weight:900;color:#E65100">${(l.totalAnticipos||0)>0?'$'+(l.totalAnticipos||0).toLocaleString('es-CL'):'—'}</div></div><div style="background:${sl>=0?'#E8F5E9':'#FFEBEE'};border-radius:6px;padding:5px;text-align:center"><div style="font-size:8px;font-weight:700;color:#888">SALDO</div><div style="font-size:11px;font-weight:900;color:${sl>=0?'#2E7D32':'#C62828'}">${sl>=0?'$'+sl.toLocaleString('es-CL'):'−$'+Math.abs(sl).toLocaleString('es-CL')}</div></div></div><div style="display:grid;grid-template-columns:1fr 1fr;gap:5px"><button onclick="imprimirLiquidacionRem('${empId}','${l.mes}','${l.anio}')" style="padding:7px;background:#546E7A;color:white;border:none;border-radius:6px;font-size:10px;font-weight:700;cursor:pointer">🖨️ Ver PDF</button><button onclick="_cargarMesHistorial('${empId}','${l.mes}','${l.anio}')" style="padding:7px;background:#E3F2FD;color:#1565C0;border:1px solid #BBDEFB;border-radius:6px;font-size:10px;font-weight:700;cursor:pointer">📋 Cargar este mes</button></div></div>`;}).join('')}</div>` : '';
+
+    // Si no existe liquidación y no se ha iniciado la creación → mostrar botón crear
+    if (!liqExistente && !uiState.remCreando) {
+      return `${mesSel}
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+        <button onclick="cerrarFormRem()" style="padding:6px 10px;background:#ECEFF1;border:none;border-radius:6px;font-size:11px;cursor:pointer">← Volver</button>
+        <div>
+          <div style="font-size:13px;font-weight:800;color:#0B2545">${emp.nombre}</div>
+          <div style="font-size:10px;color:#777">${emp.cargo} · ${emp.area}</div>
+        </div>
+      </div>
+      <div style="background:#E3F2FD;border:1px dashed #1565C0;border-radius:10px;padding:22px 14px;text-align:center;margin-bottom:10px">
+        <div style="font-size:11px;color:#546E7A;margin-bottom:12px">Sin liquidación para <strong>${mesLabelRem}</strong></div>
+        <button onclick="uiState.remCreando=true;render()" style="padding:11px 24px;background:#0B2545;color:white;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer">+ Crear liquidación ${mesLabelRem}</button>
+      </div>
+      ${_histHtml}`;
     }
 
     return `
@@ -2087,7 +2161,8 @@ function _costoTabRemuneraciones(mes, anio) {
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
       <button onclick="guardarLiquidacionRem()" style="padding:11px;background:#0B2545;color:white;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer">💾 Guardar</button>
       <button onclick="imprimirLiquidacionRem('${empId}','${remMes}','${remAnio}')" style="padding:11px;background:#546E7A;color:white;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer">🖨️ PDF</button>
-    </div>`;
+    </div>
+    ${_histHtml}`;
   }
 
   // ── VISTA LISTA ──
@@ -2130,8 +2205,8 @@ function _costoTabRemuneraciones(mes, anio) {
         </div>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
-        <button onclick="abrirFormRem('${emp.id}')" style="padding:8px;background:#0B2545;color:white;border:none;border-radius:7px;font-size:11px;font-weight:700;cursor:pointer">✏️ Ver / Editar</button>
-        <button onclick="imprimirLiquidacionRem('${emp.id}','${remMes}','${remAnio}')" style="padding:8px;background:#546E7A;color:white;border:none;border-radius:7px;font-size:11px;font-weight:700;cursor:pointer">🖨️ PDF</button>
+        <button onclick="abrirFormRem('${emp.id}')" style="padding:8px;background:${liq?'#0B2545':'#1565C0'};color:white;border:none;border-radius:7px;font-size:11px;font-weight:700;cursor:pointer">${liq?'✏️ Ver / Editar':'+ Crear liquidación'}</button>
+        ${liq?`<button onclick="imprimirLiquidacionRem('${emp.id}','${remMes}','${remAnio}')" style="padding:8px;background:#546E7A;color:white;border:none;border-radius:7px;font-size:11px;font-weight:700;cursor:pointer">🖨️ PDF</button>`:'<span></span>'}
       </div>
     </div>`;
   }).join('')}`;
@@ -2146,7 +2221,7 @@ function imprimirLiquidacionRem(empId, remMes, remAnio) {
   if (!liq) return alert('Guarda la liquidación antes de generar el PDF');
   const mesLabel = `${MNOMBRES[parseInt(remMes)-1]} ${remAnio}`;
   const hoyFmt = new Date().toLocaleDateString('es-CL',{day:'2-digit',month:'long',year:'numeric'});
-  const nCorr = `LIQ-REM-${remMes}-${remAnio}-${empId}`;
+  const nCorr = liq.correlativo || `LIQ-REM-${remMes}-${remAnio}-${empId}`;
   const ants = (liq.anticipos||[]).filter(a=>a.monto>0);
   const antFilas = ants.map(a=>`<tr><td>Anticipo ${a.numero}${a.fecha?' — '+a.fecha:''}</td><td class="r">$${a.monto.toLocaleString('es-CL')}</td></tr>`).join('');
   const html = `<!DOCTYPE html><html><head><meta charset="UTF-8">
