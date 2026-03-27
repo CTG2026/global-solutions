@@ -6539,7 +6539,10 @@ function renderDashboard() {
   const ventasCerradas = serviciosMesArr.filter(s => s.cerrado && s.precio).reduce((a,s) => a + (s.precio||0), 0);
   const ventasBorrador = serviciosMesArr.filter(s => !s.cerrado && s.estado === 'borrador' && s.precio).reduce((a,s) => a + (s.precio||0), 0);
   const ventas = ventasCerradas + ventasBorrador;
-  const gasto = d.gasto_real || 0;
+  // Calcular costos live desde el módulo de costos
+  const gastoManuales = (appData.costos||[]).filter(c => c.mes===mesPadded && c.anio===anioStr).reduce((a,c) => a + (c.total||0), 0);
+  const gastoCombustible = (appData.copec||[]).filter(c => c.mes===mesPadded && c.anio===anioStr).reduce((a,c) => a + (c.monto||0), 0);
+  const gasto = gastoManuales + gastoCombustible;
   const caja = d.caja || 0;
   const resultado = ventas - gasto;
   const resultadoPct = metaVentas > 0 ? Math.min(100, Math.round(ventas/metaVentas*100)) : 0;
@@ -6549,7 +6552,18 @@ function renderDashboard() {
   const gastoAlerta = gastoPct > 90;
   const dispPct = (d.flota_total||9) > 0 ? Math.round((d.flota_disponible||0)/(d.flota_total||9)*100) : 0;
   const ocupPct = (d.flota_disponible||0) > 0 ? Math.round((d.flota_ocupada||0)/(d.flota_disponible||1)*100) : 0;
-  const serviciosSemana = d.servicios_semana || 0;
+  // Calcular servicios de la semana actual live desde appData.servicios
+  const dayOfWeek = hoy.getDay();
+  const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+  const lunesSemana = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate() + mondayOffset);
+  const domingoSemana = new Date(lunesSemana.getTime() + 6 * 86400000);
+  const serviciosSemana = (appData.servicios||[]).filter(s => {
+    if (!s.fecha) return false;
+    const p = s.fecha.split('-');
+    if (p.length !== 3) return false;
+    const fd = new Date(parseInt(p[2]), parseInt(p[1])-1, parseInt(p[0]));
+    return fd >= lunesSemana && fd <= domingoSemana;
+  }).length;
   const serviciosSemanaPresup = d.servicios_semana_presup || 0;
   const facturasCobrar = d.facturas_cobrar || 0;
   const semanaActual = Math.ceil(hoy.getDate()/7);
@@ -6587,10 +6601,9 @@ function renderDashboard() {
       <div style="background:#1a3d6b;border-radius:10px;padding:12px 14px">
         <div style="font-size:9px;font-weight:800;letter-spacing:1.5px;color:rgba(255,255,255,0.5);margin-bottom:4px">COSTOS</div>
         <div style="font-size:26px;font-weight:900;color:${gastoAlerta?'#EF9A9A':'white'};line-height:1">${fmtPesoCompacto(gasto)}</div>
-        <div style="font-size:10px;color:rgba(255,255,255,0.55);margin-top:2px">${presupuesto>0?'presup. '+fmtPesoCompacto(presupuesto):'CF '+fmtPesoCompacto(costosFijos)}</div>
+        <div style="font-size:10px;color:rgba(255,255,255,0.55);margin-top:2px">${gastoManuales>0||gastoCombustible>0?fmtPesoCompacto(gastoManuales)+' costos + '+fmtPesoCompacto(gastoCombustible)+' comb.':(presupuesto>0?'presup. '+fmtPesoCompacto(presupuesto):'CF '+fmtPesoCompacto(costosFijos))}</div>
         ${bar(gastoPct, gastoAlerta?'#EF9A9A':'rgba(255,255,255,0.7)',6)}
         <div style="font-size:10px;font-weight:700;color:${gastoAlerta?'#EF9A9A':'rgba(255,255,255,0.8)'}">${gastoPct}% ejecutado${gastoAlerta?' ⚠':''}</div>
-        ${eBtn('gasto_real','Gasto real del mes ($)',gasto)}
       </div>
     </div>`;
 
@@ -6613,7 +6626,7 @@ function renderDashboard() {
         <div style="font-size:22px;font-weight:900;color:white;line-height:1">${serviciosSemana}<span style="font-size:11px;color:rgba(255,255,255,0.4)">/${serviciosSemanaPresup||'?'}</span></div>
         <div style="font-size:10px;color:rgba(255,255,255,0.55);margin-top:4px">Sem ${semanaActual} del mes</div>
         <div style="font-size:12px;font-weight:700;color:rgba(255,255,255,0.85);margin-top:2px">${serviciosMes} en el mes</div>
-        ${eBtn('servicios_semana','Servicios esta semana',serviciosSemana)}
+        <div style="font-size:9px;color:rgba(255,255,255,0.4);margin-top:3px">auto desde sistema</div>
       </div>
       <div style="background:#1a3d6b;border-radius:10px;padding:10px 12px">
         <div style="font-size:9px;font-weight:800;letter-spacing:1px;color:rgba(255,255,255,0.5);margin-bottom:4px">CAJA</div>
