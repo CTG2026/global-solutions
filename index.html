@@ -5,11 +5,11 @@
   <meta http-equiv="cache-control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="pragma" content="no-cache">
   <meta http-equiv="expires" content="0">
-  <meta name="version" content="1774697668">
+  <meta name="version" content="1774700040">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <script>
 (function() {
-  var VERSION = '1774697668';
+  var VERSION = '1774700040';
   var stored = localStorage.getItem('gs_app_version');
   if (stored !== VERSION) {
     var session = localStorage.getItem('gs_session');
@@ -751,6 +751,10 @@ function renderRendimientoComb() {
         <div style="font-size:9px;font-weight:700;color:#888;margin-bottom:3px">MONTO CARGA ($)</div>
         <input id="rc_monto" type="number" placeholder="ej: 95000" style="${inp}">
       </div>
+      <div style="grid-column:1/-1">
+        <div style="font-size:9px;font-weight:700;color:#888;margin-bottom:3px">KM RECORRIDOS <span style="font-weight:400;color:#aaa">— opcional, cierra el turno al instante</span></div>
+        <input id="rc_km_ini" type="number" placeholder="ej: 320" style="${inp}">
+      </div>
     </div>
     <button onclick="crearRegistroRC()" style="width:100%;padding:10px;background:#0B2545;color:white;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer">⛽ Registrar carga</button>
   </div>`;
@@ -890,15 +894,20 @@ function crearRegistroRC() {
   const conductor = document.getElementById('rc_conductor')?.value;
   const litros    = parseFloat(document.getElementById('rc_litros')?.value)||0;
   const monto     = parseInt(document.getElementById('rc_monto')?.value)||0;
+  const kmIni     = parseInt(document.getElementById('rc_km_ini')?.value)||0;
   if (!patente) return alert('Selecciona la patente');
   if (!litros)  return alert('Ingresa los litros cargados');
   if (!appData.rendimientoComb) appData.rendimientoComb = [];
   const fecha = _rcFmtISO(fechaISO);
   const p = fechaISO.split('-');
+  const cerradoAlInstante = kmIni > 0;
+  const rendimiento = cerradoAlInstante ? +(kmIni / litros).toFixed(2) : 0;
   const nuevo = {
     id: _rcNextId(), fecha, patente, conductor, litros, monto,
-    km: 0, rendimiento: 0, estado: 'abierto',
-    mes: p[1], anio: p[0], fechaCierre: ''
+    km: kmIni, rendimiento,
+    estado: cerradoAlInstante ? 'cerrado' : 'abierto',
+    mes: p[1], anio: p[0],
+    fechaCierre: cerradoAlInstante ? fecha : ''
   };
   appData.rendimientoComb.push(nuevo);
   saveData();
