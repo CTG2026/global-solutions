@@ -5,11 +5,11 @@
   <meta http-equiv="cache-control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="pragma" content="no-cache">
   <meta http-equiv="expires" content="0">
-  <meta name="version" content="1774731500">
+  <meta name="version" content="1774740000">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <script>
 (function() {
-  var VERSION = '1774731500';
+  var VERSION = '1774740000';
   var stored = localStorage.getItem('gs_app_version');
   if (stored !== VERSION) {
     var session = localStorage.getItem('gs_session');
@@ -8379,15 +8379,31 @@ document.addEventListener('touchend', async e => {
   }
 }, {passive:true});
 
-// Desregistrar Service Workers y forzar recarga limpia
+// Registrar Service Worker — Network First para siempre cargar versión más reciente
 if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.getRegistrations().then(regs => {
-    regs.forEach(reg => reg.unregister());
+  window.addEventListener('load', function() {
+    navigator.serviceWorker.register('./sw.js')
+      .then(function(reg) {
+        // Forzar búsqueda de actualización en cada carga
+        reg.update();
+        // Cuando hay un nuevo SW esperando, recargar automáticamente
+        reg.addEventListener('updatefound', function() {
+          var newWorker = reg.installing;
+          newWorker.addEventListener('statechange', function() {
+            if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+              // Nueva versión instalada — recargar para activarla
+              window.location.reload();
+            }
+          });
+        });
+      })
+      .catch(function(err) { console.warn('SW registro fallido:', err); });
+
+    // Si el SW se actualiza en otra pestaña, recargar esta también
+    navigator.serviceWorker.addEventListener('controllerchange', function() {
+      window.location.reload();
+    });
   });
-}
-// Limpiar caché del navegador para forzar versión más reciente
-if ('caches' in window) {
-  caches.keys().then(keys => keys.forEach(k => caches.delete(k)));
 }
 // Limpiar localStorage de servicios al arrancar — Supabase es la única fuente
 try {
