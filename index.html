@@ -5,11 +5,11 @@
   <meta http-equiv="cache-control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="pragma" content="no-cache">
   <meta http-equiv="expires" content="0">
-  <meta name="version" content="1774656058">
+  <meta name="version" content="1774656176">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <script>
 (function() {
-  var VERSION = '1774656058';
+  var VERSION = '1774656176';
   var stored = localStorage.getItem('gs_app_version');
   if (stored !== VERSION) {
     var session = localStorage.getItem('gs_session');
@@ -794,6 +794,7 @@ function renderRendimientoComb() {
             <th style="padding:6px 8px;text-align:right;font-size:9px">Litros</th>
             <th style="padding:6px 8px;text-align:right;font-size:9px">Km</th>
             <th style="padding:6px 8px;text-align:right;font-size:9px">Km/L</th>
+            <th style="padding:6px 4px;font-size:9px"></th>
           </tr>
         </thead>
         <tbody>
@@ -804,6 +805,7 @@ function renderRendimientoComb() {
             <td style="padding:6px 8px;text-align:right">${r.litros}L</td>
             <td style="padding:6px 8px;text-align:right">${r.km} km</td>
             <td style="padding:6px 8px;text-align:right;font-weight:800;color:#2E7D32">${r.rendimiento} km/L</td>
+            <td style="padding:4px 6px"><button onclick="imprimirTurnoRC('${r.id}')" style="padding:4px 8px;background:#546E7A;color:white;border:none;border-radius:5px;font-size:10px;cursor:pointer;white-space:nowrap">🖨️ PDF</button></td>
           </tr>`).join('')}
         </tbody>
       </table>
@@ -900,6 +902,76 @@ function eliminarTurnoRC(idx) {
   if (!confirm('¿Eliminar este registro?')) return;
   appData.rendimientoComb.splice(idx, 1);
   saveData(); render();
+}
+
+function imprimirTurnoRC(id) {
+  const r = (appData.rendimientoComb||[]).find(x=>x.id===id);
+  if (!r) return alert('Registro no encontrado');
+  const hoyFmt = new Date().toLocaleDateString('es-CL',{day:'2-digit',month:'long',year:'numeric'});
+  const html = `<!DOCTYPE html><html><head><meta charset="UTF-8">
+  <title>Rendimiento ${r.patente} — ${r.fecha}</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:Arial,sans-serif;font-size:11px;color:#1a1a1a;padding:24px}
+    @page{size:A4 portrait;margin:14mm 16mm}
+    @media print{body{padding:0}}
+    .header{border-bottom:4px solid #0B2545;padding-bottom:12px;margin-bottom:16px;display:flex;justify-content:space-between;align-items:flex-start}
+    .logo{font-size:22px;font-weight:900;color:#0B2545}.logo .sub{font-size:9px;color:#546E7A;font-weight:400;display:block;margin-top:2px}
+    .meta{text-align:right}.meta .title{font-size:16px;font-weight:900;color:#0B2545}.meta .row{font-size:9px;color:#546E7A;margin-top:2px}
+    .ficha{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:20px}
+    .field{background:#F4F6F8;border-radius:6px;padding:10px 12px}
+    .field .lbl{font-size:8px;font-weight:700;color:#888;text-transform:uppercase;margin-bottom:4px}
+    .field .val{font-size:14px;font-weight:900;color:#0B2545}
+    .result{background:#0B2545;color:white;border-radius:8px;padding:16px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;text-align:center;margin-bottom:20px}
+    .result .rl{font-size:8px;opacity:0.7;font-weight:700;text-transform:uppercase;margin-bottom:4px}
+    .result .rv{font-size:22px;font-weight:900}
+    .firmas{display:grid;grid-template-columns:1fr 1fr;gap:40px;margin-top:30px}
+    .firma-box{text-align:center}
+    .firma-line{border-top:1px solid #0B2545;padding-top:6px;margin-top:30px}
+    .firma-line .label{font-size:9px;font-weight:700;color:#0B2545}
+    .firma-line .name{font-size:10px;color:#333;margin-top:2px}
+    .footer{text-align:center;font-size:8px;color:#aaa;border-top:1px solid #eee;padding-top:8px;margin-top:20px}
+  </style>
+  </head><body>
+  <div class="header">
+    <div class="logo">Global Solutions SpA<span class="sub">Transporte de Carga</span></div>
+    <div class="meta">
+      <div class="title">REGISTRO RENDIMIENTO COMBUSTIBLE</div>
+      <div class="row">N° ${r.id}</div>
+      <div class="row">Emisión: ${hoyFmt}</div>
+    </div>
+  </div>
+  <div class="ficha">
+    <div class="field"><div class="lbl">Patente</div><div class="val">${r.patente}</div></div>
+    <div class="field"><div class="lbl">Conductor</div><div class="val" style="font-size:12px">${r.conductor||'—'}</div></div>
+    <div class="field"><div class="lbl">Fecha carga</div><div class="val" style="font-size:12px">${r.fecha}</div></div>
+    <div class="field"><div class="lbl">Fecha cierre</div><div class="val" style="font-size:12px">${r.fechaCierre||'—'}</div></div>
+    <div class="field"><div class="lbl">Estado</div><div class="val" style="font-size:12px;color:${r.estado==='cerrado'?'#2E7D32':'#E65100'}">${r.estado==='cerrado'?'Cerrado':'Abierto'}</div></div>
+  </div>
+  <div class="result">
+    <div><div class="rl">Litros cargados</div><div class="rv">${r.litros}L</div></div>
+    <div><div class="rl">Km recorridos</div><div class="rv">${r.km} km</div></div>
+    <div style="background:rgba(255,255,255,0.1);border-radius:6px;padding:8px"><div class="rl">Rendimiento</div><div class="rv" style="color:#81C784">${r.rendimiento} km/L</div></div>
+  </div>
+  <div class="firmas">
+    <div class="firma-box">
+      <div class="firma-line">
+        <div class="label">Firma Conductor</div>
+        <div class="name">${r.conductor||'___________________'}</div>
+      </div>
+    </div>
+    <div class="firma-box">
+      <div class="firma-line">
+        <div class="label">Firma Supervisor</div>
+        <div class="name">Global Solutions SpA</div>
+      </div>
+    </div>
+  </div>
+  <div class="footer">Global Solutions SpA · Rendimiento de Combustible · ${r.id} · Generado el ${hoyFmt}</div>
+  <script>window.onload=function(){window.print();}<\/script>
+  </body></html>`;
+  const w = window.open('','_blank');
+  if(w){w.document.write(html);w.document.close();}
 }
 
 function imprimirInformeRC() {
