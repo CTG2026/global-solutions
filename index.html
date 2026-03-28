@@ -5,11 +5,11 @@
   <meta http-equiv="cache-control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="pragma" content="no-cache">
   <meta http-equiv="expires" content="0">
-  <meta name="version" content="1774730200">
+  <meta name="version" content="1774731500">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <script>
 (function() {
-  var VERSION = '1774730200';
+  var VERSION = '1774731500';
   var stored = localStorage.getItem('gs_app_version');
   if (stored !== VERSION) {
     var session = localStorage.getItem('gs_session');
@@ -4235,7 +4235,7 @@ function buildGuiasRegistroHTML() {
   const guiasHTML = guias.map((g,gi) => `
     <div style="background:white;border:1px solid #CFD8DC;border-radius:8px;padding:12px;margin-bottom:8px">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
-        <span style="font-size:10px;font-weight:800;color:#455A64;letter-spacing:1px">GUÍA N°${gi+1}</span>
+        <span style="font-size:10px;font-weight:800;color:#455A64;letter-spacing:1px">GUÍA</span>
         ${guias.length>1?`<button onclick="delGuia(${gi})" style="background:#FFEBEE;color:#C62828;border:1px solid #FFCDD2;border-radius:6px;padding:4px 10px;font-size:11px;cursor:pointer;font-weight:700">× eliminar</button>`:''}
       </div>
       <div style="display:grid;gap:8px">
