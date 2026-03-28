@@ -5,11 +5,11 @@
   <meta http-equiv="cache-control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="pragma" content="no-cache">
   <meta http-equiv="expires" content="0">
-  <meta name="version" content="1774656696">
+  <meta name="version" content="1774697668">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <script>
 (function() {
-  var VERSION = '1774656696';
+  var VERSION = '1774697668';
   var stored = localStorage.getItem('gs_app_version');
   if (stored !== VERSION) {
     var session = localStorage.getItem('gs_session');
@@ -747,6 +747,10 @@ function renderRendimientoComb() {
         <div style="font-size:9px;font-weight:700;color:#888;margin-bottom:3px">LITROS CARGADOS</div>
         <input id="rc_litros" type="number" placeholder="ej: 120" style="${inp}">
       </div>
+      <div style="grid-column:1/-1">
+        <div style="font-size:9px;font-weight:700;color:#888;margin-bottom:3px">MONTO CARGA ($)</div>
+        <input id="rc_monto" type="number" placeholder="ej: 95000" style="${inp}">
+      </div>
     </div>
     <button onclick="crearRegistroRC()" style="width:100%;padding:10px;background:#0B2545;color:white;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer">⛽ Registrar carga</button>
   </div>`;
@@ -772,6 +776,7 @@ function renderRendimientoComb() {
               <div style="text-align:right">
                 <div style="font-size:10px;color:#777">Carga: ${r.fecha}</div>
                 <div style="font-size:12px;font-weight:800;color:#0B2545;margin-top:2px">⛽ ${r.litros}L</div>
+                ${r.monto?`<div style="font-size:10px;color:#546E7A">$${r.monto.toLocaleString('es-CL')}</div>`:''}
               </div>
             </div>
             <div style="background:white;border-radius:7px;padding:10px;border:1px solid #FFE082;margin-bottom:8px">
@@ -802,6 +807,7 @@ function renderRendimientoComb() {
             <th style="padding:6px 8px;text-align:left;font-size:9px">Patente</th>
             <th style="padding:6px 8px;text-align:left;font-size:9px">Conductor</th>
             <th style="padding:6px 8px;text-align:right;font-size:9px">Litros</th>
+            <th style="padding:6px 8px;text-align:right;font-size:9px">Monto</th>
             <th style="padding:6px 8px;text-align:right;font-size:9px">Km</th>
             <th style="padding:6px 8px;text-align:right;font-size:9px">Km/L</th>
             <th style="padding:6px 4px;font-size:9px"></th>
@@ -813,6 +819,7 @@ function renderRendimientoComb() {
             <td style="padding:6px 8px;font-weight:700">${r.patente}</td>
             <td style="padding:6px 8px">${r.conductor||'—'}</td>
             <td style="padding:6px 8px;text-align:right">${r.litros}L</td>
+            <td style="padding:6px 8px;text-align:right">${r.monto?'$'+r.monto.toLocaleString('es-CL'):'—'}</td>
             <td style="padding:6px 8px;text-align:right">${r.km} km</td>
             <td style="padding:6px 8px;text-align:right;font-weight:800;color:#2E7D32">${r.rendimiento} km/L</td>
             <td style="padding:4px 6px"><button onclick="imprimirTurnoRC('${r.id}')" style="padding:4px 8px;background:#546E7A;color:white;border:none;border-radius:5px;font-size:10px;cursor:pointer;white-space:nowrap">🖨️ PDF</button></td>
@@ -882,13 +889,14 @@ function crearRegistroRC() {
   const patente   = document.getElementById('rc_patente')?.value;
   const conductor = document.getElementById('rc_conductor')?.value;
   const litros    = parseFloat(document.getElementById('rc_litros')?.value)||0;
+  const monto     = parseInt(document.getElementById('rc_monto')?.value)||0;
   if (!patente) return alert('Selecciona la patente');
   if (!litros)  return alert('Ingresa los litros cargados');
   if (!appData.rendimientoComb) appData.rendimientoComb = [];
   const fecha = _rcFmtISO(fechaISO);
   const p = fechaISO.split('-');
   const nuevo = {
-    id: _rcNextId(), fecha, patente, conductor, litros,
+    id: _rcNextId(), fecha, patente, conductor, litros, monto,
     km: 0, rendimiento: 0, estado: 'abierto',
     mes: p[1], anio: p[0], fechaCierre: ''
   };
@@ -962,6 +970,7 @@ function imprimirTurnoRC(id) {
     <div class="field"><div class="lbl">Fecha carga</div><div class="val" style="font-size:12px">${r.fecha}</div></div>
     <div class="field"><div class="lbl">Fecha cierre</div><div class="val" style="font-size:12px">${r.fechaCierre||'—'}</div></div>
     <div class="field"><div class="lbl">Estado</div><div class="val" style="font-size:12px;color:${r.estado==='cerrado'?'#2E7D32':'#E65100'}">${r.estado==='cerrado'?'Cerrado':'Abierto'}</div></div>
+    ${r.monto?`<div class="field"><div class="lbl">Monto carga</div><div class="val" style="font-size:12px">$${r.monto.toLocaleString('es-CL')}</div></div>`:''}
   </div>
   <div class="result">
     <div><div class="rl">Litros cargados</div><div class="rv">${r.litros}L</div></div>
@@ -1022,6 +1031,7 @@ function imprimirInformeRC() {
 
   const totalLitros = registros.reduce((s,r)=>s+(r.litros||0),0);
   const totalKm     = registros.reduce((s,r)=>s+(r.km||0),0);
+  const totalMonto  = registros.reduce((s,r)=>s+(r.monto||0),0);
   const rendProm    = totalKm>0&&totalLitros>0 ? (totalKm/totalLitros).toFixed(2) : '—';
 
   // Subtotales por equipo
@@ -1050,8 +1060,9 @@ function imprimirInformeRC() {
       <td style="padding:6px 8px">${r.fecha}</td>
       <td style="padding:6px 8px;font-weight:700">${r.patente}</td>
       <td style="padding:6px 8px">${r.conductor||'—'}</td>
-      <td style="padding:6px 8px;text-align:right">${r.litros}</td>
-      <td style="padding:6px 8px;text-align:right">${r.km}</td>
+      <td style="padding:6px 8px;text-align:right">${r.litros}L</td>
+      <td style="padding:6px 8px;text-align:right">${r.monto?'$'+r.monto.toLocaleString('es-CL'):'—'}</td>
+      <td style="padding:6px 8px;text-align:right">${r.km} km</td>
       <td style="padding:6px 8px;text-align:right;font-weight:800;color:#1B5E20">${r.rendimiento} km/L</td>
     </tr>`).join('');
 
@@ -1120,12 +1131,13 @@ function imprimirInformeRC() {
   <table>
     <thead><tr>
       <th style="${th}">Fecha</th><th style="${th}">Patente</th><th style="${th}">Conductor</th>
-      <th style="${thr}">Litros</th><th style="${thr}">Km</th><th style="${thr}">Km/L</th>
+      <th style="${thr}">Litros</th><th style="${thr}">Monto</th><th style="${thr}">Km</th><th style="${thr}">Km/L</th>
     </tr></thead>
     <tbody>${filasDetalle}</tbody>
     <tfoot><tr>
       <td colspan="3" style="padding:6px 8px">TOTALES</td>
       <td style="padding:6px 8px;text-align:right">${totalLitros}L</td>
+      <td style="padding:6px 8px;text-align:right">${totalMonto>0?'$'+totalMonto.toLocaleString('es-CL'):'—'}</td>
       <td style="padding:6px 8px;text-align:right">${totalKm.toLocaleString('es-CL')} km</td>
       <td style="padding:6px 8px;text-align:right;color:#1B5E20">${rendProm!=='—'?rendProm+' km/L':rendProm}</td>
     </tr></tfoot>
@@ -5297,6 +5309,7 @@ async function upsertRendimientoCombSupabase(r) {
       patente:      r.patente      || '',
       conductor:    r.conductor    || '',
       litros:       r.litros       || 0,
+      monto:        r.monto        || 0,
       km:           r.km           || 0,
       rendimiento:  r.rendimiento  || 0,
       estado:       r.estado       || 'abierto',
@@ -5319,6 +5332,7 @@ async function syncRendimientoCombDesdeSupabase() {
         patente:     r.patente      || '',
         conductor:   r.conductor    || '',
         litros:      r.litros       || 0,
+        monto:       r.monto        || 0,
         km:          r.km           || 0,
         rendimiento: r.rendimiento  || 0,
         estado:      r.estado       || 'cerrado',
