@@ -5,11 +5,11 @@
   <meta http-equiv="cache-control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="pragma" content="no-cache">
   <meta http-equiv="expires" content="0">
-  <meta name="version" content="1774720100">
+  <meta name="version" content="1774730200">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <script>
 (function() {
-  var VERSION = '1774720100';
+  var VERSION = '1774730200';
   var stored = localStorage.getItem('gs_app_version');
   if (stored !== VERSION) {
     var session = localStorage.getItem('gs_session');
@@ -3538,10 +3538,7 @@ function generarHTMLCotV2(c){
 function srvVista(s) {
   const puntos = s.puntos || s.guias || [];
   // Números de guía en orden P1, P2, P3... — lee guia o num según disponibilidad
-  const gdNums = puntos.map((g,i)=>{
-    const n = g.guia||g.num||'';
-    return n ? (puntos.length>1 ? `P${i+1}:${n}` : n) : '';
-  }).filter(Boolean).join('  ·  ') || '—';
+  const gdNums = puntos.map(g=>g.guia||g.num||'').filter(Boolean).join(', ') || '—';
   const gdFechaGuia = puntos.map(g=>g.fecha_guia||g.fecha).filter(Boolean).slice(0,1)[0] || s.fecha || '—';
   const gdDescarga = puntos.map(g=>g.fecha_descarga).filter(Boolean).join(', ') || '—';
   const destinoFinal = puntos.map(g=>g.destino).filter(Boolean).slice(-1)[0] || s.destino || '—';
@@ -4318,12 +4315,28 @@ async function addServicio() {
     : clienteSelect;
   const peajesVal = document.getElementById('srv_peajes')?.value || uiState.srvForm?.peajes || '';
   const peajes = parseInt(peajesVal);
-  // Validaciones obligatorias
-  if (!fechaRaw) { alert('⚠️ Debes ingresar la fecha del servicio.'); return; }
-  if (!conductor) { alert('⚠️ Debes seleccionar un conductor.'); return; }
-  if (!patente) { alert('⚠️ Debes seleccionar una patente.'); return; }
-  if (!cliente) { alert('⚠️ Debes seleccionar un cliente.'); return; }
-  if (peajes === undefined || peajes === null || isNaN(peajes)) { alert('⚠️ Ingresa los peajes — escribe 0 si no hay.'); return; }
+  // Origen
+  const origenSel = uiState.srvForm?.origen || 'Casablanca';
+  const origen = origenSel === 'manual'
+    ? (document.getElementById('srv_origen_manual')?.value.trim() || uiState.srvForm?.origenManual || '')
+    : origenSel;
+  // Guías
+  const guiasRaw = uiState.srv_guias || [];
+  // Validaciones en orden
+  const markRed = id => { const el=document.getElementById(id); if(el){el.style.border='2px solid #C62828';} };
+  if (!fechaRaw) { alert('⚠️ Ingresa la fecha del servicio.'); return; }
+  if (!conductor) { alert('⚠️ Selecciona un conductor.'); return; }
+  if (!patente) { alert('⚠️ Selecciona una patente.'); return; }
+  if (!tipoEquipo) { alert('⚠️ Selecciona el tipo de equipo.'); return; }
+  if (!cliente) { alert('⚠️ Selecciona un cliente.'); return; }
+  if (!origen) { alert('⚠️ Ingresa el origen del servicio.'); return; }
+  for (let i=0; i<guiasRaw.length; i++) {
+    const g = guiasRaw[i];
+    if (!g.num) { markRed(`srv_guia_num_${i}`); alert(`⚠️ La guía N°${i+1} necesita número.`); return; }
+    if (!g.destino) { markRed(`srv_guia_dest_${i}`); alert(`⚠️ La guía N°${i+1} necesita destino.`); return; }
+    if (!g.fecha_guia) { markRed(`srv_guia_fg_${i}`); alert(`⚠️ La guía N°${i+1} necesita fecha.`); return; }
+  }
+  if (isNaN(peajes)) { alert('⚠️ Ingresa los peajes.\nSi no hubo, escribe 0.'); return; }
   if (!appData.servicios) appData.servicios = [];
   const hoy = new Date();
   const fechaFinal = fecha || `${String(hoy.getDate()).padStart(2,'0')}-${String(hoy.getMonth()+1).padStart(2,'0')}-${hoy.getFullYear()}`;
@@ -4331,20 +4344,21 @@ async function addServicio() {
   const anio = partesFecha[2] || hoy.getFullYear().toString();
   const mes = partesFecha[1] || String(hoy.getMonth()+1).padStart(2,'0');
   const id = generarIdServicio(appData.servicios, fechaFinal);
-  const puntos = (uiState.srv_puntos || []).filter(p => p.guia||p.origen||p.destino);
-  const origen = puntos.length ? puntos[0].origen : '';
-  const guias = puntos.length
-    ? puntos.map(p => ({ num: p.guia, destino: p.destino, fecha_descarga: p.fecha_descarga, origen: p.origen, tipo: p.tipo, fecha_guia: p.fecha_guia, kg: p.kg||'', imagen_url: p.imagen_url||'' }))
-    : [{ num:'', destino:'', fecha_descarga:'' }];
-  const tag = '';
-  const km = 0;
-  const viaticos = 0;
-  const numPuntos = parseInt(document.getElementById('srv_num_puntos')?.value||uiState.srvForm?.numPuntos||'1')||1;
-  const estadia = document.getElementById('srv_estadia')?.value||uiState.srvForm?.estadia||'no';
-  const estadiaDias = parseInt(document.getElementById('srv_estadia_dias')?.value||uiState.srvForm?.estadiaDias||'1')||1;
-  const servicio = { id, fecha: fechaFinal, anio, mes, patente, conductor, tipoEquipo, cliente, precio: 0, petroleo: 0, adicional: 0, liquidado: false, origen: 'Casablanca', tag, km, viaticos, peajes, guias, puntos, numPuntos, estadia, estadiaDias };
+  const guias = guiasRaw.filter(g => g.num || g.destino).map(g => ({
+    num: g.num || '', guia: g.num || '',
+    destino: g.destino || '', fecha_guia: g.fecha_guia || '',
+    fecha_descarga: g.fecha_descarga || '', kg: g.kg || '', imagen_url: g.imagen_url || ''
+  }));
+  const numPuntos = parseInt(uiState.srvForm?.numPuntos)||1;
+  const estadia = uiState.srvForm?.estadia || 'no';
+  const estadiaDias = parseInt(uiState.srvForm?.estadiaDias)||1;
+  const servicio = {
+    id, fecha: fechaFinal, anio, mes, patente, conductor, tipoEquipo, cliente,
+    origen, guias, puntos: guias, numPuntos, estadia, estadiaDias,
+    peajes: parseInt(peajes)||0, precio: 0, petroleo: 0, adicional: 0,
+    viaticos: 0, km: 0, tag: '', oc: '', liquidado: false, cerrado: false, estado: 'activo'
+  };
   appData.servicios.push(servicio);
-  // Registrar para deshacer
   registrarAccion(`Registrar servicio ${id} — ${cliente}`, () => {
     const i = appData.servicios.findIndex(s=>s.id===id);
     if (i!==-1) {
@@ -4356,13 +4370,10 @@ async function addServicio() {
     if (!appData.conductores) appData.conductores = [];
     appData.conductores.push(conductor);
   }
-  // Limpiar formulario completo
-  uiState.srv_guias = [{ num:'', destino:'', fecha_descarga:'' }];
-  uiState.srv_puntos = [{ origen:'', destino:'', tipo:'descarga', guia:'', fecha_guia:'', fecha_descarga:'', kg:'', imagen_url:'' }];
+  uiState.srv_guias = [{ num:'', destino:'', fecha_guia:'', fecha_descarga:'', kg:'', imagen_url:'' }];
   uiState.srvForm = {};
   saveData();
   render();
-  // Sincronizar con Supabase inmediatamente
   if (supaConectado && supa) {
     try {
       const { error } = await supa.from('servicios').upsert(servicioToRow(servicio), {onConflict:'id'});
@@ -5308,6 +5319,7 @@ async function syncServiciosDesdeSupabase() {
         margen: r.margen||0, rendimiento: r.rendimiento||0,
         tag: r.tag||'', liquidacionId: r.liquidacion_id||'',
         cerrado: r.cerrado||false, estado: r.estado||'activo',
+        numPuntos: r.num_puntos||1, estadia: r.estadia||'no', estadiaDias: r.estadia_dias||1,
         cfProrrateado: r.cf_prorrateado||50800,
         comisionConductor: r.comision_conductor||0,
       }));
