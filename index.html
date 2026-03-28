@@ -5,11 +5,11 @@
   <meta http-equiv="cache-control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="pragma" content="no-cache">
   <meta http-equiv="expires" content="0">
-  <meta name="version" content="1774656299">
+  <meta name="version" content="1774656696">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <script>
 (function() {
-  var VERSION = '1774656299';
+  var VERSION = '1774656696';
   var stored = localStorage.getItem('gs_app_version');
   if (stored !== VERSION) {
     var session = localStorage.getItem('gs_session');
@@ -751,31 +751,41 @@ function renderRendimientoComb() {
     <button onclick="crearRegistroRC()" style="width:100%;padding:10px;background:#0B2545;color:white;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer">⛽ Registrar carga</button>
   </div>`;
 
-  // ── SECCIÓN 2: TURNOS ABIERTOS ──
-  const sec2 = abiertos.length ? `<div style="margin-bottom:10px">
-    <div style="font-size:9px;font-weight:800;color:#E65100;letter-spacing:0.5px;margin-bottom:8px">● TURNOS ABIERTOS (${abiertos.length})</div>
-    ${abiertos.map(r=>{
-      const idx = appData.rendimientoComb.indexOf(r);
-      return `<div style="background:#FFF8E1;border:1px solid #FFCC80;border-left:4px solid #E65100;border-radius:10px;padding:10px 12px;margin-bottom:8px">
-        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">
-          <div>
-            <div style="font-size:13px;font-weight:800;color:#E65100">${r.patente}</div>
-            <div style="font-size:10px;color:#555">${r.conductor||'—'}</div>
-          </div>
-          <div style="text-align:right">
-            <div style="font-size:10px;color:#777">${r.fecha}</div>
-            <div style="font-size:11px;font-weight:700;color:#0B2545">${r.litros}L cargados</div>
-          </div>
-        </div>
-        <div style="font-size:9px;font-weight:700;color:#888;margin-bottom:4px">DÍA 2 — KM RECORRIDOS</div>
-        <input id="rc_km_${idx}" type="number" placeholder="ej: 320" style="${inp};border-color:#FFCC80;margin-bottom:8px">
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
-          <button onclick="cerrarTurnoRC(${idx})" style="padding:9px;background:#E65100;color:white;border:none;border-radius:7px;font-size:11px;font-weight:700;cursor:pointer">✓ Cerrar turno</button>
-          <button onclick="eliminarTurnoRC(${idx})" style="padding:9px;background:#FFEBEE;color:#C62828;border:1px solid #EF9A9A;border-radius:7px;font-size:11px;font-weight:700;cursor:pointer">✕ Eliminar</button>
-        </div>
-      </div>`;
-    }).join('')}
-  </div>` : '';
+  // ── SECCIÓN 2: TURNOS ABIERTOS (siempre visible) ──
+  const sec2 = `<div style="margin-bottom:10px">
+    <div style="font-size:9px;font-weight:800;color:#E65100;letter-spacing:0.5px;margin-bottom:8px;display:flex;align-items:center;gap:6px">
+      <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#E65100"></span>
+      TURNOS ABIERTOS${abiertos.length ? ' ('+abiertos.length+')' : ''}
+    </div>
+    ${abiertos.length === 0
+      ? `<div style="background:#FFF8E1;border:1px dashed #FFCC80;border-radius:10px;padding:16px;text-align:center;color:#888;font-size:11px">
+          Sin turnos abiertos — registra una carga arriba para comenzar
+        </div>`
+      : abiertos.map(r => {
+          const idx = appData.rendimientoComb.indexOf(r);
+          return `<div style="background:#FFF8E1;border:1px solid #FFCC80;border-left:4px solid #E65100;border-radius:10px;padding:12px;margin-bottom:8px">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px">
+              <div>
+                <div style="font-size:14px;font-weight:900;color:#E65100">${r.patente}</div>
+                <div style="font-size:11px;color:#555;margin-top:2px">👤 ${r.conductor||'—'}</div>
+              </div>
+              <div style="text-align:right">
+                <div style="font-size:10px;color:#777">Carga: ${r.fecha}</div>
+                <div style="font-size:12px;font-weight:800;color:#0B2545;margin-top:2px">⛽ ${r.litros}L</div>
+              </div>
+            </div>
+            <div style="background:white;border-radius:7px;padding:10px;border:1px solid #FFE082;margin-bottom:8px">
+              <div style="font-size:9px;font-weight:800;color:#E65100;margin-bottom:6px">DÍA 2 — INGRESAR KM RECORRIDOS</div>
+              <input id="rc_km_${idx}" type="number" placeholder="ej: 320" style="${inp};border-color:#FFCC80">
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+              <button onclick="cerrarTurnoRC(${idx})" style="padding:10px;background:#E65100;color:white;border:none;border-radius:7px;font-size:11px;font-weight:700;cursor:pointer">✓ Cerrar turno</button>
+              <button onclick="eliminarTurnoRC(${idx})" style="padding:10px;background:#FFEBEE;color:#C62828;border:1px solid #EF9A9A;border-radius:7px;font-size:11px;font-weight:700;cursor:pointer">✕ Eliminar</button>
+            </div>
+          </div>`;
+        }).join('')
+    }
+  </div>`;
 
   // ── SECCIÓN 3: HISTORIAL ──
   const mostrarHist = uiState.rcMostrarHist;
