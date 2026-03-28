@@ -4155,20 +4155,19 @@ function updPunto(pi, campo, valor) {
   uiState.srv_puntos[pi][campo] = valor;
 }
 
-async function subirImagenGuia(event, pi) {
+async function subirImagenGuia(event, gi) {
   const file = event.target.files[0];
   if (!file) return;
   if (!supaConectado || !supa) { alert('Sin conexión a Supabase'); return; }
   try {
     showToastGeneral('⏳ Subiendo imagen...', '#1565C0');
     const ext = file.name.split('.').pop();
-    const nombre = `guia_${Date.now()}_${pi}.${ext}`;
-    const { data, error } = await supa.storage.from('guias').upload(nombre, file, { upsert: true });
+    const nombre = `guia_${Date.now()}_${gi}.${ext}`;
+    const { error } = await supa.storage.from('guias').upload(nombre, file, { upsert: true });
     if (error) { showToastGeneral('❌ Error al subir imagen', '#C62828'); return; }
     const { data: urlData } = supa.storage.from('guias').getPublicUrl(nombre);
-    if (!uiState.srv_puntos) return;
-    if (!uiState.srv_puntos[pi].imagenes) uiState.srv_puntos[pi].imagenes = [];
-    uiState.srv_puntos[pi].imagenes.push(urlData.publicUrl);
+    if (!uiState.srv_guias) return;
+    uiState.srv_guias[gi].imagen_url = urlData.publicUrl;
     showToastGeneral('✅ Imagen subida', '#2E7D32');
     render();
   } catch(e) { showToastGeneral('❌ Error: ' + e.message, '#C62828'); }
@@ -4191,8 +4190,8 @@ function eliminarImagenGuia(pi, ii) {
 }
 
 function addGuia() {
-  if (!uiState.srv_guias) uiState.srv_guias = [{ num:'', destino:'', fecha_descarga:'' }];
-  uiState.srv_guias.push({ num:'', destino:'', fecha_descarga:'' });
+  if (!uiState.srv_guias) uiState.srv_guias = [];
+  uiState.srv_guias.push({ num:'', destino:'', fecha_guia:'', fecha_descarga:'', kg:'', imagen_url:'' });
   render();
 }
 function delGuia(gi) {
@@ -4218,8 +4217,90 @@ function toggleConductorTercero() {
 }
 
 function updGuia(gi, campo, valor) {
-  if (!uiState.srv_guias) uiState.srv_guias = [{ num:'', destino:'', fecha_descarga:'' }];
+  if (!uiState.srv_guias) uiState.srv_guias = [{ num:'', destino:'', fecha_guia:'', fecha_descarga:'', kg:'', imagen_url:'' }];
   uiState.srv_guias[gi][campo] = valor;
+}
+
+function buildGuiasRegistroHTML() {
+  if (!uiState.srvForm) uiState.srvForm = {};
+  const sf = uiState.srvForm;
+  if (!uiState.srv_guias || !uiState.srv_guias.length) {
+    uiState.srv_guias = [{ num:'', destino:'', fecha_guia:'', fecha_descarga:'', kg:'', imagen_url:'' }];
+  }
+  const guias = uiState.srv_guias;
+  const sfOrigen = sf.origen || 'Casablanca';
+  const sfOrigenManual = sf.origenManual || '';
+  const sfNumPuntos = parseInt(sf.numPuntos)||1;
+  const sfEstadia = sf.estadia || 'no';
+  const sfEstadiaDias = parseInt(sf.estadiaDias)||1;
+  const pill = (active, label, onclick, color) =>
+    `<button onclick="${onclick}" style="padding:12px 18px;border:2px solid ${active?(color||'#455A64'):'#dde'};background:${active?(color||'#455A64'):'white'};color:${active?'white':(color||'#455A64')};border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;-webkit-tap-highlight-color:transparent;touch-action:manipulation">${label}</button>`;
+  const guiasHTML = guias.map((g,gi) => `
+    <div style="background:white;border:1px solid #CFD8DC;border-radius:8px;padding:12px;margin-bottom:8px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+        <span style="font-size:10px;font-weight:800;color:#455A64;letter-spacing:1px">GUÍA N°${gi+1}</span>
+        ${guias.length>1?`<button onclick="delGuia(${gi})" style="background:#FFEBEE;color:#C62828;border:1px solid #FFCDD2;border-radius:6px;padding:4px 10px;font-size:11px;cursor:pointer;font-weight:700">× eliminar</button>`:''}
+      </div>
+      <div style="display:grid;gap:8px">
+        <div>
+          <div style="font-size:9px;font-weight:700;color:#888;margin-bottom:4px">N° GUÍA <span style="color:#C62828">*</span></div>
+          <input id="srv_guia_num_${gi}" value="${g.num||''}" oninput="updGuia(${gi},'num',this.value)" placeholder="ej: 16263" style="width:100%;border:1px solid #dde;border-radius:8px;padding:12px;font-size:14px;outline:none;font-family:inherit">
+        </div>
+        <div>
+          <div style="font-size:9px;font-weight:700;color:#888;margin-bottom:4px">DESTINO <span style="color:#C62828">*</span></div>
+          <input id="srv_guia_dest_${gi}" value="${g.destino||''}" oninput="updGuia(${gi},'destino',this.value)" placeholder="ej: Marchigue" style="width:100%;border:1px solid #dde;border-radius:8px;padding:12px;font-size:14px;outline:none;font-family:inherit">
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+          <div>
+            <div style="font-size:9px;font-weight:700;color:#888;margin-bottom:4px">FECHA GUÍA <span style="color:#C62828">*</span></div>
+            <input id="srv_guia_fg_${gi}" value="${g.fecha_guia||''}" onchange="updGuia(${gi},'fecha_guia',this.value)" type="date" style="width:100%;border:1px solid #dde;border-radius:8px;padding:10px 8px;font-size:12px;outline:none;font-family:inherit">
+          </div>
+          <div>
+            <div style="font-size:9px;font-weight:700;color:#888;margin-bottom:4px">FECHA DESCARGA</div>
+            <input value="${g.fecha_descarga||''}" onchange="updGuia(${gi},'fecha_descarga',this.value)" type="date" style="width:100%;border:1px solid #dde;border-radius:8px;padding:10px 8px;font-size:12px;outline:none;font-family:inherit">
+          </div>
+        </div>
+        <div>
+          <div style="font-size:9px;font-weight:700;color:#888;margin-bottom:4px">KG TRASLADADOS</div>
+          <input value="${g.kg||''}" oninput="updGuia(${gi},'kg',this.value)" type="number" placeholder="ej: 20000" style="width:100%;border:1px solid #dde;border-radius:8px;padding:12px;font-size:14px;outline:none;font-family:inherit">
+        </div>
+        <div>
+          <div style="font-size:9px;font-weight:700;color:#888;margin-bottom:6px">📎 IMAGEN GUÍA DE DESPACHO</div>
+          ${g.imagen_url
+            ? `<div style="position:relative"><img src="${g.imagen_url}" style="width:100%;max-height:160px;object-fit:cover;border-radius:8px;border:1px solid #dde" onclick="verImagenGuia('${g.imagen_url}')"><button onclick="updGuia(${gi},'imagen_url','');render()" style="position:absolute;top:6px;right:6px;background:rgba(0,0,0,0.55);color:white;border:none;border-radius:50%;width:28px;height:28px;font-size:14px;cursor:pointer">×</button></div>`
+            : `<div style="display:flex;gap:8px"><label style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;background:#f8f9fa;border:1px dashed #ccc;border-radius:8px;padding:14px 6px;cursor:pointer;font-size:11px;color:#607D8B;text-align:center">📷<span>Tomar foto</span><input type="file" accept="image/*" capture="environment" onchange="subirImagenGuia(event,${gi})" style="display:none"></label><label style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;background:#f8f9fa;border:1px dashed #ccc;border-radius:8px;padding:14px 6px;cursor:pointer;font-size:11px;color:#607D8B;text-align:center">🖼️<span>Biblioteca</span><input type="file" accept="image/*" onchange="subirImagenGuia(event,${gi})" style="display:none"></label></div>`}
+        </div>
+      </div>
+    </div>`).join('');
+  return `
+    <div style="margin-bottom:12px;padding-bottom:12px;border-bottom:2px solid #CFD8DC">
+      <div style="font-size:10px;font-weight:800;color:#455A64;letter-spacing:1px;margin-bottom:8px">ORIGEN</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap">
+        ${pill(sfOrigen==='Casablanca','Casablanca',"if(!uiState.srvForm)uiState.srvForm={};uiState.srvForm.origen='Casablanca';render()")}
+        ${pill(sfOrigen==='Coltauco','Coltauco',"if(!uiState.srvForm)uiState.srvForm={};uiState.srvForm.origen='Coltauco';render()")}
+        ${pill(sfOrigen==='manual','Otro...',"if(!uiState.srvForm)uiState.srvForm={};uiState.srvForm.origen='manual';render()")}
+      </div>
+      ${sfOrigen==='manual'?`<input id="srv_origen_manual" value="${sfOrigenManual}" oninput="if(!uiState.srvForm)uiState.srvForm={};uiState.srvForm.origenManual=this.value" placeholder="Ingresar origen..." style="margin-top:8px;width:100%;border:2px solid #455A64;border-radius:8px;padding:12px;font-size:13px;outline:none;font-family:inherit">`:''}
+    </div>
+    <div style="background:#F8F9FA;border-radius:10px;padding:12px;margin-bottom:12px">
+      <div style="font-size:10px;font-weight:800;color:#455A64;letter-spacing:1px;margin-bottom:4px">GUÍAS DE DESPACHO</div>
+      <div style="font-size:10px;color:#888;margin-bottom:10px">Agrega cada guía por separado</div>
+      ${guiasHTML}
+      <button onclick="addGuia()" style="width:100%;background:white;color:#455A64;border:2px dashed #90A4AE;border-radius:8px;padding:12px;font-size:12px;cursor:pointer;font-weight:700;-webkit-tap-highlight-color:transparent">+ Agregar otra guía</button>
+    </div>
+    <div style="margin-bottom:12px;padding-bottom:12px;border-bottom:2px solid #CFD8DC">
+      <div style="font-size:10px;font-weight:800;color:#455A64;letter-spacing:1px;margin-bottom:6px">PUNTOS DE DESCARGA</div>
+      <div style="font-size:10px;color:#888;margin-bottom:8px">¿Cuántos puntos de entrega tiene este servicio?</div>
+      <div style="display:flex;gap:6px">${[1,2,3,4,5].map(n=>pill(sfNumPuntos===n,String(n),`if(!uiState.srvForm)uiState.srvForm={};uiState.srvForm.numPuntos=${n};render()`)).join('')}</div>
+    </div>
+    <div style="margin-bottom:12px;padding-bottom:12px;border-bottom:2px solid #CFD8DC">
+      <div style="font-size:10px;font-weight:800;color:#455A64;letter-spacing:1px;margin-bottom:6px">¿HUBO ESTADÍA?</div>
+      <div style="display:flex;gap:8px;margin-bottom:${sfEstadia==='si'?'10px':'0'}">
+        ${pill(sfEstadia==='no','NO',"if(!uiState.srvForm)uiState.srvForm={};uiState.srvForm.estadia='no';render()")}
+        ${pill(sfEstadia==='si','SÍ',"if(!uiState.srvForm)uiState.srvForm={};uiState.srvForm.estadia='si';render()",'#2E7D32')}
+      </div>
+      ${sfEstadia==='si'?`<div style="font-size:9px;font-weight:700;color:#888;margin-bottom:6px">DÍAS DE ESTADÍA</div><div style="display:flex;gap:6px">${[1,2,3,4,5].map(n=>pill(sfEstadiaDias===n,String(n),`if(!uiState.srvForm)uiState.srvForm={};uiState.srvForm.estadiaDias=${n};render()`,'#2E7D32')).join('')}</div>`:''}
+    </div>`;
 }
 
 async function addServicio() {
@@ -4779,9 +4860,7 @@ function renderFase(fase) {
           </div>
         </div>
 
-        <!-- GUÍAS DE DESPACHO -->
-        <div style="font-size:10px;font-weight:800;color:#455A64;letter-spacing:1px;margin-bottom:8px;padding-bottom:5px;border-bottom:2px solid #CFD8DC">GUÍAS DE DESPACHO</div>
-        ${puntosHTML}
+        ${buildGuiasRegistroHTML()}
 
         <!-- PEAJES -->
         <div style="margin-bottom:12px">
@@ -4839,8 +4918,7 @@ function renderFase(fase) {
           const conductoresLista=appData.conductores;
           const patentesLista=appData.patentes||['WR9192','GKFD84','XR8555','GCFF12','BPBL35','XA1114','DSDV36'];
           const conductorPresel=(sessionRol&&sessionRol.acceso==='conductor'&&sessionConductor)?sessionConductor:'';
-          if(!uiState.srv_puntos||!uiState.srv_puntos.length){uiState.srv_puntos=[{origen:'Casablanca',destino:'',guia:'',fecha_guia:'',fecha_descarga:'',kg:'',imagenes:[],puntosDescarga:1}];}
-          const puntos=uiState.srv_puntos;
+          if(!uiState.srv_guias||!uiState.srv_guias.length){uiState.srv_guias=[{num:'',destino:'',fecha_guia:'',fecha_descarga:'',kg:'',imagen_url:''}];}
           if(!uiState.srvForm)uiState.srvForm={};
           const sf=uiState.srvForm;
           const sfFecha=sf.fecha||hoyISO;
@@ -4853,41 +4931,6 @@ function renderFase(fase) {
           const sfPeajes=sf.peajes||'';
           const mostrarPatenteManual=sfPatente==='__tercero__';
           const mostrarClienteNuevo=sfCliente==='__nuevo__';
-          const ORIGENES_SRV = appData.origenes || ['Casablanca', 'Coltauco'];
-          const puntosHTML=puntos.map((p,pi)=>`<div style="background:white;border:1px solid #CFD8DC;border-radius:8px;padding:10px;margin-bottom:8px">
-  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-    <span style="font-size:10px;font-weight:800;color:#455A64;letter-spacing:1px">GUÍA ${pi+1}</span>
-    ${puntos.length>1?`<span onclick="delPunto(${pi})" style="color:#bbb;cursor:pointer;font-size:16px">×</span>`:''}
-  </div>
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:5px">
-    <div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">ORIGEN</div>
-      <select onchange="updPunto(${pi},'origen',this.value)" style="width:100%;border:1px solid #dde;border-radius:5px;padding:6px 8px;font-size:12px;outline:none;font-family:inherit;background:white;-webkit-appearance:auto">
-        ${ORIGENES_SRV.map(o=>`<option value="${o}" ${p.origen===o?'selected':''}>${o}</option>`).join('')}
-      </select></div>
-    <div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">DESTINO FINAL</div>
-      <input value="${p.destino}" onchange="updPunto(${pi},'destino',this.value)" placeholder="ej: Marchigue" style="width:100%;border:1px solid #dde;border-radius:5px;padding:6px 8px;font-size:12px;outline:none;font-family:inherit"></div>
-    <div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">N° GUÍA</div>
-      <input value="${p.guia}" onchange="updPunto(${pi},'guia',this.value)" placeholder="ej: 123456" style="width:100%;border:1px solid #dde;border-radius:5px;padding:6px 8px;font-size:12px;outline:none;font-family:inherit"></div>
-    <div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">FECHA GUÍA</div>
-      <input value="${p.fecha_guia}" onchange="updPunto(${pi},'fecha_guia',this.value)" type="date" style="width:100%;border:1px solid #dde;border-radius:5px;padding:6px 8px;font-size:12px;outline:none;font-family:inherit"></div>
-    <div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">FECHA DESCARGA</div>
-      <input value="${p.fecha_descarga}" onchange="updPunto(${pi},'fecha_descarga',this.value)" type="date" style="width:100%;border:1px solid #dde;border-radius:5px;padding:6px 8px;font-size:12px;outline:none;font-family:inherit"></div>
-    <div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">KG CARGADOS</div>
-      <input value="${p.kg||''}" onchange="updPunto(${pi},'kg',this.value)" type="number" placeholder="ej: 20000" style="width:100%;border:1px solid #dde;border-radius:5px;padding:6px 8px;font-size:12px;outline:none;font-family:inherit"></div>
-    <div style="grid-column:1/-1"><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">PUNTOS DE DESCARGA</div>
-      <select onchange="updPunto(${pi},'puntosDescarga',parseInt(this.value))" style="width:100%;border:1px solid #dde;border-radius:5px;padding:6px 8px;font-size:12px;outline:none;font-family:inherit;background:white;-webkit-appearance:auto">
-        ${[1,2,3,4,5,6].map(n=>`<option value="${n}" ${(p.puntosDescarga||1)===n?'selected':''}>${n} punto${n>1?'s':''}</option>`).join('')}
-      </select></div>
-    <div style="grid-column:1/-1">
-      <div style="font-size:9px;font-weight:700;color:#888;margin-bottom:4px">📎 IMÁGENES GUÍAS</div>
-      ${(p.imagenes&&p.imagenes.length)?`<div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:6px">${p.imagenes.map((img,ii)=>`<div style="position:relative"><img src="${img}" style="width:64px;height:64px;object-fit:cover;border-radius:6px;border:1px solid #dde" onclick="verImagenGuia('${img}')"><span onclick="eliminarImagenGuia(${pi},${ii})" style="position:absolute;top:-4px;right:-4px;background:#C62828;color:white;border-radius:50%;width:16px;height:16px;font-size:10px;display:flex;align-items:center;justify-content:center;cursor:pointer;font-weight:700">×</span></div>`).join('')}</div>`:''}
-      <label style="display:flex;align-items:center;gap:6px;background:#f8f9fa;border:1px dashed #ccc;border-radius:6px;padding:8px 10px;cursor:pointer;font-size:11px;color:#607D8B">
-        📷 ${(p.imagenes&&p.imagenes.length)?'Agregar otra imagen':'Toca para adjuntar imagen'}
-        <input type="file" accept="image/*" capture="environment" onchange="subirImagenGuia(event,${pi})" style="display:none">
-      </label>
-    </div>
-  </div>
-</div>`).join('');
           const conductoresOpts=conductoresLista.map(cn=>'<option value="'+cn+'" '+(cn===sfConductor?'selected':'')+'>'+cn+'</option>').join('');
           const hoyMes=(()=>{const h=new Date();return String(h.getMonth()+1).padStart(2,'0');})();
           const hoyAnio=new Date().getFullYear().toString();
@@ -4912,8 +4955,7 @@ function renderFase(fase) {
             +'<div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">PATENTE</div><select id="srv_patente" onchange="if(!uiState.srvForm)uiState.srvForm={};uiState.srvForm.patente=this.value;togglePatenteTercero()" style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit;background:white;-webkit-appearance:auto"><option value="">Seleccionar...</option>'+patentesLista.filter(p=>p!=='TERCERO').map(p=>'<option value="'+p+'" '+(p===sfPatente?'selected':'')+'>'+p+'</option>').join('')+'<option value="__tercero__" '+(sfPatente==='__tercero__'?'selected':'')+'>Tercero</option></select><input id="srv_patente_manual" value="'+sfPatenteManual+'" placeholder="Ingresar patente..." oninput="if(!uiState.srvForm)uiState.srvForm={};uiState.srvForm.patenteManual=this.value.toUpperCase()" style="display:'+(mostrarPatenteManual?'block':'none')+';margin-top:4px;width:100%;border:1px solid #FFA726;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit;text-transform:uppercase"><div style="margin-top:3px"><span onclick="mostrarAgregarPatente()" style="font-size:10px;color:#607D8B;cursor:pointer;text-decoration:underline">+ Agregar nueva</span></div></div>'
             +'<div style="grid-column:1/-1"><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">TIPO DE EQUIPO</div><select id="srv_tipo_equipo" onchange="if(!uiState.srvForm)uiState.srvForm={};uiState.srvForm.tipoEquipo=this.value" style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit;background:white;-webkit-appearance:auto"><option value="">Seleccionar...</option>'+['Camion solo','Camion con carro','Rampla','Camion 3/4','Camioneta'].map(t=>'<option value="'+t+'" '+(sfTipoEquipo===t?'selected':'')+'>'+t+'</option>').join('')+'</select></div></div>'
             +'<div style="margin-bottom:8px"><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">CLIENTE</div><select id="srv_cliente" onchange="if(!uiState.srvForm)uiState.srvForm={};uiState.srvForm.cliente=this.value;toggleClienteNuevo(this.value)" style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit;background:white;-webkit-appearance:auto"><option value="">Seleccionar cliente...</option>'+clientesActivos.map(cl=>'<option value="'+cl+'" '+(sfCliente===cl?'selected':'')+'>'+cl+'</option>').join('')+'<option value="__nuevo__" '+(sfCliente==='__nuevo__'?'selected':'')+'>+ Cliente no está en la lista...</option></select><div id="srv_cliente_nuevo_box" style="display:'+(mostrarClienteNuevo?'block':'none')+';margin-top:5px"><input id="srv_cliente_nuevo" value="'+sfClienteNuevo+'" placeholder="Escribir nombre del cliente" oninput="if(!uiState.srvForm)uiState.srvForm={};uiState.srvForm.clienteNuevo=this.value" style="width:100%;border:1px solid #FFE082;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit;background:#FFFDE7"><div style="font-size:9px;color:#F9A825;margin-top:3px">Quedará pendiente de agregar al pipeline.</div></div></div>'
-            +'<div style="font-size:10px;font-weight:800;color:#455A64;letter-spacing:1px;margin-bottom:8px;padding-bottom:5px;border-bottom:2px solid #CFD8DC">GUÍAS DE DESPACHO</div>'
-            +puntosHTML
+            +buildGuiasRegistroHTML()
             +'<div style="margin-bottom:12px"><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">PEAJES ($)</div><input id="srv_peajes" type="number" value="'+sfPeajes+'" placeholder="ej: 8000" oninput="if(!uiState.srvForm)uiState.srvForm={};uiState.srvForm.peajes=this.value" style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit"></div>'
             +'<button onclick="addServicio()" style="width:100%;background:#455A64;color:white;border:none;border-radius:8px;padding:16px;font-size:15px;cursor:pointer;font-weight:700;min-height:54px;-webkit-tap-highlight-color:transparent;touch-action:manipulation">+ Registrar servicio</button>'
             +(serviciosPendientes.length?'<div style="margin-top:12px"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px"><div style="font-size:10px;font-weight:700;color:#607D8B;letter-spacing:1px">SERVICIOS PENDIENTES DE CERRAR ('+serviciosPendientes.length+')</div><span onclick="uiState.srv_ver_todos=!uiState.srv_ver_todos;render()" style="font-size:9px;color:#1565C0;cursor:pointer;text-decoration:underline">'+(verTodos?'Ver mes actual':'Ver todos')+'</span></div>'+lista+'</div>':'<div style="margin-top:6px">'+lista+'</div>')
