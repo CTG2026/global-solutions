@@ -5,11 +5,11 @@
   <meta http-equiv="cache-control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="pragma" content="no-cache">
   <meta http-equiv="expires" content="0">
-  <meta name="version" content="1774740000">
+  <meta name="version" content="1774750000">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <script>
 (function() {
-  var VERSION = '1774740000';
+  var VERSION = '1774750000';
   var stored = localStorage.getItem('gs_app_version');
   if (stored !== VERSION) {
     var session = localStorage.getItem('gs_session');
@@ -5302,7 +5302,31 @@ async function syncServiciosDesdeSupabase() {
   try {
     const { data, error } = await supa.from('servicios').select('*').order('created_at');
     if (error) { console.warn('Error sync servicios:', error); return; }
-    // Supabase manda siempre — nunca subir locales, si está vacío queda vacío
+
+    // ─── RESCATE: subir servicios locales que no están en Supabase ───────────
+    // Antes de sobreescribir, detectar servicios guardados localmente pero no sincronizados
+    const localServicios = appData.servicios || [];
+    const remoteIds = new Set((data || []).map(r => r.id));
+    const pendientesDeSubir = localServicios.filter(s => s.id && !remoteIds.has(s.id));
+    if (pendientesDeSubir.length > 0) {
+      console.log(`Subiendo ${pendientesDeSubir.length} servicio(s) local(es) pendientes a Supabase...`);
+      for (const s of pendientesDeSubir) {
+        try { await supa.from('servicios').upsert(servicioToRow(s), {onConflict:'id'}); }
+        catch(e) { console.warn('Error subiendo servicio pendiente:', s.id, e); }
+      }
+      // Re-fetch para incluir los recién subidos
+      const { data: data2, error: err2 } = await supa.from('servicios').select('*').order('created_at');
+      if (!err2 && data2) {
+        return _procesarRemotosServicios(data2);
+      }
+    }
+    // ─────────────────────────────────────────────────────────────────────────
+
+    _procesarRemotosServicios(data || []);
+  } catch(e) { console.warn('Error sync servicios:', e); }
+}
+
+function _procesarRemotosServicios(data) {
     appData.servicios = [];
     if (data && data.length > 0) {
       const remotos = data.map(r => ({
@@ -5326,7 +5350,6 @@ async function syncServiciosDesdeSupabase() {
       appData.servicios = remotos;
     }
     saveData(); render();
-  } catch(e) { console.warn('Error sync servicios:', e); }
 }
 
 async function upsertServicioSupabase(s) {
