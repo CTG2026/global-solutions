@@ -5,11 +5,11 @@
   <meta http-equiv="cache-control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="pragma" content="no-cache">
   <meta http-equiv="expires" content="0">
-  <meta name="version" content="1774700040">
+  <meta name="version" content="1774701118">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <script>
 (function() {
-  var VERSION = '1774700040';
+  var VERSION = '1774701118';
   var stored = localStorage.getItem('gs_app_version');
   if (stored !== VERSION) {
     var session = localStorage.getItem('gs_session');
@@ -798,39 +798,60 @@ function renderRendimientoComb() {
 
   // ── SECCIÓN 3: HISTORIAL ──
   const mostrarHist = uiState.rcMostrarHist;
+  const editId = uiState.rcEditId || null;
   const sec3 = cerrados.length ? `<div style="margin-bottom:10px">
     <div onclick="uiState.rcMostrarHist=!uiState.rcMostrarHist;render()" style="font-size:9px;font-weight:800;color:#455A64;letter-spacing:0.5px;margin-bottom:6px;cursor:pointer;display:flex;justify-content:space-between;align-items:center">
       <span>HISTORIAL (${cerrados.length})</span>
       <span>${mostrarHist?'▲':'▼'}</span>
     </div>
-    ${mostrarHist ? `<div style="overflow-x:auto">
-      <table style="width:100%;border-collapse:collapse;font-size:11px">
-        <thead>
-          <tr style="background:#0B2545;color:white">
-            <th style="padding:6px 8px;text-align:left;font-size:9px">Fecha</th>
-            <th style="padding:6px 8px;text-align:left;font-size:9px">Patente</th>
-            <th style="padding:6px 8px;text-align:left;font-size:9px">Conductor</th>
-            <th style="padding:6px 8px;text-align:right;font-size:9px">Litros</th>
-            <th style="padding:6px 8px;text-align:right;font-size:9px">Monto</th>
-            <th style="padding:6px 8px;text-align:right;font-size:9px">Km</th>
-            <th style="padding:6px 8px;text-align:right;font-size:9px">Km/L</th>
-            <th style="padding:6px 4px;font-size:9px"></th>
-          </tr>
-        </thead>
-        <tbody>
-          ${cerrados.map((r,i)=>`<tr style="background:${i%2?'#F4F6F8':'white'};border-bottom:1px solid #eee">
-            <td style="padding:6px 8px">${r.fecha}</td>
-            <td style="padding:6px 8px;font-weight:700">${r.patente}</td>
-            <td style="padding:6px 8px">${r.conductor||'—'}</td>
-            <td style="padding:6px 8px;text-align:right">${r.litros}L</td>
-            <td style="padding:6px 8px;text-align:right">${r.monto?'$'+r.monto.toLocaleString('es-CL'):'—'}</td>
-            <td style="padding:6px 8px;text-align:right">${r.km} km</td>
-            <td style="padding:6px 8px;text-align:right;font-weight:800;color:#2E7D32">${r.rendimiento} km/L</td>
-            <td style="padding:4px 6px"><button onclick="imprimirTurnoRC('${r.id}')" style="padding:4px 8px;background:#546E7A;color:white;border:none;border-radius:5px;font-size:10px;cursor:pointer;white-space:nowrap">🖨️ PDF</button></td>
-          </tr>`).join('')}
-        </tbody>
-      </table>
-    </div>` : ''}
+    ${mostrarHist ? cerrados.map(r => {
+      const isEdit = editId === r.id;
+      if (isEdit) {
+        return `<div style="background:#E3F2FD;border:2px solid #1565C0;border-radius:10px;padding:12px;margin-bottom:8px">
+          <div style="font-size:9px;font-weight:800;color:#1565C0;margin-bottom:10px">✏️ EDITANDO — ${r.id}</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:6px">
+            <div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:3px">FECHA</div>
+              <input id="rce_fecha" type="text" value="${r.fecha}" placeholder="DD-MM-YYYY" style="${inp}"></div>
+            <div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:3px">PATENTE</div>
+              <select id="rce_patente" style="${inp};-webkit-appearance:auto">
+                ${FLOTA.map(p=>`<option value="${p}" ${r.patente===p?'selected':''}>${p}</option>`).join('')}
+              </select></div>
+            <div style="grid-column:1/-1"><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:3px">CONDUCTOR</div>
+              <select id="rce_conductor" style="${inp};-webkit-appearance:auto">
+                <option value="">—</option>
+                ${conductores.map(c=>`<option value="${c}" ${r.conductor===c?'selected':''}>${c}</option>`).join('')}
+              </select></div>
+            <div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:3px">LITROS</div>
+              <input id="rce_litros" type="number" value="${r.litros||''}" style="${inp}"></div>
+            <div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:3px">MONTO ($)</div>
+              <input id="rce_monto" type="number" value="${r.monto||''}" style="${inp}"></div>
+            <div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:3px">KM RECORRIDOS</div>
+              <input id="rce_km" type="number" value="${r.km||''}" style="${inp}"></div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+            <button onclick="guardarEdicionRC('${r.id}')" style="padding:10px;background:#1565C0;color:white;border:none;border-radius:7px;font-size:11px;font-weight:700;cursor:pointer">💾 Guardar</button>
+            <button onclick="uiState.rcEditId=null;render()" style="padding:10px;background:#ECEFF1;color:#333;border:none;border-radius:7px;font-size:11px;font-weight:700;cursor:pointer">✕ Cancelar</button>
+          </div>
+        </div>`;
+      }
+      return `<div style="background:white;border:1px solid #dde;border-left:4px solid #2E7D32;border-radius:10px;padding:10px 12px;margin-bottom:6px">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px">
+          <div>
+            <div style="font-size:13px;font-weight:800;color:#0B2545">${r.patente}</div>
+            <div style="font-size:10px;color:#546E7A">${r.conductor||'—'} · ${r.fecha}</div>
+          </div>
+          <div style="text-align:right">
+            <div style="font-size:16px;font-weight:900;color:#2E7D32">${r.rendimiento} km/L</div>
+            <div style="font-size:9px;color:#777">${r.km} km · ${r.litros}L${r.monto?' · $'+r.monto.toLocaleString('es-CL'):''}</div>
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:5px">
+          <button onclick="uiState.rcEditId='${r.id}';uiState.rcMostrarHist=true;render()" style="padding:7px;background:#E3F2FD;color:#1565C0;border:1px solid #BBDEFB;border-radius:6px;font-size:10px;font-weight:700;cursor:pointer">✏️ Editar</button>
+          <button onclick="imprimirTurnoRC('${r.id}')" style="padding:7px;background:#546E7A;color:white;border:none;border-radius:6px;font-size:10px;font-weight:700;cursor:pointer">🖨️ PDF</button>
+          <button onclick="eliminarRegistroRC('${r.id}')" style="padding:7px;background:#FFEBEE;color:#C62828;border:1px solid #EF9A9A;border-radius:6px;font-size:10px;font-weight:700;cursor:pointer">✕ Eliminar</button>
+        </div>
+      </div>`;
+    }).join('') : ''}
   </div>` : '';
 
   // ── SECCIÓN 4: INFORMES ──
@@ -934,6 +955,37 @@ function eliminarTurnoRC(idx) {
   if (!confirm('¿Eliminar este registro?')) return;
   appData.rendimientoComb.splice(idx, 1);
   saveData(); render();
+}
+
+function eliminarRegistroRC(id) {
+  if (!confirm('¿Eliminar este registro?')) return;
+  appData.rendimientoComb = appData.rendimientoComb.filter(r=>r.id!==id);
+  saveData(); render();
+}
+
+function guardarEdicionRC(id) {
+  const r = (appData.rendimientoComb||[]).find(x=>x.id===id);
+  if (!r) return;
+  const fecha    = document.getElementById('rce_fecha')?.value||r.fecha;
+  const patente  = document.getElementById('rce_patente')?.value||r.patente;
+  const conductor= document.getElementById('rce_conductor')?.value||'';
+  const litros   = parseFloat(document.getElementById('rce_litros')?.value)||0;
+  const monto    = parseInt(document.getElementById('rce_monto')?.value)||0;
+  const km       = parseInt(document.getElementById('rce_km')?.value)||0;
+  if (!litros) return alert('Los litros no pueden ser 0');
+  r.fecha     = fecha;
+  r.patente   = patente;
+  r.conductor = conductor;
+  r.litros    = litros;
+  r.monto     = monto;
+  r.km        = km;
+  r.rendimiento = km>0 && litros>0 ? +(km/litros).toFixed(2) : 0;
+  const p = fecha.split('-');
+  if (p.length===3) { r.mes=p[1]; r.anio=p[2]; }
+  uiState.rcEditId = null;
+  saveData();
+  upsertRendimientoCombSupabase(r);
+  render();
 }
 
 function imprimirTurnoRC(id) {
