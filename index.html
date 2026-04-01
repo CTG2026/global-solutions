@@ -5,11 +5,11 @@
   <meta http-equiv="cache-control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="pragma" content="no-cache">
   <meta http-equiv="expires" content="0">
-  <meta name="version" content="1774770000">
+  <meta name="version" content="1774860000">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <script>
 (function() {
-  var VERSION = '1774770000';
+  var VERSION = '1774860000';
   var stored = localStorage.getItem('gs_app_version');
   if (stored !== VERSION) {
     var session = localStorage.getItem('gs_session');
@@ -3066,8 +3066,12 @@ function renderLiquidacionesV2() {
 
   const totalSel=seleccionados.reduce((a,id)=>{const s=servicios.find(sv=>sv.id===id);return a+(s?s.precio||0:0);},0);
   const clienteSel=uiState.liq_cliente_sel||'';
-  const rutsCliente=clienteSel?(appData.clientesRut||{})[clienteSel]||[]:[];
+  const clienteFromSel=seleccionados.length?(servicios.find(sv=>sv.id===seleccionados[0])?.cliente||''):'';
+  const clienteAutoFill=clienteFromSel||clienteSel;
+  const rutsCliente=clienteAutoFill?(appData.clientesRut||{})[clienteAutoFill]||[]:[];
+  const emailAutoFill=(appData.pipeline||[]).find(c=>c.cliente===clienteAutoFill)?.emailFactura||'';
   const rutsSel=uiState.liq_ruts_sel||[];
+  const rutsSelEfectivos=rutsSel.length?rutsSel:rutsCliente;
 
   const clientesHTML=Object.entries(porCliente).map(([cl,svcs])=>{
     const isOpen=!!uiState['liq_cl_'+cl];
@@ -3105,12 +3109,12 @@ function renderLiquidacionesV2() {
       <div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">FECHA</div>
         <input id="liq_fecha_v2" type="date" value="${hoyISO}" style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit;background:white"></div>
       <div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">EMAIL CLIENTE</div>
-        <input id="liq_email_v2" type="email" placeholder="cliente@empresa.cl" style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit;background:white"></div>
+        <input id="liq_email_v2" type="email" placeholder="cliente@empresa.cl" value="${emailAutoFill}" style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit;background:white"></div>
     </div>
     <div style="margin-bottom:8px">
       <div style="font-size:9px;font-weight:700;color:#888;margin-bottom:4px">RUT(S) CLIENTE <span style="font-weight:400;color:#bbb">(para holdings con múltiples RUT)</span></div>
       ${rutsCliente.map(rut=>`<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
-        <input type="checkbox" ${rutsSel.includes(rut)?'checked':''} onchange="toggleRutLiq('${rut}',this.checked)" style="cursor:pointer">
+        <input type="checkbox" ${rutsSelEfectivos.includes(rut)?'checked':''} onchange="toggleRutLiq('${rut}',this.checked)" style="cursor:pointer">
         <span style="font-size:11px;color:#333">${rut}</span></div>`).join('')}
       <div style="display:flex;gap:6px;margin-top:4px">
         <input id="liq_rut_nuevo" placeholder="Agregar RUT ej: 76.123.456-7" style="flex:1;border:1px solid #dde;border-radius:6px;padding:6px 9px;font-size:11px;outline:none;font-family:inherit" onkeydown="if(event.key==='Enter')agregarRutLiq()">
@@ -3772,8 +3776,8 @@ function renderEditarServicio(id) {
   const fechaISO = s.fecha?(()=>{const p=s.fecha.split('-');return p.length===3&&p[0].length===2?`${p[2]}-${p[1]}-${p[0]}`:s.fecha;})():hoyISO;
   const conductoresLista = appData.conductores||['Manuel Madrid','Felipe Vidal','Felipe Madariaga','Sebastián Zúñiga','Pablo Riquelme','Tercero'];
   const patentesLista = appData.patentes||['WR9192','GKFD84','XR8555','GCFF12','BPBL35','XA1114','DSDV36'];
-  const clientesDefault = (window.DEFAULT_DATA||{pipeline:[]}).pipeline.filter(c=>c.etapa==='activo').map(c=>c.cliente);
-  const clientesLocal = (appData.pipeline||[]).filter(c=>c.etapa==='activo').map(c=>c.cliente);
+  const clientesDefault = (window.DEFAULT_DATA||{pipeline:[]}).pipeline.map(c=>c.cliente);
+  const clientesLocal = (appData.pipeline||[]).map(c=>c.cliente);
   const clientesActivos = [...new Set([...clientesDefault,...clientesLocal])].sort();
   const puntos = uiState.edit_srv_puntos||[];
   const TIPOS_PUNTO=['carga','descarga','carga y descarga'];
@@ -4990,8 +4994,8 @@ function renderFase(fase) {
           const servicios=appData.servicios||[];
           const hoyISO=(()=>{const h=new Date();return h.getFullYear()+'-'+String(h.getMonth()+1).padStart(2,'0')+'-'+String(h.getDate()).padStart(2,'0');})();
           const nextId=generarIdServicio(servicios, null);
-          const clientesDefault=DEFAULT_DATA.pipeline.filter(c=>c.etapa==='activo').map(c=>c.cliente);
-          const clientesLocal=(appData.pipeline||[]).filter(c=>c.etapa==='activo').map(c=>c.cliente);
+          const clientesDefault=DEFAULT_DATA.pipeline.map(c=>c.cliente);
+          const clientesLocal=(appData.pipeline||[]).map(c=>c.cliente);
           const clientesActivos=[...new Set([...clientesDefault,...clientesLocal])].sort();
           const conductoresDefault=['Manuel Madrid','Felipe Vidal','Felipe Madariaga','Sebastián Zúñiga','Pablo Riquelme','Tercero'];
           if(!appData.conductores||appData.conductores.length<2){appData.conductores=conductoresDefault;saveData();}
