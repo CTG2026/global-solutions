@@ -5,11 +5,11 @@
   <meta http-equiv="cache-control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="pragma" content="no-cache">
   <meta http-equiv="expires" content="0">
-  <meta name="version" content="1774760000">
+  <meta name="version" content="1774770000">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <script>
 (function() {
-  var VERSION = '1774760000';
+  var VERSION = '1774770000';
   var stored = localStorage.getItem('gs_app_version');
   if (stored !== VERSION) {
     var session = localStorage.getItem('gs_session');
@@ -3220,6 +3220,7 @@ function renderLiquidacionesV2() {
             <button onclick="guardarObsLiq('${liq.id}')" style="padding:8px 12px;background:#607D8B;color:white;border:none;border-radius:7px;font-size:10px;font-weight:700;cursor:pointer">💾 Guardar obs.</button>
             <button onclick="descargarLiqV2('${liq.id}')" style="padding:8px 14px;background:#0B2545;color:white;border:none;border-radius:7px;font-size:10px;font-weight:700;cursor:pointer">📄 PDF</button>
             <button onclick="uiState.liq_editId=(uiState.liq_editId==='${liq.id}'?null:'${liq.id}');render()" style="padding:8px 12px;background:#FFF8E1;color:#E65100;border:1px solid #E65100;border-radius:7px;font-size:10px;font-weight:700;cursor:pointer">✎ Editar</button>
+            <button onclick="eliminarLiquidacion('${liq.id}')" style="padding:8px 12px;background:#FFEBEE;color:#C62828;border:1px solid #FFCDD2;border-radius:7px;font-size:10px;font-weight:700;cursor:pointer">× Eliminar</button>
           </div>
           ${uiState.liq_editId===liq.id?`
           <div style="background:#FFF8E1;border:1px solid #FFE082;border-radius:8px;padding:10px 12px;margin-bottom:6px">
@@ -3305,6 +3306,19 @@ function eliminarRutEditLiq(liqId, ri) {
   if (!liq || !liq.ruts) return;
   liq.ruts.splice(ri, 1);
   render();
+}
+function eliminarLiquidacion(liqId) {
+  const liq = (appData.liquidaciones||[]).find(l=>l.id===liqId);
+  if (!liq) return;
+  if (!confirm(`¿Eliminar liquidación ${liqId}?\nEsta acción no se puede deshacer.`)) return;
+  // Liberar los servicios asociados para que puedan liquidarse de nuevo
+  (liq.serviciosIds||[]).forEach(sid => {
+    const s = (appData.servicios||[]).find(sv=>sv.id===sid);
+    if (s && s.liquidacionId===liqId) { delete s.liquidacionId; upsertServicioSupabase(s); }
+  });
+  appData.liquidaciones = appData.liquidaciones.filter(l=>l.id!==liqId);
+  saveData(); pushLiquidacionesSupabase(); render();
+  showToastGeneral('🗑️ Liquidación eliminada','#C62828');
 }
 function descargarLiqV2(liqId) {
   const liq = (appData.liquidaciones||[]).find(l=>l.id===liqId);
