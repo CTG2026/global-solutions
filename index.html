@@ -5,11 +5,11 @@
   <meta http-equiv="cache-control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="pragma" content="no-cache">
   <meta http-equiv="expires" content="0">
-  <meta name="version" content="1774860000">
+  <meta name="version" content="1774870000">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <script>
 (function() {
-  var VERSION = '1774860000';
+  var VERSION = '1774870000';
   var stored = localStorage.getItem('gs_app_version');
   if (stored !== VERSION) {
     var session = localStorage.getItem('gs_session');
@@ -1738,22 +1738,26 @@ function nextFacturaId() {
 }
 
 function crearFactura() {
-  const numero   = document.getElementById('fac_numero')?.value.trim();
-  const fecha    = document.getElementById('fac_fecha')?.value;
-  const clienteV = document.getElementById('fac_cliente')?.value.trim();
-  const liqId    = document.getElementById('fac_liq')?.value.trim();
-  const monto    = parseInt(document.getElementById('fac_monto')?.value)||0;
+  const f = uiState.fac_form_data || {};
+  const numero   = (document.getElementById('fac_numero')?.value || f.numero || '').trim();
+  const fecha    = document.getElementById('fac_fecha')?.value || f.fecha || '';
+  const clienteV = (document.getElementById('fac_cliente')?.value || f.cliente || '').trim();
+  const liqId    = (document.getElementById('fac_liq')?.value || f.liq || '').trim();
+  const montoNeto = parseInt(document.getElementById('fac_monto_neto')?.value || f.monto_neto) || 0;
   if (!numero)   { alert('⚠️ Ingresa el número de factura.'); return; }
   if (!fecha)    { alert('⚠️ Ingresa la fecha de emisión.'); return; }
   if (!clienteV) { alert('⚠️ Ingresa el cliente.'); return; }
-  if (!monto)    { alert('⚠️ Ingresa el monto de la factura.'); return; }
+  if (!montoNeto){ alert('⚠️ Ingresa el monto neto de la factura.'); return; }
   if (!appData.facturas) appData.facturas = [];
   const p=fecha.split('-');
   const fechaStr=p.length===3&&p[0].length===4?`${p[2]}-${p[1]}-${p[0]}`:fecha;
+  const iva = Math.round(montoNeto * 0.17);
+  const monto = montoNeto + iva;
   const id = nextFacturaId();
-  const factura = { id, numero, fecha:fechaStr, cliente:clienteV, liquidacionId:liqId||'', monto, estado:'emitida', factoring:false, factoringEmpresa:'', factoringFechaAnticipo:'', factoringMonto:0, factoringComision:0, factoringFechaLiquidacion:'', observaciones:'' };
+  const factura = { id, numero, fecha:fechaStr, cliente:clienteV, liquidacionId:liqId||'', monto_neto:montoNeto, iva, monto, estado:'emitida', factoring:false, factoringEmpresa:'', factoringFechaAnticipo:'', factoringMonto:0, factoringComision:0, factoringFechaLiquidacion:'', observaciones:'' };
   appData.facturas.push(factura);
   uiState.fac_form_open = false;
+  uiState.fac_form_data = {};
   saveData();
   upsertFacturaSupabase(factura);
   render();
@@ -1787,6 +1791,7 @@ function guardarFactoring(id) {
   f.factoringMonto=parseInt(document.getElementById('fac_fact_monto_'+id)?.value)||f.factoringMonto;
   f.factoringComision=parseInt(document.getElementById('fac_fact_comision_'+id)?.value)||f.factoringComision;
   f.factoringFechaLiquidacion=plStr||f.factoringFechaLiquidacion;
+  delete uiState['fac_ft_'+id];
   saveData(); upsertFacturaSupabase(f);
   showToastGeneral('💾 Factoring guardado','#1565C0');
 }
@@ -1827,6 +1832,10 @@ function renderFacturas() {
   const totalCobrado=(appData.facturas||[]).filter(f=>f.estado==='cobrada').reduce((a,f)=>a+(f.monto||0),0);
 
   const formOpen=!!uiState.fac_form_open;
+  const facF=uiState.fac_form_data||{};
+  const facNetoUI=parseInt(facF.monto_neto)||0;
+  const facIvaUI=Math.round(facNetoUI*0.17);
+  const facTotalUI=facNetoUI+facIvaUI;
   const histHTML=facturas.length?facturas.map(f=>{
     const isOpen=!!uiState['fac_open_'+f.id];
     const est=estadoConfig[f.estado]||estadoConfig.emitida;
@@ -1850,7 +1859,9 @@ function renderFacturas() {
           <div><span style="color:#888">Número</span><div style="font-weight:700">${f.numero||'—'}</div></div>
           <div><span style="color:#888">Fecha emisión</span><div>${f.fecha||'—'}</div></div>
           <div><span style="color:#888">Cliente</span><div style="font-weight:600">${f.cliente||'—'}</div></div>
-          <div><span style="color:#888">Monto</span><div style="font-weight:700;color:#2E7D32">$${(f.monto||0).toLocaleString('es-CL')}</div></div>
+          ${f.monto_neto?`<div><span style="color:#888">Neto</span><div style="font-weight:700">$${f.monto_neto.toLocaleString('es-CL')}</div></div>
+          <div><span style="color:#888">IVA 17%</span><div style="font-weight:700">$${(f.iva||0).toLocaleString('es-CL')}</div></div>`:''}
+          <div><span style="color:#888">Total</span><div style="font-weight:700;color:#2E7D32">$${(f.monto||0).toLocaleString('es-CL')}</div></div>
           ${f.liquidacionId?`<div style="grid-column:1/-1"><span style="color:#888">Liquidación</span><div style="color:#1565C0;font-weight:700">${f.liquidacionId}</div></div>`:''}
         </div>
         <!-- FACTORING -->
@@ -1864,15 +1875,15 @@ function renderFacturas() {
           <div style="font-size:9px;font-weight:700;color:#E65100;margin-bottom:6px">🏦 DATOS FACTORING</div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-bottom:6px">
             <div style="grid-column:1/-1"><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">EMPRESA FACTORING</div>
-              <input id="fac_fact_empresa_${f.id}" value="${f.factoringEmpresa||''}" placeholder="ej: Latam Capital" style="width:100%;border:1px solid #dde;border-radius:5px;padding:6px 8px;font-size:12px;outline:none;font-family:inherit"></div>
+              <input id="fac_fact_empresa_${f.id}" value="${(uiState['fac_ft_'+f.id]||{}).empresa??f.factoringEmpresa||''}" oninput="if(!uiState['fac_ft_${f.id}'])uiState['fac_ft_${f.id}']={};uiState['fac_ft_${f.id}'].empresa=this.value" placeholder="ej: Latam Capital" style="width:100%;border:1px solid #dde;border-radius:5px;padding:6px 8px;font-size:12px;outline:none;font-family:inherit"></div>
             <div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">FECHA ANTICIPO</div>
-              <input id="fac_fact_fecha_${f.id}" type="date" value="${(()=>{const p=(f.factoringFechaAnticipo||'').split('-');return p[0].length===2?p[2]+'-'+p[1]+'-'+p[0]:f.factoringFechaAnticipo||'';})()}" style="width:100%;border:1px solid #dde;border-radius:5px;padding:6px 8px;font-size:12px;outline:none;font-family:inherit"></div>
+              <input id="fac_fact_fecha_${f.id}" type="date" value="${(()=>{const ov=(uiState['fac_ft_'+f.id]||{}).fecha_anticipo;if(ov)return ov;const p=(f.factoringFechaAnticipo||'').split('-');return p[0].length===2?p[2]+'-'+p[1]+'-'+p[0]:f.factoringFechaAnticipo||'';})()}" onchange="if(!uiState['fac_ft_${f.id}'])uiState['fac_ft_${f.id}']={};uiState['fac_ft_${f.id}'].fecha_anticipo=this.value" style="width:100%;border:1px solid #dde;border-radius:5px;padding:6px 8px;font-size:12px;outline:none;font-family:inherit"></div>
             <div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">MONTO ANTICIPADO ($)</div>
-              <input id="fac_fact_monto_${f.id}" type="number" value="${f.factoringMonto||''}" placeholder="ej: 800000" style="width:100%;border:1px solid #dde;border-radius:5px;padding:6px 8px;font-size:12px;outline:none;font-family:inherit"></div>
+              <input id="fac_fact_monto_${f.id}" type="number" value="${(uiState['fac_ft_'+f.id]||{}).monto??f.factoringMonto||''}" oninput="if(!uiState['fac_ft_${f.id}'])uiState['fac_ft_${f.id}']={};uiState['fac_ft_${f.id}'].monto=this.value" placeholder="ej: 800000" style="width:100%;border:1px solid #dde;border-radius:5px;padding:6px 8px;font-size:12px;outline:none;font-family:inherit"></div>
             <div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">COMISIÓN ($)</div>
-              <input id="fac_fact_comision_${f.id}" type="number" value="${f.factoringComision||''}" placeholder="ej: 25000" style="width:100%;border:1px solid #dde;border-radius:5px;padding:6px 8px;font-size:12px;outline:none;font-family:inherit"></div>
+              <input id="fac_fact_comision_${f.id}" type="number" value="${(uiState['fac_ft_'+f.id]||{}).comision??f.factoringComision||''}" oninput="if(!uiState['fac_ft_${f.id}'])uiState['fac_ft_${f.id}']={};uiState['fac_ft_${f.id}'].comision=this.value" placeholder="ej: 25000" style="width:100%;border:1px solid #dde;border-radius:5px;padding:6px 8px;font-size:12px;outline:none;font-family:inherit"></div>
             <div style="grid-column:1/-1"><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">FECHA LIQUIDACIÓN FINAL</div>
-              <input id="fac_fact_liq_${f.id}" type="date" value="${(()=>{const p=(f.factoringFechaLiquidacion||'').split('-');return p[0].length===2?p[2]+'-'+p[1]+'-'+p[0]:f.factoringFechaLiquidacion||'';})()}" style="width:100%;border:1px solid #dde;border-radius:5px;padding:6px 8px;font-size:12px;outline:none;font-family:inherit"></div>
+              <input id="fac_fact_liq_${f.id}" type="date" value="${(()=>{const ov=(uiState['fac_ft_'+f.id]||{}).fecha_liq;if(ov)return ov;const p=(f.factoringFechaLiquidacion||'').split('-');return p[0].length===2?p[2]+'-'+p[1]+'-'+p[0]:f.factoringFechaLiquidacion||'';})()}" onchange="if(!uiState['fac_ft_${f.id}'])uiState['fac_ft_${f.id}']={};uiState['fac_ft_${f.id}'].fecha_liq=this.value" style="width:100%;border:1px solid #dde;border-radius:5px;padding:6px 8px;font-size:12px;outline:none;font-family:inherit"></div>
           </div>
           <button onclick="guardarFactoring('${f.id}')" style="width:100%;padding:8px;background:#E65100;color:white;border:none;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer">💾 Guardar factoring</button>
         </div>`:''}
@@ -1913,21 +1924,25 @@ function renderFacturas() {
       ${formOpen?`<div style="padding:0 12px 12px">
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px">
           <div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">N° FACTURA</div>
-            <input id="fac_numero" placeholder="ej: 001234" style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit"></div>
+            <input id="fac_numero" placeholder="ej: 001234" value="${facF.numero||''}" oninput="uiState.fac_form_data={...uiState.fac_form_data||{},numero:this.value}" style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit"></div>
           <div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">FECHA EMISIÓN</div>
-            <input id="fac_fecha" type="date" style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit"></div>
+            <input id="fac_fecha" type="date" value="${facF.fecha||''}" onchange="uiState.fac_form_data={...uiState.fac_form_data||{},fecha:this.value}" style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit"></div>
           <div style="grid-column:1/-1"><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">CLIENTE</div>
-            <select id="fac_cliente" style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit;background:white;-webkit-appearance:auto">
+            <select id="fac_cliente" onchange="uiState.fac_form_data={...uiState.fac_form_data||{},cliente:this.value}" style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit;background:white;-webkit-appearance:auto">
               <option value="">Seleccionar cliente...</option>
-              ${clientesActivos.map(c=>`<option value="${c}">${c}</option>`).join('')}
+              ${clientesActivos.map(c=>`<option value="${c}" ${facF.cliente===c?'selected':''}>${c}</option>`).join('')}
             </select></div>
           <div style="grid-column:1/-1"><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">LIQUIDACIÓN ASOCIADA <span style="font-weight:400;color:#aaa">— opcional</span></div>
-            <select id="fac_liq" style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit;background:white;-webkit-appearance:auto">
+            <select id="fac_liq" onchange="uiState.fac_form_data={...uiState.fac_form_data||{},liq:this.value}" style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit;background:white;-webkit-appearance:auto">
               <option value="">Sin liquidación asociada</option>
               ${liqOpts}
             </select></div>
-          <div style="grid-column:1/-1"><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">MONTO FACTURA ($)</div>
-            <input id="fac_monto" type="number" placeholder="ej: 950000" style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:14px;font-weight:700;outline:none;font-family:inherit"></div>
+          <div style="grid-column:1/-1"><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">MONTO NETO ($)</div>
+            <input id="fac_monto_neto" type="number" placeholder="ej: 800000" value="${facF.monto_neto||''}" oninput="uiState.fac_form_data={...uiState.fac_form_data||{},monto_neto:this.value};render()" style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:14px;font-weight:700;outline:none;font-family:inherit"></div>
+          <div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">IVA 17%</div>
+            <div style="width:100%;border:1px solid #e8e8e8;border-radius:6px;padding:7px 9px;font-size:13px;font-weight:700;background:#F5F5F5;color:#546E7A">${facIvaUI?'$'+facIvaUI.toLocaleString('es-CL'):'—'}</div></div>
+          <div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">TOTAL FACTURA</div>
+            <div style="width:100%;border:1px solid #e8e8e8;border-radius:6px;padding:7px 9px;font-size:13px;font-weight:900;background:#E8F5E9;color:#2E7D32">${facTotalUI?'$'+facTotalUI.toLocaleString('es-CL'):'—'}</div></div>
         </div>
         <button onclick="crearFactura()" style="width:100%;padding:12px;background:#546E7A;color:white;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer">+ Registrar factura</button>
       </div>`:''}
@@ -5289,7 +5304,10 @@ async function initSupabase() {
       await syncRemuneracionesDesdeSupabase();
       await syncRendimientoCombDesdeSupabase();
       await syncConfigPanel();
-      render();
+      // No re-render si el usuario está llenando un formulario
+      const _ae = document.activeElement;
+      const _enForm = _ae && (_ae.tagName==='INPUT'||_ae.tagName==='TEXTAREA'||_ae.tagName==='SELECT');
+      if (!_enForm) render();
     } else {
       if (el) { el.textContent = '⬤ DB Error'; el.style.color = '#e57373'; }
     }
@@ -8448,9 +8466,12 @@ setInterval(async () => {
   const formulariosActivos = [
     'srv_fecha', 'srv_conductor', 'srv_patente', 'srv_cliente',
     'pip_new_cliente', 'disp_fecha', 'liq_fecha_v2',
-    'ren_fecha', 'ren_responsable', 'ren_descripcion'
+    'ren_fecha', 'ren_responsable', 'ren_descripcion',
+    'fac_numero', 'fac_monto_neto'
   ];
-  const hayFormAbierto = formulariosActivos.some(id => document.getElementById(id) !== null);
+  const _ae2 = document.activeElement;
+  const hayFormAbierto = formulariosActivos.some(id => document.getElementById(id) !== null)
+    || (_ae2 && (_ae2.tagName==='INPUT'||_ae2.tagName==='TEXTAREA'||_ae2.tagName==='SELECT'));
   if (hayFormAbierto) return;
   try {
     await syncServiciosDesdeSupabase();
