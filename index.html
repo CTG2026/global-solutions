@@ -5,11 +5,11 @@
   <meta http-equiv="cache-control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="pragma" content="no-cache">
   <meta http-equiv="expires" content="0">
-  <meta name="version" content="1774870000">
+  <meta name="version" content="1774880000">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <script>
 (function() {
-  var VERSION = '1774870000';
+  var VERSION = '1774880000';
   var stored = localStorage.getItem('gs_app_version');
   if (stored !== VERSION) {
     var session = localStorage.getItem('gs_session');
@@ -1875,13 +1875,13 @@ function renderFacturas() {
           <div style="font-size:9px;font-weight:700;color:#E65100;margin-bottom:6px">🏦 DATOS FACTORING</div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-bottom:6px">
             <div style="grid-column:1/-1"><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">EMPRESA FACTORING</div>
-              <input id="fac_fact_empresa_${f.id}" value="${(uiState['fac_ft_'+f.id]||{}).empresa??f.factoringEmpresa||''}" oninput="if(!uiState['fac_ft_${f.id}'])uiState['fac_ft_${f.id}']={};uiState['fac_ft_${f.id}'].empresa=this.value" placeholder="ej: Latam Capital" style="width:100%;border:1px solid #dde;border-radius:5px;padding:6px 8px;font-size:12px;outline:none;font-family:inherit"></div>
+              <input id="fac_fact_empresa_${f.id}" value="${(uiState['fac_ft_'+f.id]||{}).empresa||f.factoringEmpresa||''}" oninput="if(!uiState['fac_ft_${f.id}'])uiState['fac_ft_${f.id}']={};uiState['fac_ft_${f.id}'].empresa=this.value" placeholder="ej: Latam Capital" style="width:100%;border:1px solid #dde;border-radius:5px;padding:6px 8px;font-size:12px;outline:none;font-family:inherit"></div>
             <div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">FECHA ANTICIPO</div>
               <input id="fac_fact_fecha_${f.id}" type="date" value="${(()=>{const ov=(uiState['fac_ft_'+f.id]||{}).fecha_anticipo;if(ov)return ov;const p=(f.factoringFechaAnticipo||'').split('-');return p[0].length===2?p[2]+'-'+p[1]+'-'+p[0]:f.factoringFechaAnticipo||'';})()}" onchange="if(!uiState['fac_ft_${f.id}'])uiState['fac_ft_${f.id}']={};uiState['fac_ft_${f.id}'].fecha_anticipo=this.value" style="width:100%;border:1px solid #dde;border-radius:5px;padding:6px 8px;font-size:12px;outline:none;font-family:inherit"></div>
             <div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">MONTO ANTICIPADO ($)</div>
-              <input id="fac_fact_monto_${f.id}" type="number" value="${(uiState['fac_ft_'+f.id]||{}).monto??f.factoringMonto||''}" oninput="if(!uiState['fac_ft_${f.id}'])uiState['fac_ft_${f.id}']={};uiState['fac_ft_${f.id}'].monto=this.value" placeholder="ej: 800000" style="width:100%;border:1px solid #dde;border-radius:5px;padding:6px 8px;font-size:12px;outline:none;font-family:inherit"></div>
+              <input id="fac_fact_monto_${f.id}" type="number" value="${(uiState['fac_ft_'+f.id]||{}).monto||f.factoringMonto||''}" oninput="if(!uiState['fac_ft_${f.id}'])uiState['fac_ft_${f.id}']={};uiState['fac_ft_${f.id}'].monto=this.value" placeholder="ej: 800000" style="width:100%;border:1px solid #dde;border-radius:5px;padding:6px 8px;font-size:12px;outline:none;font-family:inherit"></div>
             <div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">COMISIÓN ($)</div>
-              <input id="fac_fact_comision_${f.id}" type="number" value="${(uiState['fac_ft_'+f.id]||{}).comision??f.factoringComision||''}" oninput="if(!uiState['fac_ft_${f.id}'])uiState['fac_ft_${f.id}']={};uiState['fac_ft_${f.id}'].comision=this.value" placeholder="ej: 25000" style="width:100%;border:1px solid #dde;border-radius:5px;padding:6px 8px;font-size:12px;outline:none;font-family:inherit"></div>
+              <input id="fac_fact_comision_${f.id}" type="number" value="${(uiState['fac_ft_'+f.id]||{}).comision||f.factoringComision||''}" oninput="if(!uiState['fac_ft_${f.id}'])uiState['fac_ft_${f.id}']={};uiState['fac_ft_${f.id}'].comision=this.value" placeholder="ej: 25000" style="width:100%;border:1px solid #dde;border-radius:5px;padding:6px 8px;font-size:12px;outline:none;font-family:inherit"></div>
             <div style="grid-column:1/-1"><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">FECHA LIQUIDACIÓN FINAL</div>
               <input id="fac_fact_liq_${f.id}" type="date" value="${(()=>{const ov=(uiState['fac_ft_'+f.id]||{}).fecha_liq;if(ov)return ov;const p=(f.factoringFechaLiquidacion||'').split('-');return p[0].length===2?p[2]+'-'+p[1]+'-'+p[0]:f.factoringFechaLiquidacion||'';})()}" onchange="if(!uiState['fac_ft_${f.id}'])uiState['fac_ft_${f.id}']={};uiState['fac_ft_${f.id}'].fecha_liq=this.value" style="width:100%;border:1px solid #dde;border-radius:5px;padding:6px 8px;font-size:12px;outline:none;font-family:inherit"></div>
           </div>
@@ -5803,8 +5803,8 @@ function renderPipeline() {
   // Ordenar: activo primero, luego cotizado, prospecto, inactivo — dentro de cada etapa alfabético
   const ETAPA_ORDEN = { activo:0, cotizado:1, prospecto:2, inactivo:3 };
   const pipeline = (appData.pipeline||[]).slice().sort((a,b)=>{
-    const oa = ETAPA_ORDEN[a.etapa]??99;
-    const ob = ETAPA_ORDEN[b.etapa]??99;
+    const oa = ETAPA_ORDEN[a.etapa]!==undefined?ETAPA_ORDEN[a.etapa]:99;
+    const ob = ETAPA_ORDEN[b.etapa]!==undefined?ETAPA_ORDEN[b.etapa]:99;
     if (oa !== ob) return oa - ob;
     return (a.cliente||'').localeCompare(b.cliente||'', 'es');
   });
