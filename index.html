@@ -5,11 +5,11 @@
   <meta http-equiv="cache-control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="pragma" content="no-cache">
   <meta http-equiv="expires" content="0">
-  <meta name="version" content="1774880000">
+  <meta name="version" content="1774900000">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <script>
 (function() {
-  var VERSION = '1774880000';
+  var VERSION = '1774900000';
   var stored = localStorage.getItem('gs_app_version');
   if (stored !== VERSION) {
     var session = localStorage.getItem('gs_session');
@@ -1782,14 +1782,21 @@ function toggleFactoring(id) {
 function guardarFactoring(id) {
   const f=(appData.facturas||[]).find(x=>x.id===id);
   if (!f) return;
-  const p=document.getElementById('fac_fact_fecha_'+id)?.value||'';
+  const ft = uiState['fac_ft_'+id] || {};
+  const p=document.getElementById('fac_fact_fecha_'+id)?.value||ft.fecha_anticipo||'';
   const pStr=p?p.split('-').reverse().join('-'):'';
-  const pl=document.getElementById('fac_fact_liq_'+id)?.value||'';
+  const pl=document.getElementById('fac_fact_liq_'+id)?.value||ft.fecha_liq||'';
   const plStr=pl?pl.split('-').reverse().join('-'):'';
-  f.factoringEmpresa=document.getElementById('fac_fact_empresa_'+id)?.value.trim()||f.factoringEmpresa;
+  const pv=document.getElementById('fac_fact_vcto_'+id)?.value||ft.fecha_vcto||'';
+  const pvStr=pv?pv.split('-').reverse().join('-'):'';
+  f.factoringEmpresa=document.getElementById('fac_fact_empresa_'+id)?.value||ft.empresa||f.factoringEmpresa;
   f.factoringFechaAnticipo=pStr||f.factoringFechaAnticipo;
-  f.factoringMonto=parseInt(document.getElementById('fac_fact_monto_'+id)?.value)||f.factoringMonto;
-  f.factoringComision=parseInt(document.getElementById('fac_fact_comision_'+id)?.value)||f.factoringComision;
+  f.factoringFechaVencimiento=pvStr||f.factoringFechaVencimiento||'';
+  f.factoringMonto=parseInt(document.getElementById('fac_fact_monto_'+id)?.value||ft.monto)||f.factoringMonto;
+  f.factoringComision=parseInt(document.getElementById('fac_fact_comision_'+id)?.value||ft.comision)||f.factoringComision;
+  f.factoringCostoOp=parseInt(document.getElementById('fac_fact_costo_op_'+id)?.value||ft.costo_op)||f.factoringCostoOp||0;
+  f.factoringCostoMora=parseInt(document.getElementById('fac_fact_costo_mora_'+id)?.value||ft.costo_mora)||f.factoringCostoMora||0;
+  f.factoringOtrosCostos=parseInt(document.getElementById('fac_fact_otros_'+id)?.value||ft.otros_costos)||f.factoringOtrosCostos||0;
   f.factoringFechaLiquidacion=plStr||f.factoringFechaLiquidacion;
   delete uiState['fac_ft_'+id];
   saveData(); upsertFacturaSupabase(f);
@@ -1875,14 +1882,25 @@ function renderFacturas() {
           <div style="font-size:9px;font-weight:700;color:#E65100;margin-bottom:6px">🏦 DATOS FACTORING</div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-bottom:6px">
             <div style="grid-column:1/-1"><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">EMPRESA FACTORING</div>
-              <input id="fac_fact_empresa_${f.id}" value="${(uiState['fac_ft_'+f.id]||{}).empresa||f.factoringEmpresa||''}" oninput="if(!uiState['fac_ft_${f.id}'])uiState['fac_ft_${f.id}']={};uiState['fac_ft_${f.id}'].empresa=this.value" placeholder="ej: Latam Capital" style="width:100%;border:1px solid #dde;border-radius:5px;padding:6px 8px;font-size:12px;outline:none;font-family:inherit"></div>
+              <select id="fac_fact_empresa_${f.id}" onchange="if(!uiState['fac_ft_${f.id}'])uiState['fac_ft_${f.id}']={};uiState['fac_ft_${f.id}'].empresa=this.value" style="width:100%;border:1px solid #dde;border-radius:5px;padding:6px 8px;font-size:12px;outline:none;font-family:inherit;background:white;-webkit-appearance:auto">
+                <option value="">Seleccionar...</option>
+                ${['Latam Capital','Factoring Progreso','Bankapital'].map(emp=>`<option value="${emp}" ${((uiState['fac_ft_'+f.id]||{}).empresa||f.factoringEmpresa||'')=== emp?'selected':''}>${emp}</option>`).join('')}
+              </select></div>
             <div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">FECHA ANTICIPO</div>
               <input id="fac_fact_fecha_${f.id}" type="date" value="${(()=>{const ov=(uiState['fac_ft_'+f.id]||{}).fecha_anticipo;if(ov)return ov;const p=(f.factoringFechaAnticipo||'').split('-');return p[0].length===2?p[2]+'-'+p[1]+'-'+p[0]:f.factoringFechaAnticipo||'';})()}" onchange="if(!uiState['fac_ft_${f.id}'])uiState['fac_ft_${f.id}']={};uiState['fac_ft_${f.id}'].fecha_anticipo=this.value" style="width:100%;border:1px solid #dde;border-radius:5px;padding:6px 8px;font-size:12px;outline:none;font-family:inherit"></div>
+            <div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">VCTO. DEUDOR (pago cliente)</div>
+              <input id="fac_fact_vcto_${f.id}" type="date" value="${(()=>{const ov=(uiState['fac_ft_'+f.id]||{}).fecha_vcto;if(ov)return ov;const p=(f.factoringFechaVencimiento||'').split('-');return p[0].length===2?p[2]+'-'+p[1]+'-'+p[0]:f.factoringFechaVencimiento||'';})()}" onchange="if(!uiState['fac_ft_${f.id}'])uiState['fac_ft_${f.id}']={};uiState['fac_ft_${f.id}'].fecha_vcto=this.value" style="width:100%;border:1px solid #FFB74D;border-radius:5px;padding:6px 8px;font-size:12px;outline:none;font-family:inherit;background:#FFFDE7"></div>
             <div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">MONTO ANTICIPADO ($)</div>
               <input id="fac_fact_monto_${f.id}" type="number" value="${(uiState['fac_ft_'+f.id]||{}).monto||f.factoringMonto||''}" oninput="if(!uiState['fac_ft_${f.id}'])uiState['fac_ft_${f.id}']={};uiState['fac_ft_${f.id}'].monto=this.value" placeholder="ej: 800000" style="width:100%;border:1px solid #dde;border-radius:5px;padding:6px 8px;font-size:12px;outline:none;font-family:inherit"></div>
             <div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">COMISIÓN ($)</div>
               <input id="fac_fact_comision_${f.id}" type="number" value="${(uiState['fac_ft_'+f.id]||{}).comision||f.factoringComision||''}" oninput="if(!uiState['fac_ft_${f.id}'])uiState['fac_ft_${f.id}']={};uiState['fac_ft_${f.id}'].comision=this.value" placeholder="ej: 25000" style="width:100%;border:1px solid #dde;border-radius:5px;padding:6px 8px;font-size:12px;outline:none;font-family:inherit"></div>
-            <div style="grid-column:1/-1"><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">FECHA LIQUIDACIÓN FINAL</div>
+            <div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">COSTO OPERACIÓN ($)</div>
+              <input id="fac_fact_costo_op_${f.id}" type="number" value="${(uiState['fac_ft_'+f.id]||{}).costo_op||f.factoringCostoOp||''}" oninput="if(!uiState['fac_ft_${f.id}'])uiState['fac_ft_${f.id}']={};uiState['fac_ft_${f.id}'].costo_op=this.value" placeholder="0" style="width:100%;border:1px solid #dde;border-radius:5px;padding:6px 8px;font-size:12px;outline:none;font-family:inherit"></div>
+            <div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">COSTO MORA ($)</div>
+              <input id="fac_fact_costo_mora_${f.id}" type="number" value="${(uiState['fac_ft_'+f.id]||{}).costo_mora||f.factoringCostoMora||''}" oninput="if(!uiState['fac_ft_${f.id}'])uiState['fac_ft_${f.id}']={};uiState['fac_ft_${f.id}'].costo_mora=this.value" placeholder="0" style="width:100%;border:1px solid #dde;border-radius:5px;padding:6px 8px;font-size:12px;outline:none;font-family:inherit"></div>
+            <div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">OTROS COSTOS ($)</div>
+              <input id="fac_fact_otros_${f.id}" type="number" value="${(uiState['fac_ft_'+f.id]||{}).otros_costos||f.factoringOtrosCostos||''}" oninput="if(!uiState['fac_ft_${f.id}'])uiState['fac_ft_${f.id}']={};uiState['fac_ft_${f.id}'].otros_costos=this.value" placeholder="0" style="width:100%;border:1px solid #dde;border-radius:5px;padding:6px 8px;font-size:12px;outline:none;font-family:inherit"></div>
+            <div style="grid-column:1/-1"><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">FECHA LIQUIDACIÓN FINAL (GS recibe saldo)</div>
               <input id="fac_fact_liq_${f.id}" type="date" value="${(()=>{const ov=(uiState['fac_ft_'+f.id]||{}).fecha_liq;if(ov)return ov;const p=(f.factoringFechaLiquidacion||'').split('-');return p[0].length===2?p[2]+'-'+p[1]+'-'+p[0]:f.factoringFechaLiquidacion||'';})()}" onchange="if(!uiState['fac_ft_${f.id}'])uiState['fac_ft_${f.id}']={};uiState['fac_ft_${f.id}'].fecha_liq=this.value" style="width:100%;border:1px solid #dde;border-radius:5px;padding:6px 8px;font-size:12px;outline:none;font-family:inherit"></div>
           </div>
           <button onclick="guardarFactoring('${f.id}')" style="width:100%;padding:8px;background:#E65100;color:white;border:none;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer">💾 Guardar factoring</button>
@@ -1947,6 +1965,59 @@ function renderFacturas() {
         <button onclick="crearFactura()" style="width:100%;padding:12px;background:#546E7A;color:white;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer">+ Registrar factura</button>
       </div>`:''}
     </div>
+    <!-- OPERACIONES FACTORING -->
+    ${(()=>{
+      const ops=(appData.facturas||[]).filter(f=>f.factoring);
+      if(!ops.length) return '';
+      const hoy=new Date(); hoy.setHours(0,0,0,0);
+      const parseFechaLocal=s=>{if(!s)return null;const p=s.split('-');if(p.length!==3)return null;return p[0].length===2?new Date(+p[2],+p[1]-1,+p[0]):new Date(+p[0],+p[1]-1,+p[2]);};
+      const filas=ops.map(f=>{
+        const vcto=parseFechaLocal(f.factoringFechaVencimiento);
+        const dias=vcto?Math.ceil((vcto-hoy)/86400000):null;
+        let vctoColor='#546E7A', vctoBg='transparent', vctoLabel=f.factoringFechaVencimiento||'—';
+        if(vcto){
+          if(dias<0){vctoColor='#C62828';vctoBg='#FFEBEE';vctoLabel='⚠️ VENCIDA '+Math.abs(dias)+'d';}
+          else if(dias===0){vctoColor='#E65100';vctoBg='#FFF3E0';vctoLabel='🔴 HOY';}
+          else if(dias<=5){vctoColor='#E65100';vctoBg='#FFF8E1';vctoLabel='⏰ '+dias+'d — '+f.factoringFechaVencimiento;}
+          else if(dias<=15){vctoColor='#F57F17';vctoBg='#FFFDE7';vctoLabel=dias+'d — '+f.factoringFechaVencimiento;}
+          else{vctoLabel=f.factoringFechaVencimiento;}
+        }
+        const costoTotal=(f.factoringComision||0)+(f.factoringCostoOp||0)+(f.factoringCostoMora||0)+(f.factoringOtrosCostos||0);
+        const estadoConf={emitida:'📄',en_factoring:'🏦',cobrada:'✅',vencida:'⚠️'};
+        return `<tr style="border-bottom:1px solid #f0f0f0">
+          <td style="padding:5px 6px;font-size:10px;font-weight:700;color:#37474F">${f.numero||f.id}</td>
+          <td style="padding:5px 4px;font-size:10px;color:#546E7A">${f.cliente||'—'}</td>
+          <td style="padding:5px 4px;font-size:10px;color:#E65100;font-weight:600">${f.factoringEmpresa||'—'}</td>
+          <td style="padding:5px 4px;font-size:10px;font-weight:700;color:#2E7D32">$${(f.monto||0).toLocaleString('es-CL')}</td>
+          <td style="padding:5px 4px;font-size:10px;color:#546E7A">${f.factoringFechaAnticipo||'—'}</td>
+          <td style="padding:4px 6px;font-size:10px;font-weight:700;color:${vctoColor};background:${vctoBg};border-radius:4px;white-space:nowrap">${vctoLabel}</td>
+          <td style="padding:5px 4px;font-size:10px;color:#546E7A">${f.factoringFechaLiquidacion||'—'}</td>
+          <td style="padding:5px 4px;font-size:10px;color:#C62828">${costoTotal?'$'+costoTotal.toLocaleString('es-CL'):'—'}</td>
+          <td style="padding:5px 4px;font-size:10px">${estadoConf[f.estado]||'📄'} ${f.estado||'emitida'}</td>
+        </tr>`;
+      }).join('');
+      return `<div style="margin-bottom:10px">
+        <div onclick="uiState.fac_ops_open=!uiState.fac_ops_open;render()" style="display:flex;justify-content:space-between;align-items:center;cursor:pointer;margin-bottom:6px">
+          <div style="font-size:9px;font-weight:700;color:#E65100;letter-spacing:0.5px">🏦 OPERACIONES FACTORING (${ops.length})</div>
+          <span style="font-size:10px;color:#aaa">${uiState.fac_ops_open?'▲':'▼'}</span>
+        </div>
+        ${uiState.fac_ops_open?`<div style="overflow-x:auto">
+        <table style="width:100%;border-collapse:collapse;font-size:10px">
+          <thead><tr style="background:#FFF3E0">
+            <th style="padding:5px 6px;text-align:left;font-size:9px;color:#E65100">FACTURA</th>
+            <th style="padding:5px 4px;text-align:left;font-size:9px;color:#E65100">CLIENTE</th>
+            <th style="padding:5px 4px;text-align:left;font-size:9px;color:#E65100">EMPRESA</th>
+            <th style="padding:5px 4px;text-align:left;font-size:9px;color:#E65100">MONTO</th>
+            <th style="padding:5px 4px;text-align:left;font-size:9px;color:#E65100">ANTICIPO</th>
+            <th style="padding:5px 4px;text-align:left;font-size:9px;color:#C62828;font-weight:900">VCTO DEUDOR</th>
+            <th style="padding:5px 4px;text-align:left;font-size:9px;color:#E65100">LIQ. FINAL</th>
+            <th style="padding:5px 4px;text-align:left;font-size:9px;color:#E65100">COSTOS</th>
+            <th style="padding:5px 4px;text-align:left;font-size:9px;color:#E65100">ESTADO</th>
+          </tr></thead>
+          <tbody>${filas}</tbody>
+        </table></div>`:''}
+      </div>`;
+    })()}
     <!-- HISTORIAL -->
     <div style="font-size:9px;font-weight:700;color:#888;letter-spacing:0.5px;margin-bottom:6px">HISTORIAL — ${appData.facturas.length} factura${appData.facturas.length!==1?'s':''}</div>
     ${histHTML}
@@ -5495,18 +5566,29 @@ async function syncFacturasDesdeSupabase() {
     const { data, error } = await supa.from('facturas').select('*').order('id');
     if (error) { console.warn('Error sync facturas:', error); return; }
     if (data && data.length > 0) {
-      appData.facturas = data.map(r => ({
-        id: r.id, numero: r.numero||'', fecha: r.fecha||'',
-        cliente: r.cliente||'', liquidacionId: r.liquidacion_id||'',
-        monto: r.monto||0, estado: r.estado||'emitida',
-        factoring: r.factoring||false,
-        factoringEmpresa: r.factoring_empresa||'',
-        factoringFechaAnticipo: r.factoring_fecha_anticipo||'',
-        factoringMonto: r.factoring_monto||0,
-        factoringComision: r.factoring_comision||0,
-        factoringFechaLiquidacion: r.factoring_fecha_liquidacion||'',
-        observaciones: r.observaciones||''
-      }));
+      const localById={};
+      (appData.facturas||[]).forEach(f=>{localById[f.id]=f;});
+      appData.facturas = data.map(r => {
+        const loc=localById[r.id]||{};
+        return {
+          id: r.id, numero: r.numero||'', fecha: r.fecha||'',
+          cliente: r.cliente||'', liquidacionId: r.liquidacion_id||'',
+          monto: r.monto||0, estado: r.estado||'emitida',
+          factoring: r.factoring||false,
+          factoringEmpresa: r.factoring_empresa||'',
+          factoringFechaAnticipo: r.factoring_fecha_anticipo||'',
+          factoringMonto: r.factoring_monto||0,
+          factoringComision: r.factoring_comision||0,
+          factoringFechaLiquidacion: r.factoring_fecha_liquidacion||'',
+          observaciones: r.observaciones||'',
+          // preserve local-only fields
+          monto_neto: loc.monto_neto||0, iva: loc.iva||0,
+          factoringFechaVencimiento: loc.factoringFechaVencimiento||'',
+          factoringCostoOp: loc.factoringCostoOp||0,
+          factoringCostoMora: loc.factoringCostoMora||0,
+          factoringOtrosCostos: loc.factoringOtrosCostos||0,
+        };
+      });
       saveData();
     }
   } catch(e) { console.warn('Error sync facturas:', e); }
