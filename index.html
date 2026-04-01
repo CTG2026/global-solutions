@@ -5,11 +5,11 @@
   <meta http-equiv="cache-control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="pragma" content="no-cache">
   <meta http-equiv="expires" content="0">
-  <meta name="version" content="1774750000">
+  <meta name="version" content="1774760000">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <script>
 (function() {
-  var VERSION = '1774750000';
+  var VERSION = '1774760000';
   var stored = localStorage.getItem('gs_app_version');
   if (stored !== VERSION) {
     var session = localStorage.getItem('gs_session');
@@ -3219,7 +3219,33 @@ function renderLiquidacionesV2() {
             ${liq.estado==='facturada'?`<button onclick="cambiarEstadoLiq('${liq.id}','pagada')" style="flex:1;padding:8px;background:#E8F5E9;color:#2E7D32;border:1px solid #2E7D32;border-radius:7px;font-size:10px;font-weight:700;cursor:pointer">✅ Marcar pagada</button>`:''}
             <button onclick="guardarObsLiq('${liq.id}')" style="padding:8px 12px;background:#607D8B;color:white;border:none;border-radius:7px;font-size:10px;font-weight:700;cursor:pointer">💾 Guardar obs.</button>
             <button onclick="descargarLiqV2('${liq.id}')" style="padding:8px 14px;background:#0B2545;color:white;border:none;border-radius:7px;font-size:10px;font-weight:700;cursor:pointer">📄 PDF</button>
+            <button onclick="uiState.liq_editId=(uiState.liq_editId==='${liq.id}'?null:'${liq.id}');render()" style="padding:8px 12px;background:#FFF8E1;color:#E65100;border:1px solid #E65100;border-radius:7px;font-size:10px;font-weight:700;cursor:pointer">✎ Editar</button>
           </div>
+          ${uiState.liq_editId===liq.id?`
+          <div style="background:#FFF8E1;border:1px solid #FFE082;border-radius:8px;padding:10px 12px;margin-bottom:6px">
+            <div style="font-size:9px;font-weight:800;color:#E65100;letter-spacing:1px;margin-bottom:8px">EDITANDO ${liq.id}</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px">
+              <div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">FECHA</div>
+                <input id="liq_edit_fecha_${liq.id}" type="date" value="${(()=>{const p=(liq.fecha||'').split('-');return p.length===3&&p[0].length===2?p[2]+'-'+p[1]+'-'+p[0]:liq.fecha||'';})()}" style="width:100%;border:1px solid #FFE082;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit;background:white"></div>
+              <div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">EMAIL CLIENTE</div>
+                <input id="liq_edit_email_${liq.id}" type="email" value="${liq.email||''}" placeholder="cliente@empresa.cl" style="width:100%;border:1px solid #FFE082;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit;background:white"></div>
+            </div>
+            <div style="margin-bottom:8px">
+              <div style="font-size:9px;font-weight:700;color:#888;margin-bottom:4px">RUTS CLIENTE</div>
+              ${(liq.ruts||[]).map((rut,ri)=>`<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">
+                <span style="font-size:11px;flex:1">${rut}</span>
+                <span onclick="eliminarRutEditLiq('${liq.id}',${ri})" style="color:#E53935;cursor:pointer;font-size:14px;padding:2px 6px">×</span>
+              </div>`).join('')}
+              <div style="display:flex;gap:6px;margin-top:4px">
+                <input id="liq_edit_rut_nuevo_${liq.id}" placeholder="Agregar RUT" style="flex:1;border:1px solid #FFE082;border-radius:6px;padding:6px 9px;font-size:11px;outline:none;font-family:inherit" onkeydown="if(event.key==='Enter')agregarRutEditLiq('${liq.id}')">
+                <button onclick="agregarRutEditLiq('${liq.id}')" style="background:#607D8B;color:white;border:none;border-radius:6px;padding:6px 10px;font-size:11px;cursor:pointer">+ RUT</button>
+              </div>
+            </div>
+            <div style="display:flex;gap:6px">
+              <button onclick="guardarEdicionLiq('${liq.id}')" style="flex:1;padding:9px;background:#E65100;color:white;border:none;border-radius:7px;font-size:11px;font-weight:700;cursor:pointer">✓ Guardar cambios</button>
+              <button onclick="uiState.liq_editId=null;render()" style="padding:9px 14px;background:#eee;color:#555;border:none;border-radius:7px;font-size:11px;cursor:pointer">Cancelar</button>
+            </div>
+          </div>`:''}
         </div>`:''}
       </div>`;
     }).join('')}`:'<div style="text-align:center;color:#aaa;font-size:11px;padding:12px">Sin liquidaciones creadas aún</div>';
@@ -3249,6 +3275,36 @@ function guardarObsLiq(liqId) {
   saveData();
   pushLiquidacionesSupabase();
   showToastGeneral('💾 Observaciones guardadas','#607D8B');
+}
+function guardarEdicionLiq(liqId) {
+  const liq = (appData.liquidaciones||[]).find(l=>l.id===liqId);
+  if (!liq) return;
+  const fechaISO = document.getElementById('liq_edit_fecha_'+liqId)?.value||'';
+  if (fechaISO) {
+    const p = fechaISO.split('-');
+    liq.fecha = p.length===3 ? `${p[2]}-${p[1]}-${p[0]}` : fechaISO;
+  }
+  liq.email = document.getElementById('liq_edit_email_'+liqId)?.value||liq.email||'';
+  uiState.liq_editId = null;
+  saveData(); pushLiquidacionesSupabase(); render();
+  showToastGeneral('✅ Liquidación actualizada','#2E7D32');
+}
+function agregarRutEditLiq(liqId) {
+  const input = document.getElementById('liq_edit_rut_nuevo_'+liqId);
+  const rut = input?.value.trim();
+  if (!rut) return;
+  const liq = (appData.liquidaciones||[]).find(l=>l.id===liqId);
+  if (!liq) return;
+  if (!liq.ruts) liq.ruts = [];
+  if (!liq.ruts.includes(rut)) liq.ruts.push(rut);
+  input.value = '';
+  render();
+}
+function eliminarRutEditLiq(liqId, ri) {
+  const liq = (appData.liquidaciones||[]).find(l=>l.id===liqId);
+  if (!liq || !liq.ruts) return;
+  liq.ruts.splice(ri, 1);
+  render();
 }
 function descargarLiqV2(liqId) {
   const liq = (appData.liquidaciones||[]).find(l=>l.id===liqId);
