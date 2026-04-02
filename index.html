@@ -5,11 +5,11 @@
   <meta http-equiv="cache-control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="pragma" content="no-cache">
   <meta http-equiv="expires" content="0">
-  <meta name="version" content="1774950000">
+  <meta name="version" content="1774960000">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <script>
 (function() {
-  var VERSION = '1774950000';
+  var VERSION = '1774960000';
   var stored = localStorage.getItem('gs_app_version');
   if (stored !== VERSION) {
     var session = localStorage.getItem('gs_session');
@@ -3688,6 +3688,16 @@ const COT_ITEMS_V36=[
 
 function getCotNumero(){return 'COT-'+String(622+(appData.cotizaciones||[]).length+1).toString().padStart(5,'0');}
 
+// ── CALCULADORA DE SERVICIOS ──────────────────────────────────────────────────
+function renderCalculadoraServicios() {
+  return `<div style="padding:2px">
+    <div style="font-size:10px;font-weight:700;color:#546E7A;letter-spacing:0.5px;margin-bottom:8px">🧮 CALCULADORA DE SERVICIOS</div>
+    <div style="background:#F4F6F8;border-radius:8px;padding:16px;text-align:center;color:#90A4AE;font-size:11px">
+      Módulo en construcción
+    </div>
+  </div>`;
+}
+
 function renderCotizacionPDF(){
   if(!appData.cotizaciones) appData.cotizaciones=[];
   const hoyISO=(()=>{const h=new Date();return `${h.getFullYear()}-${String(h.getMonth()+1).padStart(2,'0')}-${String(h.getDate()).padStart(2,'0')}`;})();
@@ -4261,6 +4271,9 @@ function loadData() {
   if (_comF && !_comF.rutinarias.some(r=>r.cotizacionTask)) {
     _comF.rutinarias.push({titulo:'Cotización PDF',proc:'Generar cotización formal en PDF.',subtareas:[],cotizacionTask:true,done:false});
   }
+  if (_comF && !_comF.rutinarias.some(r=>r.calculadoraTask)) {
+    _comF.rutinarias.push({titulo:'Calculadora de Servicios',proc:'Calcular precio y rentabilidad de un servicio antes de cotizar.',subtareas:[],calculadoraTask:true,done:false});
+  }
 
   // Migración: agregar ámbito control si no existe
   if (!appData.fases.find(f => f.id === 'control')) {
@@ -4362,7 +4375,7 @@ function delTarea(faseId, ti) {
   if (!fase) return;
   const tarea = fase.rutinarias[ti];
   // Proteger tareas del sistema
-  if (tarea && (tarea.registroServicio || tarea.liquidacionServicios || tarea.disponibilidadDiaria || tarea.pipelineTask || tarea.respaldoTask || tarea.rendimientoCombTask || tarea.cierreServicioTask || tarea.liquidacionTask || tarea.cotizacionTask || tarea.rendicionTask || tarea.facturaTask)) {
+  if (tarea && (tarea.registroServicio || tarea.liquidacionServicios || tarea.disponibilidadDiaria || tarea.pipelineTask || tarea.respaldoTask || tarea.rendimientoCombTask || tarea.cierreServicioTask || tarea.liquidacionTask || tarea.cotizacionTask || tarea.calculadoraTask || tarea.rendicionTask || tarea.facturaTask)) {
     alert('Esta tarea es del sistema y no puede eliminarse.');
     return;
   }
@@ -4947,6 +4960,11 @@ function renderFase(fase) {
     fase.rutinarias.push({titulo:'Cotización PDF',proc:'Generar cotización formal en PDF.',subtareas:[],cotizacionTask:true,done:false});
     saveData();
   }
+  // Calculadora de Servicios en comercial
+  if (fase.id==='comercial' && !fase.rutinarias.some(r=>r.calculadoraTask)) {
+    fase.rutinarias.push({titulo:'Calculadora de Servicios',proc:'Calcular precio y rentabilidad de un servicio antes de cotizar.',subtareas:[],calculadoraTask:true,done:false});
+    saveData();
+  }
   // Pipeline siempre primero en comercial
   if (fase.id==='comercial') {
     const pipIdx = fase.rutinarias.findIndex(r=>r.pipelineTask);
@@ -5181,7 +5199,7 @@ function renderFase(fase) {
       </div>`;
     })() : '';
 
-    const _flag = tarea.registroServicio?'registroServicio':tarea.disponibilidadDiaria?'disponibilidadDiaria':tarea.rendimientoCombTask?'rendimientoCombTask':tarea.liquidacionTask?'liquidacionTask':tarea.cierreServicioTask?'cierreServicioTask':tarea.cotizacionTask?'cotizacionTask':tarea.pipelineTask?'pipelineTask':tarea.respaldoTask?'respaldoTask':tarea.rendicionTask?'rendicionTask':tarea.facturaTask?'facturaTask':tarea.costosTask?'costosTask':tarea.cajaTask?'cajaTask':'';
+    const _flag = tarea.registroServicio?'registroServicio':tarea.disponibilidadDiaria?'disponibilidadDiaria':tarea.rendimientoCombTask?'rendimientoCombTask':tarea.liquidacionTask?'liquidacionTask':tarea.cierreServicioTask?'cierreServicioTask':tarea.cotizacionTask?'cotizacionTask':tarea.calculadoraTask?'calculadoraTask':tarea.pipelineTask?'pipelineTask':tarea.respaldoTask?'respaldoTask':tarea.rendicionTask?'rendicionTask':tarea.facturaTask?'facturaTask':tarea.costosTask?'costosTask':tarea.cajaTask?'cajaTask':'';
     return `<div class="acord-item" data-flag="${_flag}" style="${isDone?'opacity:0.6':''}">
       <div class="acord-header ${isOpen?'open':''}" style="${isDone?'background:#f5f5f5':''}">
         <span class="acord-arrow" onclick="toggleAcord('${fase.id}',${tiReal})" style="padding:4px 6px 4px 0;cursor:pointer">▶</span>
@@ -5191,7 +5209,7 @@ function renderFase(fase) {
         }
         <span onclick="toggleTareaDone('${fase.id}',${tiReal})" title="${isDone?'Reactivar':'Tachar tarea'}" style="cursor:pointer;font-size:14px;color:${isDone?fase.color:'#ccc'};padding:0 4px">${isDone?'✓':'○'}</span>
         <span onclick="editTareaTitulo('${fase.id}',${tiReal})" title="Editar nombre" style="cursor:pointer;font-size:12px;color:#bbb;padding:0 4px">✎</span>
-        ${!tarea.registroServicio&&!tarea.liquidacionServicios&&!tarea.disponibilidadDiaria&&!tarea.pipelineTask&&!tarea.respaldoTask&&!tarea.rendimientoCombTask&&!tarea.cierreServicioTask&&!tarea.liquidacionTask&&!tarea.cotizacionTask&&!tarea.rendicionTask&&!tarea.facturaTask&&!tarea.costosTask&&!tarea.cajaTask?`
+        ${!tarea.registroServicio&&!tarea.liquidacionServicios&&!tarea.disponibilidadDiaria&&!tarea.pipelineTask&&!tarea.respaldoTask&&!tarea.rendimientoCombTask&&!tarea.cierreServicioTask&&!tarea.liquidacionTask&&!tarea.cotizacionTask&&!tarea.calculadoraTask&&!tarea.rendicionTask&&!tarea.facturaTask&&!tarea.costosTask&&!tarea.cajaTask?`
       <span onclick="moverTarea('${fase.id}',${tiReal},-1)" title="Subir" style="cursor:pointer;font-size:10px;color:#ddd;padding:0 2px">▲</span>
       <span onclick="moverTarea('${fase.id}',${tiReal},1)" title="Bajar" style="cursor:pointer;font-size:10px;color:#ddd;padding:0 2px">▼</span>
       ${modoEdicion ? `
@@ -5264,6 +5282,7 @@ function renderFase(fase) {
         ${tarea.liquidacionTask ? `<div style="margin:-4px">${renderLiquidacionesV2()}</div>` : ''}
         ${tarea.rendimientoCombTask ? `<div style="margin:-4px">${renderRendimientoComb()}</div>` : ''}
         ${tarea.cotizacionTask ? `<div style="margin:-4px">${renderCotizacionPDF()}</div>` : ''}
+        ${tarea.calculadoraTask ? `<div style="margin:-4px">${renderCalculadoraServicios()}</div>` : ''}
         ${tarea.disponibilidadDiaria ? `<div style="margin:-4px">${renderDisponibilidad()}</div>` : ''}
         ${tarea.pipelineTask ? `<div style="margin-bottom:8px">${renderPipeline()}</div>` : ''}
         ${tarea.rendicionTask ? `<div style="margin:-4px">${renderRendiciones()}</div>` : ''}
