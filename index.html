@@ -5,11 +5,11 @@
   <meta http-equiv="cache-control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="pragma" content="no-cache">
   <meta http-equiv="expires" content="0">
-  <meta name="version" content="1774960000">
+  <meta name="version" content="1774970000">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <script>
 (function() {
-  var VERSION = '1774960000';
+  var VERSION = '1774970000';
   var stored = localStorage.getItem('gs_app_version');
   if (stored !== VERSION) {
     var session = localStorage.getItem('gs_session');
@@ -3690,11 +3690,80 @@ function getCotNumero(){return 'COT-'+String(622+(appData.cotizaciones||[]).leng
 
 // ── CALCULADORA DE SERVICIOS ──────────────────────────────────────────────────
 function renderCalculadoraServicios() {
+  const c = uiState.calc || {};
+  const tramos = c.tramos || [{origen:'',destino:'',km:''}];
+  const clientesLista = [...new Set((appData.pipeline||[]).map(p=>p.cliente))].sort();
+  const hoyISO = (()=>{const h=new Date();return `${h.getFullYear()}-${String(h.getMonth()+1).padStart(2,'0')}-${String(h.getDate()).padStart(2,'0')}`;})();
+  const inp = 'width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit;background:white';
+  const lbl = 'font-size:9px;font-weight:700;color:#888;margin-bottom:2px';
+  const sec = 'font-size:9px;font-weight:800;color:#546E7A;letter-spacing:1px;margin:10px 0 6px;padding-bottom:4px;border-bottom:1px solid #CFD8DC';
+
+  const tramosHTML = tramos.map((t,i) => `
+    <div style="background:white;border:1px solid #dde;border-radius:8px;padding:10px;margin-bottom:6px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+        <span style="font-size:10px;font-weight:700;color:#546E7A">TRAMO ${i+1}</span>
+        ${tramos.length>1?`<span onclick="(()=>{const tr=(uiState.calc.tramos||[]);tr.splice(${i},1);uiState.calc.tramos=tr;render()})()" style="color:#bbb;cursor:pointer;font-size:16px;line-height:1">×</span>`:''}
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 80px;gap:5px">
+        <div><div style="${lbl}">ORIGEN</div>
+          <input value="${t.origen||''}" oninput="(()=>{if(!uiState.calc)uiState.calc={};if(!uiState.calc.tramos)uiState.calc.tramos=[{}];uiState.calc.tramos[${i}]={...uiState.calc.tramos[${i}],origen:this.value}})()" placeholder="ej: Casablanca" style="${inp}"></div>
+        <div><div style="${lbl}">DESTINO</div>
+          <input value="${t.destino||''}" oninput="(()=>{if(!uiState.calc)uiState.calc={};if(!uiState.calc.tramos)uiState.calc.tramos=[{}];uiState.calc.tramos[${i}]={...uiState.calc.tramos[${i}],destino:this.value}})()" placeholder="ej: Santiago" style="${inp}"></div>
+        <div><div style="${lbl}">KM</div>
+          <input type="number" value="${t.km||''}" oninput="(()=>{if(!uiState.calc)uiState.calc={};if(!uiState.calc.tramos)uiState.calc.tramos=[{}];uiState.calc.tramos[${i}]={...uiState.calc.tramos[${i}],km:this.value}})()" placeholder="0" style="${inp}"></div>
+      </div>
+    </div>`).join('');
+
   return `<div style="padding:2px">
-    <div style="font-size:10px;font-weight:700;color:#546E7A;letter-spacing:0.5px;margin-bottom:8px">🧮 CALCULADORA DE SERVICIOS</div>
-    <div style="background:#F4F6F8;border-radius:8px;padding:16px;text-align:center;color:#90A4AE;font-size:11px">
-      Módulo en construcción
+    <div style="font-size:10px;font-weight:700;color:#546E7A;letter-spacing:0.5px;margin-bottom:10px">🧮 CALCULADORA DE SERVICIOS</div>
+
+    <!-- IDENTIFICACIÓN -->
+    <div style="${sec}">IDENTIFICACIÓN</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:6px">
+      <div style="grid-column:1/-1"><div style="${lbl}">CLIENTE</div>
+        <select onchange="if(!uiState.calc)uiState.calc={};uiState.calc.cliente=this.value" style="${inp};-webkit-appearance:auto">
+          <option value="">Seleccionar cliente...</option>
+          ${clientesLista.map(cl=>`<option value="${cl}" ${c.cliente===cl?'selected':''}>${cl}</option>`).join('')}
+        </select></div>
+      <div><div style="${lbl}">TRAMO / DESCRIPCIÓN</div>
+        <input value="${c.tramo||''}" oninput="if(!uiState.calc)uiState.calc={};uiState.calc.tramo=this.value" placeholder="ej: Casablanca–Santiago" style="${inp}"></div>
+      <div><div style="${lbl}">FECHA</div>
+        <input type="date" value="${c.fecha||hoyISO}" onchange="if(!uiState.calc)uiState.calc={};uiState.calc.fecha=this.value" style="${inp}"></div>
     </div>
+
+    <!-- PRECIO -->
+    <div style="${sec}">PRECIO</div>
+    <div style="margin-bottom:6px">
+      <div style="${lbl}">PRECIO NETO ($)</div>
+      <input type="number" value="${c.precio_neto||''}" oninput="if(!uiState.calc)uiState.calc={};uiState.calc.precio_neto=this.value" placeholder="ej: 350000" style="${inp};font-size:15px;font-weight:700">
+    </div>
+
+    <!-- TRAMOS KM -->
+    <div style="${sec}">TRAMOS DE KM</div>
+    ${tramosHTML}
+    ${tramos.length<4?`<button onclick="(()=>{if(!uiState.calc)uiState.calc={};if(!uiState.calc.tramos)uiState.calc.tramos=[{origen:'',destino:'',km:''}];if(uiState.calc.tramos.length<4){uiState.calc.tramos.push({origen:'',destino:'',km:''});render();}})()" style="width:100%;background:white;color:#546E7A;border:1px dashed #90A4AE;border-radius:7px;padding:8px;font-size:11px;cursor:pointer;font-weight:700;margin-bottom:6px">+ Agregar tramo</button>`:''}
+
+    <!-- COSTOS -->
+    <div style="${sec}">COSTOS</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:4px">
+      <div><div style="${lbl}">PETRÓLEO ($)</div>
+        <input type="number" value="${c.petroleo||''}" oninput="if(!uiState.calc)uiState.calc={};uiState.calc.petroleo=this.value" placeholder="0" style="${inp}"></div>
+      <div><div style="${lbl}">LITROS CARGADOS</div>
+        <input type="number" value="${c.litros||''}" oninput="if(!uiState.calc)uiState.calc={};uiState.calc.litros=this.value" placeholder="ej: 120" style="${inp}"></div>
+      <div><div style="${lbl}">PEAJES ($)</div>
+        <input type="number" value="${c.peajes||''}" oninput="if(!uiState.calc)uiState.calc={};uiState.calc.peajes=this.value" placeholder="0" style="${inp}"></div>
+      <div><div style="${lbl}">VIÁTICOS ($)</div>
+        <input type="number" value="${c.viaticos||''}" oninput="if(!uiState.calc)uiState.calc={};uiState.calc.viaticos=this.value" placeholder="0" style="${inp}"></div>
+      <div><div style="${lbl}">COMISIÓN CONDUCTOR ($)</div>
+        <input type="number" value="${c.comision||''}" oninput="if(!uiState.calc)uiState.calc={};uiState.calc.comision=this.value" placeholder="ej: 35000" style="${inp}"></div>
+      <div><div style="${lbl}">COSTO FIJO PRORRATEADO ($)</div>
+        <input type="number" value="${c.cf_prorrateado||''}" oninput="if(!uiState.calc)uiState.calc={};uiState.calc.cf_prorrateado=this.value" placeholder="ej: 50800" style="${inp}"></div>
+      <div><div style="${lbl}">ADICIONAL ($)</div>
+        <input type="number" value="${c.adicional||''}" oninput="if(!uiState.calc)uiState.calc={};uiState.calc.adicional=this.value" placeholder="0" style="${inp}"></div>
+      <div><div style="${lbl}">OTROS COSTOS ($)</div>
+        <input type="number" value="${c.otros||''}" oninput="if(!uiState.calc)uiState.calc={};uiState.calc.otros=this.value" placeholder="0" style="${inp}"></div>
+    </div>
+    <button onclick="uiState.calc={};render()" style="width:100%;margin-top:8px;padding:8px;background:transparent;color:#aaa;border:1px solid #eee;border-radius:7px;font-size:11px;cursor:pointer">Limpiar formulario</button>
   </div>`;
 }
 
