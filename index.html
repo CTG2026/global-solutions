@@ -5,11 +5,11 @@
   <meta http-equiv="cache-control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="pragma" content="no-cache">
   <meta http-equiv="expires" content="0">
-  <meta name="version" content="1774900000">
+  <meta name="version" content="1774910000">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <script>
 (function() {
-  var VERSION = '1774900000';
+  var VERSION = '1774910000';
   var stored = localStorage.getItem('gs_app_version');
   if (stored !== VERSION) {
     var session = localStorage.getItem('gs_session');
@@ -1511,7 +1511,7 @@ function crearRendicion() {
   const id = nextRendicionId();
   appData.rendiciones.push({ id, fecha: fechaStr, responsable, descripcion: descripcion||'', lineas, total, estado:'borrador', observaciones:'' });
   uiState.ren_lineas = [{fecha:'',categoria:'Combustible',descripcion:'',patente:'',monto:''}];
-  uiState.ren_form_open = false;
+  uiState.ren_form_open = false; uiState.ren_preview = false; uiState.ren_ui_fecha=''; uiState.ren_ui_resp='';
   registrarAccion(`Crear rendición ${id}`, () => {
     appData.rendiciones = appData.rendiciones.filter(r=>r.id!==id);
   });
@@ -1628,9 +1628,9 @@ function renderRendiciones() {
       <div style="font-size:10px;font-weight:800;color:#546E7A;letter-spacing:1px;margin-bottom:10px">NUEVA RENDICIÓN — ${nextRendicionId()}</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px">
         <div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">FECHA</div>
-          <input id="ren_fecha" type="date" value="${hoyISO}" style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit;background:white"></div>
+          <input id="ren_fecha" type="date" value="${uiState.ren_ui_fecha||hoyISO}" onchange="uiState.ren_ui_fecha=this.value" style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit;background:white"></div>
         <div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">RESPONSABLE</div>
-          <input id="ren_responsable" placeholder="Nombre del responsable" style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit"></div>
+          <input id="ren_responsable" placeholder="Nombre del responsable" value="${uiState.ren_ui_resp||''}" oninput="uiState.ren_ui_resp=this.value" style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit"></div>
       </div>
 
       <div style="font-size:9px;font-weight:800;color:#546E7A;letter-spacing:1px;margin-bottom:6px;padding-bottom:4px;border-bottom:1px solid #CFD8DC">LÍNEAS DE GASTO</div>
@@ -1659,9 +1659,63 @@ function renderRendiciones() {
           </div>
         </div>`).join('')}
       <button onclick="agregarLineaRendicion()" style="width:100%;background:white;color:#546E7A;border:1px dashed #90A4AE;border-radius:7px;padding:9px;font-size:11px;cursor:pointer;font-weight:700;margin-bottom:10px">+ Agregar línea de gasto</button>
+      <!-- VISTA PREVIA -->
+      <button onclick="uiState.ren_preview=!uiState.ren_preview;render()" style="width:100%;background:${uiState.ren_preview?'#E3F2FD':'white'};color:${uiState.ren_preview?'#1565C0':'#546E7A'};border:1px solid ${uiState.ren_preview?'#1565C0':'#90A4AE'};border-radius:7px;padding:9px;font-size:11px;cursor:pointer;font-weight:700;margin-bottom:8px">👁 ${uiState.ren_preview?'Ocultar vista previa':'Ver vista previa'}</button>
+      ${uiState.ren_preview?(()=>{
+        const pvFecha=uiState.ren_ui_fecha||hoyISO;
+        const pvResp=uiState.ren_ui_resp||'(sin responsable)';
+        const pvLineas=uiState.ren_lineas||[];
+        const pvTotal=pvLineas.reduce((a,l)=>a+(parseInt(l.monto)||0),0);
+        const pvId=nextRendicionId();
+        const pvFilas=pvLineas.map((l,i)=>`<tr style="background:${i%2===0?'#f9fafb':'white'}">
+          <td style="padding:6px 8px;border-bottom:1px solid #eee;font-size:10px">${l.fecha||'—'}</td>
+          <td style="padding:6px 8px;border-bottom:1px solid #eee;font-size:10px;font-weight:600">${l.categoria||'—'}</td>
+          <td style="padding:6px 8px;border-bottom:1px solid #eee;font-size:10px">${l.descripcion||'—'}</td>
+          <td style="padding:6px 8px;border-bottom:1px solid #eee;font-size:10px;color:#455A64">${l.patente||'—'}</td>
+          <td style="padding:6px 8px;border-bottom:1px solid #eee;font-size:10px;text-align:right;font-weight:700;color:#C62828">$${(parseInt(l.monto)||0).toLocaleString('es-CL')}</td>
+        </tr>`).join('');
+        return `<div style="border:2px solid #1565C0;border-radius:10px;overflow:hidden;margin-bottom:8px">
+          <div style="background:#0B2545;color:white;padding:8px 12px;font-size:9px;font-weight:700;letter-spacing:1px">VISTA PREVIA — RENDICIÓN DE GASTOS</div>
+          <div style="padding:12px;background:white">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;padding-bottom:8px;border-bottom:2px solid #0B2545">
+              <div>
+                <div style="font-size:13px;font-weight:900;color:#0B2545">GLOBAL SOLUTIONS SpA</div>
+                <div style="font-size:9px;color:#546E7A;font-weight:600">Transporte de Carga por Carretera</div>
+              </div>
+              <div style="text-align:right">
+                <div style="font-size:16px;font-weight:900;color:#0B2545">${pvId}</div>
+                <div style="font-size:9px;color:#546E7A">Período: ${pvFecha}</div>
+              </div>
+            </div>
+            <div style="background:#f4f6f8;border-radius:6px;padding:8px 10px;margin-bottom:8px">
+              <div style="font-size:8px;font-weight:700;color:#888;letter-spacing:1px;margin-bottom:2px">RESPONSABLE</div>
+              <div style="font-size:12px;font-weight:700;color:#222">${pvResp}</div>
+            </div>
+            <div style="font-size:8px;font-weight:700;color:#888;letter-spacing:1px;margin-bottom:4px">DETALLE DE GASTOS</div>
+            <div style="overflow-x:auto;margin-bottom:8px">
+              <table style="width:100%;border-collapse:collapse">
+                <thead><tr style="background:#0B2545;color:white">
+                  <th style="padding:5px 7px;text-align:left;font-size:8px">FECHA</th>
+                  <th style="padding:5px 7px;text-align:left;font-size:8px">CATEGORÍA</th>
+                  <th style="padding:5px 7px;text-align:left;font-size:8px">DESCRIPCIÓN</th>
+                  <th style="padding:5px 7px;text-align:left;font-size:8px">EQUIPO</th>
+                  <th style="padding:5px 7px;text-align:right;font-size:8px">MONTO</th>
+                </tr></thead>
+                <tbody>${pvFilas||'<tr><td colspan="5" style="padding:8px;text-align:center;font-size:10px;color:#aaa">Sin líneas agregadas</td></tr>'}</tbody>
+              </table>
+            </div>
+            <div style="display:flex;justify-content:flex-end">
+              <div style="background:#C62828;color:white;border-radius:6px;padding:8px 14px;display:flex;justify-content:space-between;gap:20px;min-width:200px">
+                <span style="font-size:11px;font-weight:700">TOTAL RENDICIÓN</span>
+                <span style="font-size:13px;font-weight:900">$${pvTotal.toLocaleString('es-CL')}</span>
+              </div>
+            </div>
+          </div>
+        </div>`;
+      })():''}
       <div style="display:flex;gap:6px">
         <button onclick="crearRendicion()" style="flex:1;background:#546E7A;color:white;border:none;border-radius:7px;padding:10px;font-size:12px;font-weight:700;cursor:pointer">💾 Guardar rendición</button>
-        <button onclick="uiState.ren_form_open=false;render()" style="background:#eee;color:#555;border:none;border-radius:7px;padding:10px 14px;font-size:12px;cursor:pointer">Cancelar</button>
+        <button onclick="uiState.ren_form_open=false;uiState.ren_preview=false;uiState.ren_ui_fecha='';uiState.ren_ui_resp='';render()" style="background:#eee;color:#555;border:none;border-radius:7px;padding:10px 14px;font-size:12px;cursor:pointer">Cancelar</button>
       </div>
     </div>` :
     `<button onclick="uiState.ren_form_open=true;render()" style="width:100%;background:white;border:1.5px dashed #90A4AE;border-radius:8px;padding:10px;font-size:12px;color:#546E7A;cursor:pointer;font-weight:700;margin-bottom:10px">+ Nueva rendición</button>`;
