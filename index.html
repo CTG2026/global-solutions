@@ -5,11 +5,11 @@
   <meta http-equiv="cache-control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="pragma" content="no-cache">
   <meta http-equiv="expires" content="0">
-  <meta name="version" content="1774930000">
+  <meta name="version" content="1774940000">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <script>
 (function() {
-  var VERSION = '1774930000';
+  var VERSION = '1774940000';
   var stored = localStorage.getItem('gs_app_version');
   if (stored !== VERSION) {
     var session = localStorage.getItem('gs_session');
@@ -1851,6 +1851,7 @@ function guardarFactoring(id) {
   f.factoringCostoOp=parseInt(document.getElementById('fac_fact_costo_op_'+id)?.value||ft.costo_op)||f.factoringCostoOp||0;
   f.factoringCostoMora=parseInt(document.getElementById('fac_fact_costo_mora_'+id)?.value||ft.costo_mora)||f.factoringCostoMora||0;
   f.factoringOtrosCostos=parseInt(document.getElementById('fac_fact_otros_'+id)?.value||ft.otros_costos)||f.factoringOtrosCostos||0;
+  f.factoringMontoGirado=parseInt(document.getElementById('fac_fact_girado_'+id)?.value||ft.monto_girado)||f.factoringMontoGirado||0;
   f.factoringFechaLiquidacion=plStr||f.factoringFechaLiquidacion;
   delete uiState['fac_ft_'+id];
   saveData(); upsertFacturaSupabase(f);
@@ -1954,6 +1955,8 @@ function renderFacturas() {
               <input id="fac_fact_costo_mora_${f.id}" type="number" value="${(uiState['fac_ft_'+f.id]||{}).costo_mora||f.factoringCostoMora||''}" oninput="if(!uiState['fac_ft_${f.id}'])uiState['fac_ft_${f.id}']={};uiState['fac_ft_${f.id}'].costo_mora=this.value" placeholder="0" style="width:100%;border:1px solid #dde;border-radius:5px;padding:6px 8px;font-size:12px;outline:none;font-family:inherit"></div>
             <div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">OTROS COSTOS ($)</div>
               <input id="fac_fact_otros_${f.id}" type="number" value="${(uiState['fac_ft_'+f.id]||{}).otros_costos||f.factoringOtrosCostos||''}" oninput="if(!uiState['fac_ft_${f.id}'])uiState['fac_ft_${f.id}']={};uiState['fac_ft_${f.id}'].otros_costos=this.value" placeholder="0" style="width:100%;border:1px solid #dde;border-radius:5px;padding:6px 8px;font-size:12px;outline:none;font-family:inherit"></div>
+            <div style="grid-column:1/-1"><div style="font-size:9px;font-weight:700;color:#2E7D32;margin-bottom:2px">MONTO GIRADO A GS ($)</div>
+              <input id="fac_fact_girado_${f.id}" type="number" value="${(uiState['fac_ft_'+f.id]||{}).monto_girado||f.factoringMontoGirado||''}" oninput="if(!uiState['fac_ft_${f.id}'])uiState['fac_ft_${f.id}']={};uiState['fac_ft_${f.id}'].monto_girado=this.value" placeholder="Monto neto recibido" style="width:100%;border:2px solid #A5D6A7;border-radius:5px;padding:6px 8px;font-size:13px;font-weight:700;outline:none;font-family:inherit;background:#F1F8E9;color:#2E7D32"></div>
             <div style="grid-column:1/-1"><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">FECHA LIQUIDACIÓN FINAL (GS recibe saldo)</div>
               <input id="fac_fact_liq_${f.id}" type="date" value="${(()=>{const ov=(uiState['fac_ft_'+f.id]||{}).fecha_liq;if(ov)return ov;const p=(f.factoringFechaLiquidacion||'').split('-');return p[0].length===2?p[2]+'-'+p[1]+'-'+p[0]:f.factoringFechaLiquidacion||'';})()}" onchange="if(!uiState['fac_ft_${f.id}'])uiState['fac_ft_${f.id}']={};uiState['fac_ft_${f.id}'].fecha_liq=this.value" style="width:100%;border:1px solid #dde;border-radius:5px;padding:6px 8px;font-size:12px;outline:none;font-family:inherit"></div>
           </div>
@@ -2047,6 +2050,7 @@ function renderFacturas() {
           <td style="padding:4px 6px;font-size:10px;font-weight:700;color:${vctoColor};background:${vctoBg};border-radius:4px;white-space:nowrap">${vctoLabel}</td>
           <td style="padding:5px 4px;font-size:10px;color:#546E7A">${f.factoringFechaLiquidacion||'—'}</td>
           <td style="padding:5px 4px;font-size:10px;color:#C62828">${costoTotal?'$'+costoTotal.toLocaleString('es-CL'):'—'}</td>
+          <td style="padding:5px 4px;font-size:10px;font-weight:700;color:#2E7D32">${f.factoringMontoGirado?'$'+f.factoringMontoGirado.toLocaleString('es-CL'):'—'}</td>
           <td style="padding:5px 4px;font-size:10px">${estadoConf[f.estado]||'📄'} ${f.estado||'emitida'}</td>
         </tr>`;
       }).join('');
@@ -2066,6 +2070,7 @@ function renderFacturas() {
             <th style="padding:5px 4px;text-align:left;font-size:9px;color:#C62828;font-weight:900">VCTO DEUDOR</th>
             <th style="padding:5px 4px;text-align:left;font-size:9px;color:#E65100">LIQ. FINAL</th>
             <th style="padding:5px 4px;text-align:left;font-size:9px;color:#E65100">COSTOS</th>
+            <th style="padding:5px 4px;text-align:left;font-size:9px;color:#2E7D32;font-weight:900">GIRADO</th>
             <th style="padding:5px 4px;text-align:left;font-size:9px;color:#E65100">ESTADO</th>
           </tr></thead>
           <tbody>${filas}</tbody>
@@ -5709,6 +5714,7 @@ async function syncFacturasDesdeSupabase() {
           factoringCostoOp: loc.factoringCostoOp||0,
           factoringCostoMora: loc.factoringCostoMora||0,
           factoringOtrosCostos: loc.factoringOtrosCostos||0,
+          factoringMontoGirado: loc.factoringMontoGirado||0,
         };
       });
       saveData();
