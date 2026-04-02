@@ -5,11 +5,11 @@
   <meta http-equiv="cache-control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="pragma" content="no-cache">
   <meta http-equiv="expires" content="0">
-  <meta name="version" content="1775010000">
+  <meta name="version" content="1775020000">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <script>
 (function() {
-  var VERSION = '1775010000';
+  var VERSION = '1775020000';
   var stored = localStorage.getItem('gs_app_version');
   if (stored !== VERSION) {
     var session = localStorage.getItem('gs_session');
@@ -3720,6 +3720,77 @@ function _calcResumen(c) {
     petroleo, tag, peajes, viaticos, comision, base_chofer, coordinador, mantenedor, controller, cf, fin_pct, financiero, adicional, otros };
 }
 
+function guardarCotizacionCalc() {
+  var c = uiState.calc || {};
+  if (!c.precio_neto) { alert('⚠️ Ingresa al menos el precio neto antes de guardar.'); return; }
+  var r = _calcResumen(c);
+  if (!appData.cotizaciones_calc) appData.cotizaciones_calc = [];
+  var num = String(appData.cotizaciones_calc.length + 1).padStart(3, '0');
+  var id = 'COT-C-' + num;
+  var hoy = (function(){var h=new Date();return h.getFullYear()+'-'+String(h.getMonth()+1).padStart(2,'0')+'-'+String(h.getDate()).padStart(2,'0');})();
+  appData.cotizaciones_calc.push({
+    id: id,
+    fecha: c.fecha || hoy,
+    cliente: c.cliente || '',
+    tramo: c.tramo || '',
+    tramos: JSON.parse(JSON.stringify(c.tramos||[])),
+    precio: r.precio,
+    totalCostos: r.totalCostos,
+    margen: r.margen,
+    margenPct: r.margenPct,
+    porKm: r.porKm,
+    totalKm: r.totalKm,
+    secs: JSON.parse(JSON.stringify(uiState.calc_preview_secs||{})),
+    calcData: JSON.parse(JSON.stringify(c)),
+    timestamp: Date.now(),
+  });
+  saveData();
+  alert('✅ Guardado como ' + id);
+  render();
+}
+
+function imprimirCalculadora() {
+  var c = uiState.calc || {};
+  var r = _calcResumen(c);
+  var secs = uiState.calc_preview_secs || {};
+  var n = appData.cotizaciones_calc ? appData.cotizaciones_calc.length : 0;
+  var numLabel = 'COT-C-' + String(n + 1).padStart(3, '0');
+  var hoy = (function(){var h=new Date();return h.getFullYear()+'-'+String(h.getMonth()+1).padStart(2,'0')+'-'+String(h.getDate()).padStart(2,'0');})();
+  var mc = r.margen>0?'#2E7D32':r.margen<0?'#C62828':'#546E7A';
+  var tramosRows = (c.tramos||[]).filter(function(t){return t.km||t.origen||t.destino;}).map(function(t){
+    return '<tr><td style="padding:6px 10px;border:1px solid #ddd">'+( t.origen||'—')+' → '+(t.destino||'—')+'</td><td style="padding:6px 10px;border:1px solid #ddd;text-align:right;font-weight:700">'+(t.km?t.km+' km':'—')+'</td></tr>';
+  }).join('');
+  var pvCr = function(k,lbl,v){return (secs[k]&&v)?'<tr><td style="padding:6px 10px;border:1px solid #ddd">'+lbl+'</td><td style="padding:6px 10px;border:1px solid #ddd;text-align:right;color:#C62828;font-weight:600">-$'+v.toLocaleString('es-CL')+'</td></tr>':'';};
+  var costRows = pvCr('combustible','Combustible',r.petroleo)+pvCr('tag','TAG',r.tag)+pvCr('peajes','Peajes',r.peajes)+pvCr('viaticos','Viáticos',r.viaticos)+pvCr('comision','Comisión conductor',r.comision)+pvCr('base_chofer','Base chofer',r.base_chofer)+pvCr('coordinador','Costo coordinador',r.coordinador)+pvCr('mantenedor','Costo mantenedor',r.mantenedor)+pvCr('controller','Costo controller',r.controller)+pvCr('cf','Costo fijo prorrateado',r.cf)+pvCr('financiero','Costo financiero',r.financiero)+pvCr('adicional','Adicional',r.adicional)+pvCr('otros','Otros costos',r.otros);
+  var html = '<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>'+numLabel+'</title>'
+    +'<style>body{font-family:"Segoe UI",Arial,sans-serif;color:#222;margin:0 auto;padding:30px;max-width:660px}table{border-collapse:collapse;width:100%;margin-bottom:16px}th{background:#0B2545;color:white;padding:7px 10px;text-align:left;font-size:11px;letter-spacing:.5px}@media print{.no-print{display:none!important}body{padding:15px}}</style></head><body>'
+    +'<div style="background:#0B2545;color:white;padding:20px 24px;border-radius:8px;margin-bottom:20px">'
+    +'<div style="font-size:20px;font-weight:900;letter-spacing:.5px">Global Solutions SpA</div>'
+    +'<div style="font-size:11px;opacity:.75;margin-top:3px">Transporte de Carga Agroindustrial</div>'
+    +'<div style="font-size:14px;font-weight:800;margin-top:12px;padding-top:12px;border-top:1px solid rgba(255,255,255,.2)">COTIZACIÓN DE SERVICIOS</div>'
+    +'</div>'
+    +'<table style="font-size:12px;border-collapse:collapse;margin-bottom:16px">'
+    +'<tr><td style="padding:4px 8px;color:#888;width:130px">N° Cotización</td><td style="padding:4px 8px;font-weight:700">'+numLabel+'</td></tr>'
+    +'<tr><td style="padding:4px 8px;color:#888">Fecha</td><td style="padding:4px 8px">'+(c.fecha||hoy)+'</td></tr>'
+    +(c.cliente?'<tr><td style="padding:4px 8px;color:#888">Cliente</td><td style="padding:4px 8px;font-weight:600">'+c.cliente+'</td></tr>':'')
+    +(c.tramo?'<tr><td style="padding:4px 8px;color:#888">Ruta</td><td style="padding:4px 8px">'+c.tramo+'</td></tr>':'')
+    +'</table>'
+    +(tramosRows?'<table><thead><tr><th>TRAMO</th><th style="text-align:right">DISTANCIA</th></tr></thead><tbody>'+tramosRows+'</tbody>'+(r.totalKm?'<tfoot><tr><td style="padding:6px 10px;font-weight:800;border:1px solid #ddd">TOTAL KILÓMETROS</td><td style="padding:6px 10px;text-align:right;font-weight:800;border:1px solid #ddd">'+r.totalKm+' km</td></tr></tfoot>':'')+'</table>':'')
+    +(secs.precio&&r.precio?'<div style="margin-bottom:16px;padding:14px;background:#F1F8E9;border:2px solid #2E7D32;border-radius:8px;display:flex;justify-content:space-between;align-items:center"><span style="font-size:13px;font-weight:800;color:#1B5E20">PRECIO NETO</span><span style="font-size:20px;font-weight:900;color:#1B5E20">$'+r.precio.toLocaleString('es-CL')+'</span></div>':'')
+    +(costRows?'<table><thead><tr><th>CONCEPTO</th><th style="text-align:right">MONTO</th></tr></thead><tbody>'+costRows+'</tbody>'+(secs.total_costos&&r.totalCostos?'<tfoot><tr><td style="padding:6px 10px;font-weight:800;border:1px solid #ddd">TOTAL COSTOS</td><td style="padding:6px 10px;text-align:right;font-weight:800;color:#C62828;border:1px solid #ddd">-$'+r.totalCostos.toLocaleString('es-CL')+'</td></tr></tfoot>':'')+'</table>':'')
+    +((secs.margen_neto||secs.margen_pct||secs.por_km)?'<div style="background:#F4F6F8;border:1px solid #CFD8DC;border-radius:8px;padding:14px;margin-bottom:20px">'+(secs.margen_neto&&(r.precio||r.totalCostos)?'<div style="display:flex;justify-content:space-between;padding:4px 0"><span style="font-size:13px;font-weight:800;color:'+mc+'">MARGEN NETO</span><span style="font-size:18px;font-weight:900;color:'+mc+'">$'+r.margen.toLocaleString('es-CL')+'</span></div>':'')+(secs.margen_pct&&r.margenPct!==null?'<div style="display:flex;justify-content:space-between;padding:3px 0;font-size:12px"><span style="color:'+mc+';font-weight:700">MARGEN %</span><span style="color:'+mc+';font-weight:800">'+r.margenPct+'%</span></div>':'')+(secs.por_km&&r.porKm!==null?'<div style="display:flex;justify-content:space-between;padding:3px 0;font-size:12px"><span style="color:#546E7A;font-weight:700">RESULTADO / KM</span><span style="color:'+mc+';font-weight:800">$'+r.porKm.toLocaleString('es-CL')+'/km</span></div>':'')+'</div>':'')
+    +'<div style="border-top:1px solid #eee;padding-top:14px;font-size:10px;color:#888;display:flex;justify-content:space-between">'
+    +'<span>Global Solutions SpA</span><span>Válido 48 horas desde emisión</span><span>Emitido: '+hoy+'</span></div>'
+    +'<div class="no-print" style="margin-top:20px;text-align:center">'
+    +'<button onclick="window.print()" style="padding:10px 24px;background:#0B2545;color:white;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer">🖨️ Imprimir / PDF</button>'
+    +' <button onclick="window.close()" style="padding:10px 16px;background:transparent;color:#888;border:1px solid #ddd;border-radius:8px;font-size:13px;cursor:pointer">Cerrar</button>'
+    +'</div>'
+    +'<scr'+'ipt>setTimeout(function(){window.print();},500);<\/scr'+'ipt>'
+    +'</body></html>';
+  var w = window.open('','_blank','width=780,height=900');
+  if (w) { w.document.write(html); w.document.close(); }
+}
+
 function _resumenHTML(r) {
   var mc  = r.margen > 0 ? '#2E7D32' : r.margen < 0 ? '#C62828' : '#546E7A';
   var mb  = r.margen > 0 ? '#E8F5E9' : r.margen < 0 ? '#FFEBEE' : '#F4F6F8';
@@ -3850,7 +3921,12 @@ function renderCalculadoraServicios() {
     +(secs.margen_neto&&(r.precio||r.totalCostos)?'<div style="display:flex;justify-content:space-between;align-items:baseline;padding:4px 0 3px"><span style="font-size:12px;font-weight:800;color:'+_mc+'">MARGEN NETO</span><span style="font-size:15px;font-weight:900;color:'+_mc+'">'+(r.precio||r.totalCostos?'$'+r.margen.toLocaleString('es-CL'):'—')+'</span></div>':'')
     +(secs.margen_pct&&r.margenPct!==null?'<div style="display:flex;justify-content:space-between;padding:2px 0;font-size:11px"><span style="color:'+_mc+';font-weight:700">MARGEN %</span><span style="color:'+_mc+';font-weight:800">'+r.margenPct+'%</span></div>':'')
     +(secs.por_km&&r.porKm!==null?'<div style="display:flex;justify-content:space-between;padding:2px 0 3px;font-size:11px"><span style="color:#546E7A;font-weight:700">RESULTADO / KM</span><span style="color:'+_mc+';font-weight:800">$'+r.porKm.toLocaleString('es-CL')+'/km</span></div>':'')
-    +'</div></div>';
+    +'</div>'
+    +'<div style="display:flex;gap:6px;margin-top:10px">'
+    +'<button onclick="guardarCotizacionCalc()" style="flex:1;padding:9px;background:#2E7D32;color:white;border:none;border-radius:7px;font-size:11px;cursor:pointer;font-weight:700">💾 Guardar cotización</button>'
+    +'<button onclick="imprimirCalculadora()" style="flex:1;padding:9px;background:#0B2545;color:white;border:none;border-radius:7px;font-size:11px;cursor:pointer;font-weight:700">🖨️ Imprimir / PDF</button>'
+    +'</div>'
+    +'</div>';
 
   return `<div style="padding:2px">
     <div style="font-size:10px;font-weight:700;color:#546E7A;letter-spacing:0.5px;margin-bottom:10px">🧮 CALCULADORA DE SERVICIOS</div>
@@ -3934,6 +4010,23 @@ function renderCalculadoraServicios() {
     </div>
 
     <button onclick="uiState.calc={};uiState.calc_preview=false;uiState.calc_preview_secs=undefined;render()" style="width:100%;margin-top:8px;padding:8px;background:transparent;color:#aaa;border:1px solid #eee;border-radius:7px;font-size:11px;cursor:pointer">Limpiar formulario</button>
+
+    <!-- HISTORIAL -->
+    ${(()=>{
+      const lista = (appData.cotizaciones_calc||[]).slice().reverse();
+      if (!lista.length) return '';
+      const mc2 = (m) => m>0?'#2E7D32':m<0?'#C62828':'#888';
+      return '<div style="margin-top:12px">'
+        +'<div style="font-size:9px;font-weight:800;color:#546E7A;letter-spacing:1px;margin-bottom:6px">COTIZACIONES GUARDADAS ('+lista.length+')</div>'
+        +lista.slice(0,8).map(ct=>'<div style="background:white;border:1px solid #dde;border-radius:8px;padding:8px 10px;margin-bottom:5px;display:flex;justify-content:space-between;align-items:center">'
+          +'<div><div style="font-size:10px;font-weight:800;color:#0B2545">'+ct.id+'</div>'
+          +'<div style="font-size:10px;color:#888">'+ct.fecha+(ct.cliente?' · '+ct.cliente:'')+(ct.tramo?' · '+ct.tramo:'')+'</div></div>'
+          +'<div style="text-align:right">'
+          +'<div style="font-size:11px;font-weight:700;color:#333">'+(ct.precio?'$'+ct.precio.toLocaleString('es-CL'):'—')+'</div>'
+          +'<div style="font-size:10px;font-weight:700;color:'+mc2(ct.margen)+'">'+(ct.margen!==undefined?'$'+ct.margen.toLocaleString('es-CL')+(ct.margenPct!==null?' ('+ct.margenPct+'%)':''):'')+'</div>'
+          +'</div></div>').join('')
+        +'</div>';
+    })()}
   </div>`;
 }
 
@@ -4368,6 +4461,7 @@ function loadData() {
         remuneraciones: (viejos.remuneraciones && viejos.remuneraciones.length > 0) ? viejos.remuneraciones : JSON.parse(JSON.stringify(DEFAULT_DATA.remuneraciones)),
         clientesRut: viejos.clientesRut || {},
         cotizaciones: viejos.cotizaciones || [],
+        cotizaciones_calc: viejos.cotizaciones_calc || [],
         rendimientoComb: viejos.rendimientoComb || [],
         dashboard: viejos.dashboard || {},
       };
@@ -4383,6 +4477,7 @@ function loadData() {
     if (datosAPreservar.patentes?.length) appData.patentes = datosAPreservar.patentes;
     if (Object.keys(datosAPreservar.clientesRut||{}).length) appData.clientesRut = datosAPreservar.clientesRut;
     if (datosAPreservar.cotizaciones?.length) appData.cotizaciones = datosAPreservar.cotizaciones;
+    if (datosAPreservar.cotizaciones_calc?.length) appData.cotizaciones_calc = datosAPreservar.cotizaciones_calc;
     if (datosAPreservar.rendimientoComb?.length) appData.rendimientoComb = datosAPreservar.rendimientoComb;
     if (datosAPreservar.camionetas?.length) appData.camionetas = datosAPreservar.camionetas;
     if (datosAPreservar.costos?.length) appData.costos = datosAPreservar.costos;
