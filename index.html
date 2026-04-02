@@ -5,11 +5,11 @@
   <meta http-equiv="cache-control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="pragma" content="no-cache">
   <meta http-equiv="expires" content="0">
-  <meta name="version" content="1774980000">
+  <meta name="version" content="1774990000">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <script>
 (function() {
-  var VERSION = '1774980000';
+  var VERSION = '1774990000';
   var stored = localStorage.getItem('gs_app_version');
   if (stored !== VERSION) {
     var session = localStorage.getItem('gs_session');
@@ -3693,8 +3693,11 @@ function _calcResumen(c) {
   const precio  = parseInt(c.precio_neto) || 0;
   const tramos  = c.tramos || [];
   const totalKm = tramos.reduce((a,t) => a + (parseFloat(t.km)||0), 0);
-  const litros  = parseFloat(c.litros) || 0;
-  const petroleo    = parseInt(c.petroleo)     || 0;
+  const precioComb = parseInt(c.precio_comb)   || 0;
+  const rendEquipo = parseFloat(c.rend_equipo) || 0;
+  const litrosCalc = rendEquipo > 0 && totalKm > 0 ? totalKm / rendEquipo : 0;
+  const litros     = Math.round(litrosCalc);
+  const petroleo   = Math.round(litrosCalc * precioComb);
   const peajes      = parseInt(c.peajes)       || 0;
   const viaticos    = parseInt(c.viaticos)     || 0;
   const comision    = parseInt(c.comision)     || 0;
@@ -3705,8 +3708,8 @@ function _calcResumen(c) {
   const margen      = precio - totalCostos;
   const margenPct   = precio > 0 ? Math.round((margen / precio) * 100) : null;
   const porKm       = totalKm > 0 ? Math.round(margen / totalKm) : null;
-  const rendimiento = totalKm > 0 && litros > 0 ? (totalKm / litros).toFixed(1) : null;
-  return { precio, totalKm, litros, totalCostos, margen, margenPct, porKm, rendimiento,
+  const rendimiento = rendEquipo > 0 ? rendEquipo.toFixed(1) : null;
+  return { precio, totalKm, litros, precioComb, rendEquipo, totalCostos, margen, margenPct, porKm, rendimiento,
     petroleo, peajes, viaticos, comision, cf, adicional, otros };
 }
 
@@ -3747,13 +3750,13 @@ function calcularServicio() {
         ${r.rendimiento ? `<div style="background:white;border-radius:7px;padding:8px 10px;text-align:center">
           <div style="font-size:8px;color:#888;font-weight:700;margin-bottom:2px">RENDIMIENTO</div>
           <div style="font-size:14px;font-weight:900;color:#1565C0">${r.rendimiento} km/L</div>
-          <div style="font-size:9px;color:#aaa">${r.litros}L cargados</div>
+          <div style="font-size:9px;color:#aaa">${r.litros}L est.</div>
         </div>` : ''}
       </div>
       ${r.totalCostos ? `<div style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(0,0,0,0.08)">
         <div style="font-size:8px;font-weight:700;color:#888;margin-bottom:4px">DESGLOSE COSTOS</div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:2px;font-size:10px">
-          ${r.petroleo  ? `<span style="color:#555">Petróleo</span><span style="text-align:right;color:#C62828">$${r.petroleo.toLocaleString('es-CL')}</span>` : ''}
+          ${r.petroleo  ? `<span style="color:#555">Combustible</span><span style="text-align:right;color:#C62828">$${r.petroleo.toLocaleString('es-CL')}</span>` : ''}
           ${r.peajes    ? `<span style="color:#555">Peajes</span><span style="text-align:right;color:#C62828">$${r.peajes.toLocaleString('es-CL')}</span>` : ''}
           ${r.viaticos  ? `<span style="color:#555">Viáticos</span><span style="text-align:right;color:#C62828">$${r.viaticos.toLocaleString('es-CL')}</span>` : ''}
           ${r.comision  ? `<span style="color:#555">Comisión conductor</span><span style="text-align:right;color:#C62828">$${r.comision.toLocaleString('es-CL')}</span>` : ''}
@@ -3763,6 +3766,8 @@ function calcularServicio() {
         </div>
       </div>` : ''}
     </div>`;
+  const elComb = document.getElementById('calc_comb_display');
+  if (elComb) elComb.innerHTML = '⛽ Costo combustible: ' + (r.petroleo ? '$'+r.petroleo.toLocaleString('es-CL') : (r.precioComb||r.rendEquipo ? '(faltan km)' : '—'));
 }
 
 function _calcToggle(key) {
@@ -3830,13 +3835,13 @@ function renderCalculadoraServicios() {
         ${r.rendimiento ? `<div style="background:white;border-radius:7px;padding:8px 10px;text-align:center">
           <div style="font-size:8px;color:#888;font-weight:700;margin-bottom:2px">RENDIMIENTO</div>
           <div style="font-size:14px;font-weight:900;color:#1565C0">${r.rendimiento} km/L</div>
-          <div style="font-size:9px;color:#aaa">${r.litros}L cargados</div>
+          <div style="font-size:9px;color:#aaa">${r.litros}L est.</div>
         </div>` : ''}
       </div>
       ${r.totalCostos ? `<div style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(0,0,0,0.08)">
         <div style="font-size:8px;font-weight:700;color:#888;margin-bottom:4px">DESGLOSE COSTOS</div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:2px;font-size:10px">
-          ${r.petroleo  ? `<span style="color:#555">Petróleo</span><span style="text-align:right;color:#C62828">$${r.petroleo.toLocaleString('es-CL')}</span>` : ''}
+          ${r.petroleo  ? `<span style="color:#555">Combustible</span><span style="text-align:right;color:#C62828">$${r.petroleo.toLocaleString('es-CL')}</span>` : ''}
           ${r.peajes    ? `<span style="color:#555">Peajes</span><span style="text-align:right;color:#C62828">$${r.peajes.toLocaleString('es-CL')}</span>` : ''}
           ${r.viaticos  ? `<span style="color:#555">Viáticos</span><span style="text-align:right;color:#C62828">$${r.viaticos.toLocaleString('es-CL')}</span>` : ''}
           ${r.comision  ? `<span style="color:#555">Comisión conductor</span><span style="text-align:right;color:#C62828">$${r.comision.toLocaleString('es-CL')}</span>` : ''}
@@ -3873,7 +3878,7 @@ function renderCalculadoraServicios() {
     +(secs.ident&&(c.cliente||c.tramo||c.fecha)?'<div style="margin-bottom:10px"><div style="font-size:8px;font-weight:800;color:#546E7A;letter-spacing:1px;margin-bottom:4px;border-bottom:1px solid #ECEFF1;padding-bottom:3px">IDENTIFICACIÓN</div>'+(c.cliente?'<div style="font-size:11px;margin-bottom:2px"><b>Cliente:</b> '+c.cliente+'</div>':'')+(c.tramo?'<div style="font-size:11px;margin-bottom:2px"><b>Tramo:</b> '+c.tramo+'</div>':'')+(c.fecha?'<div style="font-size:11px"><b>Fecha:</b> '+c.fecha+'</div>':'')+'</div>':'')
     +(secs.tramos&&tramosPreview?'<div style="margin-bottom:10px"><div style="font-size:8px;font-weight:800;color:#546E7A;letter-spacing:1px;margin-bottom:4px;border-bottom:1px solid #ECEFF1;padding-bottom:3px">TRAMOS'+(r.totalKm?' — '+r.totalKm+' KM TOTALES':'')+'</div><table style="width:100%;border-collapse:collapse">'+tramosPreview+'</table></div>':'')
     +(secs.precio&&r.precio?'<div style="margin-bottom:10px"><div style="font-size:8px;font-weight:800;color:#546E7A;letter-spacing:1px;margin-bottom:4px;border-bottom:1px solid #ECEFF1;padding-bottom:3px">PRECIO</div><div style="font-size:15px;font-weight:900;color:#1B5E20">$'+r.precio.toLocaleString('es-CL')+'</div></div>':'')
-    +(secs.costos&&r.totalCostos?'<div style="margin-bottom:10px"><div style="font-size:8px;font-weight:800;color:#546E7A;letter-spacing:1px;margin-bottom:4px;border-bottom:1px solid #ECEFF1;padding-bottom:3px">COSTOS</div><table style="width:100%;border-collapse:collapse;font-size:11px">'+(r.petroleo?'<tr><td style="padding:2px 4px;color:#555">Petróleo</td><td style="padding:2px 4px;text-align:right;color:#C62828">$'+r.petroleo.toLocaleString('es-CL')+'</td></tr>':'')+(r.peajes?'<tr><td style="padding:2px 4px;color:#555">Peajes</td><td style="padding:2px 4px;text-align:right;color:#C62828">$'+r.peajes.toLocaleString('es-CL')+'</td></tr>':'')+(r.viaticos?'<tr><td style="padding:2px 4px;color:#555">Viáticos</td><td style="padding:2px 4px;text-align:right;color:#C62828">$'+r.viaticos.toLocaleString('es-CL')+'</td></tr>':'')+(r.comision?'<tr><td style="padding:2px 4px;color:#555">Comisión conductor</td><td style="padding:2px 4px;text-align:right;color:#C62828">$'+r.comision.toLocaleString('es-CL')+'</td></tr>':'')+(r.cf?'<tr><td style="padding:2px 4px;color:#555">Costo fijo</td><td style="padding:2px 4px;text-align:right;color:#C62828">$'+r.cf.toLocaleString('es-CL')+'</td></tr>':'')+(r.adicional?'<tr><td style="padding:2px 4px;color:#555">Adicional</td><td style="padding:2px 4px;text-align:right;color:#C62828">$'+r.adicional.toLocaleString('es-CL')+'</td></tr>':'')+(r.otros?'<tr><td style="padding:2px 4px;color:#555">Otros</td><td style="padding:2px 4px;text-align:right;color:#C62828">$'+r.otros.toLocaleString('es-CL')+'</td></tr>':'')+'<tr style="border-top:1px solid #eee"><td style="padding:4px;font-weight:700">TOTAL</td><td style="padding:4px;text-align:right;font-weight:800;color:#C62828">$'+r.totalCostos.toLocaleString('es-CL')+'</td></tr></table></div>':'')
+    +(secs.costos&&r.totalCostos?'<div style="margin-bottom:10px"><div style="font-size:8px;font-weight:800;color:#546E7A;letter-spacing:1px;margin-bottom:4px;border-bottom:1px solid #ECEFF1;padding-bottom:3px">COSTOS</div><table style="width:100%;border-collapse:collapse;font-size:11px">'+(r.petroleo?'<tr><td style="padding:2px 4px;color:#555">Combustible</td><td style="padding:2px 4px;text-align:right;color:#C62828">$'+r.petroleo.toLocaleString('es-CL')+'</td></tr>':'')+(r.peajes?'<tr><td style="padding:2px 4px;color:#555">Peajes</td><td style="padding:2px 4px;text-align:right;color:#C62828">$'+r.peajes.toLocaleString('es-CL')+'</td></tr>':'')+(r.viaticos?'<tr><td style="padding:2px 4px;color:#555">Viáticos</td><td style="padding:2px 4px;text-align:right;color:#C62828">$'+r.viaticos.toLocaleString('es-CL')+'</td></tr>':'')+(r.comision?'<tr><td style="padding:2px 4px;color:#555">Comisión conductor</td><td style="padding:2px 4px;text-align:right;color:#C62828">$'+r.comision.toLocaleString('es-CL')+'</td></tr>':'')+(r.cf?'<tr><td style="padding:2px 4px;color:#555">Costo fijo</td><td style="padding:2px 4px;text-align:right;color:#C62828">$'+r.cf.toLocaleString('es-CL')+'</td></tr>':'')+(r.adicional?'<tr><td style="padding:2px 4px;color:#555">Adicional</td><td style="padding:2px 4px;text-align:right;color:#C62828">$'+r.adicional.toLocaleString('es-CL')+'</td></tr>':'')+(r.otros?'<tr><td style="padding:2px 4px;color:#555">Otros</td><td style="padding:2px 4px;text-align:right;color:#C62828">$'+r.otros.toLocaleString('es-CL')+'</td></tr>':'')+'<tr style="border-top:1px solid #eee"><td style="padding:4px;font-weight:700">TOTAL</td><td style="padding:4px;text-align:right;font-weight:800;color:#C62828">$'+r.totalCostos.toLocaleString('es-CL')+'</td></tr></table></div>':'')
     +(secs.margen&&(r.precio||r.totalCostos)?'<div style="background:'+margenBg+';border:2px solid '+margenColor+';border-radius:7px;padding:10px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center"><span style="font-size:11px;font-weight:800;color:'+margenColor+'">MARGEN NETO</span><div style="text-align:right"><div style="font-size:15px;font-weight:900;color:'+margenColor+'">$'+r.margen.toLocaleString('es-CL')+'</div>'+(r.margenPct!==null?'<div style="font-size:10px;color:'+margenColor+';font-weight:700">'+r.margenPct+'%</div>':'')+'</div></div>':'')
     +((secs.por_km&&r.porKm!==null)||(secs.rendimiento&&r.rendimiento)?'<div style="display:grid;grid-template-columns:'+((secs.por_km&&r.porKm!==null)&&(secs.rendimiento&&r.rendimiento)?'1fr 1fr':'1fr')+';gap:6px">'+(secs.por_km&&r.porKm!==null?'<div style="background:#F4F6F8;border-radius:7px;padding:8px;text-align:center"><div style="font-size:8px;color:#888;font-weight:700;margin-bottom:2px">RESULTADO / KM</div><div style="font-size:13px;font-weight:900;color:'+margenColor+'">$'+r.porKm.toLocaleString('es-CL')+'</div></div>':'')+(secs.rendimiento&&r.rendimiento?'<div style="background:#F4F6F8;border-radius:7px;padding:8px;text-align:center"><div style="font-size:8px;color:#888;font-weight:700;margin-bottom:2px">RENDIMIENTO</div><div style="font-size:13px;font-weight:900;color:#1565C0">'+r.rendimiento+' km/L</div></div>':'')+'</div>':'')
     +'</div></div>';
@@ -3910,10 +3915,15 @@ function renderCalculadoraServicios() {
     <!-- COSTOS -->
     <div style="${sec}">COSTOS</div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:4px">
-      <div><div style="${lbl}">PETRÓLEO ($)</div>
-        <input type="number" value="${c.petroleo||''}" oninput="${upd('petroleo','this.value')}" placeholder="0" style="${inp}"></div>
-      <div><div style="${lbl}">LITROS CARGADOS</div>
-        <input type="number" value="${c.litros||''}" oninput="${upd('litros','this.value')}" placeholder="ej: 120" style="${inp}"></div>
+      <div><div style="${lbl}">PRECIO COMBUSTIBLE ($/litro)</div>
+        <input type="number" value="${c.precio_comb||''}" oninput="${upd('precio_comb','this.value')}" placeholder="ej: 1100" style="${inp}"></div>
+      <div><div style="${lbl}">RENDIMIENTO EQUIPO (km/litro)</div>
+        <input type="number" value="${c.rend_equipo||''}" oninput="${upd('rend_equipo','this.value')}" placeholder="ej: 3.5" step="0.1" style="${inp};background:#FFF8E1"></div>
+      <div style="grid-column:1/-1">
+        <div id="calc_comb_display" style="background:#FFF3E0;border:2px solid #EF6C00;border-radius:8px;padding:10px 12px;font-size:13px;font-weight:800;color:#E65100;text-align:center">
+          ⛽ Costo combustible: ${r.petroleo ? '$'+r.petroleo.toLocaleString('es-CL') : (c.precio_comb||c.rend_equipo ? '(faltan km)' : '—')}
+        </div>
+      </div>
       <div><div style="${lbl}">PEAJES ($)</div>
         <input type="number" value="${c.peajes||''}" oninput="${upd('peajes','this.value')}" placeholder="0" style="${inp}"></div>
       <div><div style="${lbl}">VIÁTICOS ($)</div>
