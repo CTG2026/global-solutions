@@ -5,11 +5,11 @@
   <meta http-equiv="cache-control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="pragma" content="no-cache">
   <meta http-equiv="expires" content="0">
-  <meta name="version" content="1774940000">
+  <meta name="version" content="1774950000">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <script>
 (function() {
-  var VERSION = '1774940000';
+  var VERSION = '1774950000';
   var stored = localStorage.getItem('gs_app_version');
   if (stored !== VERSION) {
     var session = localStorage.getItem('gs_session');
@@ -1807,7 +1807,8 @@ function crearFactura() {
   const fechaStr=p.length===3&&p[0].length===4?`${p[2]}-${p[1]}-${p[0]}`:fecha;
   const iva = Math.round(montoNeto * 0.19);
   const monto = montoNeto + iva;
-  const id = nextFacturaId();
+  if ((appData.facturas||[]).some(x=>x.id===numero)) { alert('⚠️ Ya existe una factura con el número '+numero+'.'); return; }
+  const id = numero;
   const factura = { id, numero, fecha:fechaStr, cliente:clienteV, liquidacionId:liqId||'', monto_neto:montoNeto, iva, monto, estado:'emitida', factoring:false, factoringEmpresa:'', factoringFechaAnticipo:'', factoringMonto:0, factoringComision:0, factoringFechaLiquidacion:'', observaciones:'' };
   appData.facturas.push(factura);
   uiState.fac_form_open = false;
