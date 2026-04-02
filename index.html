@@ -5,11 +5,11 @@
   <meta http-equiv="cache-control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="pragma" content="no-cache">
   <meta http-equiv="expires" content="0">
-  <meta name="version" content="1774910000">
+  <meta name="version" content="1774920000">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <script>
 (function() {
-  var VERSION = '1774910000';
+  var VERSION = '1774920000';
   var stored = localStorage.getItem('gs_app_version');
   if (stored !== VERSION) {
     var session = localStorage.getItem('gs_session');
@@ -3247,9 +3247,9 @@ function renderLiquidacionesV2() {
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px">
       <div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">FECHA</div>
-        <input id="liq_fecha_v2" type="date" value="${hoyISO}" style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit;background:white"></div>
+        <input id="liq_fecha_v2" type="date" value="${uiState.liq_ui_fecha||hoyISO}" onchange="uiState.liq_ui_fecha=this.value" style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit;background:white"></div>
       <div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">EMAIL CLIENTE</div>
-        <input id="liq_email_v2" type="email" placeholder="cliente@empresa.cl" value="${emailAutoFill}" style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit;background:white"></div>
+        <input id="liq_email_v2" type="email" placeholder="cliente@empresa.cl" value="${uiState.liq_ui_email!==undefined?uiState.liq_ui_email:emailAutoFill}" oninput="uiState.liq_ui_email=this.value" style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit;background:white"></div>
     </div>
     <div style="margin-bottom:8px">
       <div style="font-size:9px;font-weight:700;color:#888;margin-bottom:4px">RUT(S) CLIENTE <span style="font-weight:400;color:#bbb">(para holdings con múltiples RUT)</span></div>
@@ -3261,8 +3261,76 @@ function renderLiquidacionesV2() {
         <button onclick="agregarRutLiq()" style="background:#546E7A;color:white;border:none;border-radius:6px;padding:6px 12px;font-size:11px;font-weight:700;cursor:pointer">+ RUT</button>
       </div>
     </div>
+    <!-- VISTA PREVIA LIQ -->
+    <button onclick="uiState.liq_preview=!uiState.liq_preview;render()" style="width:100%;background:${uiState.liq_preview?'#E3F2FD':'white'};color:${uiState.liq_preview?'#1565C0':'#546E7A'};border:1px solid ${uiState.liq_preview?'#1565C0':'#90A4AE'};border-radius:7px;padding:9px;font-size:11px;cursor:pointer;font-weight:700;margin-bottom:8px">👁 ${uiState.liq_preview?'Ocultar vista previa':'Ver vista previa'}</button>
+    ${uiState.liq_preview?(()=>{
+      const pvFecha=(uiState.liq_ui_fecha||hoyISO).split('-').reverse().join('-');
+      const pvEmail=uiState.liq_ui_email!==undefined?uiState.liq_ui_email:emailAutoFill;
+      const pvCliente=clienteAutoFill||'—';
+      const pvRuts=rutsSelEfectivos;
+      const pvSvcs=seleccionados.map(id=>servicios.find(sv=>sv.id===id)).filter(Boolean);
+      const pvTotal=totalSel;
+      const pvIva=Math.round(pvTotal*0.19);
+      const pvTotalIva=pvTotal+pvIva;
+      const pvFilas=pvSvcs.map((s,i)=>{
+        const puntos=s.puntos||s.guias||[];
+        const guias=puntos.map(g=>g.num||g.guia).filter(Boolean).join(', ')||'—';
+        const origen=puntos[0]?.origen||s.origen||'—';
+        const destino=puntos[puntos.length-1]?.destino||'—';
+        return `<tr style="background:${i%2===0?'#f9fafb':'white'}">
+          <td style="padding:5px 7px;border-bottom:1px solid #eee;font-size:9px;font-weight:700;color:#1F4E79">${s.id}</td>
+          <td style="padding:5px 7px;border-bottom:1px solid #eee;font-size:9px;color:#1565C0">${guias}</td>
+          <td style="padding:5px 7px;border-bottom:1px solid #eee;font-size:9px">${s.fecha||'—'}</td>
+          <td style="padding:5px 7px;border-bottom:1px solid #eee;font-size:9px">${origen}</td>
+          <td style="padding:5px 7px;border-bottom:1px solid #eee;font-size:9px">${destino}</td>
+          <td style="padding:5px 7px;border-bottom:1px solid #eee;font-size:9px;text-align:right;font-weight:700;color:#2E7D32">$${(s.precio||0).toLocaleString('es-CL')}</td>
+        </tr>`;
+      }).join('');
+      return `<div style="border:2px solid #1565C0;border-radius:10px;overflow:hidden;margin-bottom:8px">
+        <div style="background:#0B2545;color:white;padding:8px 12px;font-size:9px;font-weight:700;letter-spacing:1px">VISTA PREVIA — LIQUIDACIÓN DE SERVICIOS</div>
+        <div style="padding:12px;background:white">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;padding-bottom:8px;border-bottom:2px solid #0B2545">
+            <div>
+              <div style="font-size:13px;font-weight:900;color:#0B2545">GLOBAL SOLUTIONS SpA</div>
+              <div style="font-size:9px;color:#546E7A;font-weight:600">Transporte de Carga por Carretera</div>
+            </div>
+            <div style="text-align:right">
+              <div style="font-size:14px;font-weight:900;color:#0B2545">${nextNum}</div>
+              <div style="font-size:9px;color:#546E7A">Fecha: ${pvFecha}</div>
+            </div>
+          </div>
+          <div style="background:#f4f6f8;border-radius:6px;padding:8px 10px;margin-bottom:8px">
+            <div style="font-size:8px;font-weight:700;color:#888;letter-spacing:1px;margin-bottom:2px">CLIENTE</div>
+            <div style="font-size:12px;font-weight:700;color:#222">${pvCliente}</div>
+            ${pvRuts.length?`<div style="font-size:9px;color:#546E7A;margin-top:2px"><b>RUT:</b> ${pvRuts.join(' · ')}</div>`:''}
+            ${pvEmail?`<div style="font-size:9px;color:#546E7A;margin-top:1px">📧 ${pvEmail}</div>`:''}
+          </div>
+          <div style="font-size:8px;font-weight:700;color:#888;letter-spacing:1px;margin-bottom:4px">DETALLE DE SERVICIOS</div>
+          <div style="overflow-x:auto;margin-bottom:8px">
+            <table style="width:100%;border-collapse:collapse">
+              <thead><tr style="background:#0B2545;color:white">
+                <th style="padding:5px 7px;text-align:left;font-size:8px">ID</th>
+                <th style="padding:5px 7px;text-align:left;font-size:8px">N° GUÍA</th>
+                <th style="padding:5px 7px;text-align:left;font-size:8px">FECHA</th>
+                <th style="padding:5px 7px;text-align:left;font-size:8px">ORIGEN</th>
+                <th style="padding:5px 7px;text-align:left;font-size:8px">DESTINO</th>
+                <th style="padding:5px 7px;text-align:right;font-size:8px">MONTO</th>
+              </tr></thead>
+              <tbody>${pvFilas}</tbody>
+            </table>
+          </div>
+          <div style="display:flex;justify-content:flex-end">
+            <div style="min-width:200px;border:1px solid #eee;border-radius:6px;overflow:hidden">
+              <div style="display:flex;justify-content:space-between;padding:5px 10px;font-size:9px;color:#546E7A;border-bottom:1px solid #eee"><span>Neto</span><span>$${pvTotal.toLocaleString('es-CL')}</span></div>
+              <div style="display:flex;justify-content:space-between;padding:5px 10px;font-size:9px;color:#546E7A;border-bottom:1px solid #eee"><span>IVA 19%</span><span>$${pvIva.toLocaleString('es-CL')}</span></div>
+              <div style="display:flex;justify-content:space-between;padding:6px 10px;font-size:11px;font-weight:900;color:white;background:#2E7D32"><span>TOTAL</span><span>$${pvTotalIva.toLocaleString('es-CL')}</span></div>
+            </div>
+          </div>
+        </div>
+      </div>`;
+    })():''}
     <button onclick="crearLiquidacionV2()" style="width:100%;padding:10px;background:#546E7A;color:white;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer">💾 Crear ${nextNum}</button>
-    <button onclick="uiState.liq_sel=[];render()" style="width:100%;padding:7px;background:transparent;color:#aaa;border:1px solid #eee;border-radius:7px;font-size:11px;cursor:pointer;margin-top:4px">Limpiar selección</button>
+    <button onclick="uiState.liq_sel=[];uiState.liq_preview=false;uiState.liq_ui_fecha='';uiState.liq_ui_email=undefined;render()" style="width:100%;padding:7px;background:transparent;color:#aaa;border:1px solid #eee;border-radius:7px;font-size:11px;cursor:pointer;margin-top:4px">Limpiar selección</button>
   `:'';
 
   const ESTADO_COLOR={creada:{bg:'#FFF9C4',text:'#F9A825',label:'⏳ Creada'},enviada:{bg:'#E3F2FD',text:'#1565C0',label:'📤 Enviada'},facturada:{bg:'#F3E5F5',text:'#6A1B9A',label:'🧾 Facturada'},pagada:{bg:'#E8F5E9',text:'#2E7D32',label:'✅ Pagada'}};
@@ -3410,7 +3478,7 @@ function toggleSrvLiq(id,checked){if(!uiState.liq_sel)uiState.liq_sel=[];if(chec
 function toggleTodosClienteLiq(cl,checked){if(!uiState.liq_sel)uiState.liq_sel=[];const svcs=(appData.servicios||[]).filter(s=>s.cliente===cl&&s.cerrado&&!s.liquidacionId);svcs.forEach(s=>{if(checked){if(!uiState.liq_sel.includes(s.id))uiState.liq_sel.push(s.id);}else{uiState.liq_sel=uiState.liq_sel.filter(x=>x!==s.id);}});render();}
 function toggleRutLiq(rut,checked){if(!uiState.liq_ruts_sel)uiState.liq_ruts_sel=[];if(checked){if(!uiState.liq_ruts_sel.includes(rut))uiState.liq_ruts_sel.push(rut);}else{uiState.liq_ruts_sel=uiState.liq_ruts_sel.filter(r=>r!==rut);}render();}
 function agregarRutLiq(){const input=document.getElementById('liq_rut_nuevo');const rut=input?.value.trim();if(!rut)return;const cl=uiState.liq_cliente_sel||'';if(cl){if(!appData.clientesRut)appData.clientesRut={};if(!appData.clientesRut[cl])appData.clientesRut[cl]=[];if(!appData.clientesRut[cl].includes(rut)){appData.clientesRut[cl].push(rut);saveData();}}if(!uiState.liq_ruts_sel)uiState.liq_ruts_sel=[];if(!uiState.liq_ruts_sel.includes(rut))uiState.liq_ruts_sel.push(rut);input.value='';render();}
-function crearLiquidacionV2(){const sel=uiState.liq_sel||[];if(!sel.length)return alert('Selecciona al menos un servicio');const fecha=document.getElementById('liq_fecha_v2')?.value||new Date().toISOString().split('T')[0];const email=document.getElementById('liq_email_v2')?.value||'';const p=fecha.split('-');const fechaStr=`${p[2]}-${p[1]}-${p[0]}`;const ruts=uiState.liq_ruts_sel||[];const servicios=appData.servicios||[];const total=sel.reduce((a,id)=>{const s=servicios.find(sv=>sv.id===id);return a+(s?s.precio||0:0);},0);const id='LIQ-'+String(appData.liquidaciones.length+1).padStart(3,'0');appData.liquidaciones.push({id,fecha:fechaStr,email,serviciosIds:[...sel],total,estado:'creada',nFactura:'',ruts});sel.forEach(sid=>{const s=servicios.find(sv=>sv.id===sid);if(s){s.liquidacionId=id;upsertServicioSupabase(s);}});uiState.liq_sel=[];uiState.liq_ruts_sel=[];saveData();pushLiquidacionesSupabase();render();alert('✅ '+id+' creada — Total: $'+total.toLocaleString('es-CL'));}
+function crearLiquidacionV2(){const sel=uiState.liq_sel||[];if(!sel.length)return alert('Selecciona al menos un servicio');const fecha=document.getElementById('liq_fecha_v2')?.value||new Date().toISOString().split('T')[0];const email=document.getElementById('liq_email_v2')?.value||'';const p=fecha.split('-');const fechaStr=`${p[2]}-${p[1]}-${p[0]}`;const ruts=uiState.liq_ruts_sel||[];const servicios=appData.servicios||[];const total=sel.reduce((a,id)=>{const s=servicios.find(sv=>sv.id===id);return a+(s?s.precio||0:0);},0);const id='LIQ-'+String(appData.liquidaciones.length+1).padStart(3,'0');appData.liquidaciones.push({id,fecha:fechaStr,email,serviciosIds:[...sel],total,estado:'creada',nFactura:'',ruts});sel.forEach(sid=>{const s=servicios.find(sv=>sv.id===sid);if(s){s.liquidacionId=id;upsertServicioSupabase(s);}});uiState.liq_sel=[];uiState.liq_ruts_sel=[];uiState.liq_preview=false;uiState.liq_ui_fecha='';uiState.liq_ui_email=undefined;saveData();pushLiquidacionesSupabase();render();alert('✅ '+id+' creada — Total: $'+total.toLocaleString('es-CL'));}
 function cambiarEstadoLiq(liqId,estado){const liq=(appData.liquidaciones||[]).find(l=>l.id===liqId);if(!liq)return;liq.estado=estado;saveData();pushLiquidacionesSupabase();render();}
 function guardarObsLiq(liqId) {
   const liq = (appData.liquidaciones||[]).find(l=>l.id===liqId);
