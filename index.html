@@ -3264,7 +3264,264 @@ function _costoTabCartola(mes, anio) {
     </div>`;
   }).join('')}
   <button onclick="limpiarCartolaMes('${mes}','${anio}')" style="width:100%;margin-top:6px;padding:7px;background:#FFEBEE;color:#C62828;border:1px solid #FFCDD2;border-radius:7px;font-size:10px;font-weight:700;cursor:pointer">🗑️ Limpiar mes actual</button>
-  ` : '<div style="text-align:center;color:#aaa;font-size:11px;padding:20px">Sin movimientos — sube un Excel para comenzar</div>'}`;
+  ` : '<div style="text-align:center;color:#aaa;font-size:11px;padding:20px">Sin movimientos — sube un Excel para comenzar</div>'}` + _cartolaInformes();
+}
+
+// ─── CARTOLA INFORMES ─────────────────────────────────────────────────────────
+function _cartolaInformes() {
+  var toda    = (appData.cartola||[]).filter(function(c){return c.revisado;});
+  var inpS    = 'width:100%;padding:5px 7px;border:1px solid #dde;border-radius:6px;font-size:11px;background:white;box-sizing:border-box';
+  var fDesde  = uiState.cInfDesde || '';
+  var fHasta  = uiState.cInfHasta || '';
+  var fCat    = uiState.cInfCat   || '';
+  var fEq     = uiState.cInfEq    || '';
+
+  if (!toda.length) return `
+  <div style="border-top:2px solid #E8EAF6;margin-top:14px;padding-top:10px">
+    <div style="font-size:11px;font-weight:800;color:#37474F;margin-bottom:6px">📊 INFORMES</div>
+    <div style="text-align:center;color:#aaa;font-size:11px;padding:14px">Sin transacciones revisadas — marca como revisadas para generar informes</div>
+  </div>`;
+
+  function parseFechaNum(s) {
+    if (!s) return 0;
+    var p = String(s).replace(/\//g,'-').split('-');
+    if (p.length !== 3) return 0;
+    return p[0].length===2 ? parseInt(p[2]+p[1]+p[0]) : parseInt(p[0]+p[1]+p[2]);
+  }
+  var dDesde = fDesde ? parseInt(fDesde.replace(/-/g,'')) : 0;
+  var dHasta = fHasta ? parseInt(fHasta.replace(/-/g,'')) : 0;
+
+  var datos = toda.filter(function(c){
+    var fd = parseFechaNum(c.fecha);
+    if (dDesde && fd < dDesde) return false;
+    if (dHasta && fd > dHasta) return false;
+    if (fCat && c.categoria !== fCat) return false;
+    if (fEq  && c.equipo    !== fEq)  return false;
+    return true;
+  });
+
+  function egreso(c) { return (c.egreso||0) + (c.monto&&!c.ingreso&&!c.egreso ? c.monto : 0); }
+
+  var totalIng  = datos.reduce(function(a,c){return a+(c.ingreso||0);},0);
+  var totalEg   = datos.reduce(function(a,c){return a+egreso(c);},0);
+  var saldoNeto = totalIng - totalEg;
+
+  // Informe 1 – flujo por día
+  var flujoDias = {};
+  datos.forEach(function(c){
+    var k = c.fecha||'sin fecha';
+    if (!flujoDias[k]) flujoDias[k]={ing:0,eg:0};
+    flujoDias[k].ing += c.ingreso||0;
+    flujoDias[k].eg  += egreso(c);
+  });
+  var diasOrden = Object.keys(flujoDias).sort(function(a,b){return parseFechaNum(a)-parseFechaNum(b);});
+  var saldoAcum = 0;
+  var flujoRows = diasOrden.map(function(d){
+    saldoAcum += flujoDias[d].ing - flujoDias[d].eg;
+    return {fecha:d, ing:flujoDias[d].ing, eg:flujoDias[d].eg, saldo:saldoAcum};
+  });
+
+  // Informe 2 – por categoría
+  var porCat = {};
+  datos.forEach(function(c){
+    var eg = egreso(c); if (!eg) return;
+    var k = c.categoria||'Sin categoría';
+    if (!porCat[k]) porCat[k]={n:0,total:0};
+    porCat[k].n++; porCat[k].total += eg;
+  });
+  var catRows = Object.keys(porCat).map(function(k){return {cat:k,n:porCat[k].n,total:porCat[k].total};});
+  catRows.sort(function(a,b){return b.total-a.total;});
+  var maxCat = catRows.length ? catRows[0].total : 1;
+
+  // Informe 3 – por equipo
+  var porEq = {};
+  datos.forEach(function(c){
+    var eg = egreso(c); if (!eg) return;
+    var k = c.equipo||'N/A';
+    if (!porEq[k]) porEq[k]={n:0,total:0};
+    porEq[k].n++; porEq[k].total += eg;
+  });
+  var eqRows = Object.keys(porEq).map(function(k){return {eq:k,n:porEq[k].n,total:porEq[k].total};});
+  eqRows.sort(function(a,b){return b.total-a.total;});
+
+  var top3Cat = catRows.slice(0,3);
+  var top3Eq  = eqRows.slice(0,3);
+
+  var thS = 'padding:5px 7px;text-align:left;font-size:9px;font-weight:700;color:#888;border-bottom:1px solid #eee;background:#FAFAFA';
+  var tdS = 'padding:5px 7px;font-size:10px;border-bottom:1px solid #F5F5F5';
+  var filtBadge = [fCat,fEq].filter(Boolean).map(function(x){return ' · '+x;}).join('');
+
+  return `
+  <div style="border-top:2px solid #E8EAF6;margin-top:14px;padding-top:10px">
+    <div style="font-size:11px;font-weight:800;color:#37474F;margin-bottom:8px">📊 INFORMES <span style="font-size:9px;font-weight:400;color:#888">(revisadas: ${datos.length} de ${toda.length})</span></div>
+
+    <div style="background:#F8F9FA;border:1px solid #ECEFF1;border-radius:8px;padding:8px;margin-bottom:10px">
+      <div style="font-size:9px;font-weight:700;color:#888;margin-bottom:5px">FILTROS DE PERÍODO</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:6px">
+        <div><div style="font-size:9px;color:#666;margin-bottom:2px">Desde</div><input type="date" value="${fDesde}" onchange="uiState.cInfDesde=this.value;render()" style="${inpS}"></div>
+        <div><div style="font-size:9px;color:#666;margin-bottom:2px">Hasta</div><input type="date" value="${fHasta}" onchange="uiState.cInfHasta=this.value;render()" style="${inpS}"></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+        <select onchange="uiState.cInfCat=this.value;render()" style="${inpS}">
+          <option value="">Todas las categorías</option>
+          ${CATEGORIAS_CARTOLA.map(function(c){return '<option value="'+c+'" '+(fCat===c?'selected':'')+'>'+c+'</option>';}).join('')}
+        </select>
+        <select onchange="uiState.cInfEq=this.value;render()" style="${inpS}">
+          <option value="">Todos los equipos</option>
+          ${EQUIPOS_CARTOLA.map(function(e){return '<option value="'+e+'" '+(fEq===e?'selected':'')+'>'+e+'</option>';}).join('')}
+        </select>
+      </div>
+    </div>
+
+    <!-- RESUMEN EJECUTIVO -->
+    <div style="background:white;border:1px solid #E8EAF6;border-radius:8px;padding:10px;margin-bottom:8px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <div style="font-size:10px;font-weight:800;color:#1565C0">📋 RESUMEN EJECUTIVO${filtBadge}</div>
+        <button onclick="imprimirInformeCartola('resumen')" style="padding:4px 10px;background:#E3F2FD;color:#1565C0;border:1px solid #BBDEFB;border-radius:5px;font-size:10px;font-weight:700;cursor:pointer">🖨️ PDF</button>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:5px;margin-bottom:8px">
+        <div style="background:#E8F5E9;border-radius:6px;padding:7px;text-align:center">
+          <div style="font-size:9px;color:#2E7D32;font-weight:700">INGRESOS</div>
+          <div style="font-size:12px;font-weight:800;color:#2E7D32">$${totalIng.toLocaleString('es-CL')}</div>
+        </div>
+        <div style="background:#FFEBEE;border-radius:6px;padding:7px;text-align:center">
+          <div style="font-size:9px;color:#C62828;font-weight:700">EGRESOS</div>
+          <div style="font-size:12px;font-weight:800;color:#C62828">$${totalEg.toLocaleString('es-CL')}</div>
+        </div>
+        <div style="background:${saldoNeto>=0?'#E8F5E9':'#FFEBEE'};border-radius:6px;padding:7px;text-align:center">
+          <div style="font-size:9px;font-weight:700;color:${saldoNeto>=0?'#2E7D32':'#C62828'}">SALDO NETO</div>
+          <div style="font-size:12px;font-weight:800;color:${saldoNeto>=0?'#2E7D32':'#C62828'}">${saldoNeto>=0?'+':''}$${saldoNeto.toLocaleString('es-CL')}</div>
+        </div>
+      </div>
+      ${top3Cat.length?'<div style="margin-bottom:5px"><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">TOP CATEGORÍAS GASTO</div>'+top3Cat.map(function(r,i){return '<div style="font-size:10px;padding:2px 0">'+(i+1)+'. '+r.cat+' — $'+r.total.toLocaleString('es-CL')+'</div>';}).join('')+'</div>'  :''}
+      ${top3Eq.length?'<div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">TOP EQUIPOS GASTO</div>'+top3Eq.map(function(r,i){return '<div style="font-size:10px;padding:2px 0">'+(i+1)+'. '+r.eq+' — $'+r.total.toLocaleString('es-CL')+'</div>';}).join('')+'</div>':''}
+    </div>
+
+    <!-- FLUJO DE CAJA -->
+    ${flujoRows.length?`
+    <div style="background:white;border:1px solid #E8EAF6;border-radius:8px;padding:10px;margin-bottom:8px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <div style="font-size:10px;font-weight:800;color:#1565C0">💵 FLUJO DE CAJA</div>
+        <button onclick="imprimirInformeCartola('flujo')" style="padding:4px 10px;background:#E3F2FD;color:#1565C0;border:1px solid #BBDEFB;border-radius:5px;font-size:10px;font-weight:700;cursor:pointer">🖨️ PDF</button>
+      </div>
+      <div style="overflow-x:auto">
+      <table style="width:100%;border-collapse:collapse;min-width:300px">
+        <tr><th style="${thS}">FECHA</th><th style="${thS};text-align:right">INGRESOS</th><th style="${thS};text-align:right">EGRESOS</th><th style="${thS};text-align:right">SALDO</th></tr>
+        ${flujoRows.map(function(r){return '<tr><td style="'+tdS+'">'+r.fecha+'</td><td style="'+tdS+';text-align:right;color:'+(r.ing>0?'#2E7D32':'#aaa')+'">'+(r.ing>0?'$'+r.ing.toLocaleString('es-CL'):'—')+'</td><td style="'+tdS+';text-align:right;color:'+(r.eg>0?'#C62828':'#aaa')+'">'+(r.eg>0?'$'+r.eg.toLocaleString('es-CL'):'—')+'</td><td style="'+tdS+';text-align:right;font-weight:700;color:'+(r.saldo>=0?'#2E7D32':'#C62828')+'">$'+r.saldo.toLocaleString('es-CL')+'</td></tr>';}).join('')}
+        <tr style="background:#F8F9FA"><td style="${tdS};font-weight:700">TOTAL</td><td style="${tdS};text-align:right;font-weight:700;color:#2E7D32">$${totalIng.toLocaleString('es-CL')}</td><td style="${tdS};text-align:right;font-weight:700;color:#C62828">$${totalEg.toLocaleString('es-CL')}</td><td style="${tdS};text-align:right;font-weight:700;color:${saldoNeto>=0?'#2E7D32':'#C62828'}">${saldoNeto>=0?'+':''}$${saldoNeto.toLocaleString('es-CL')}</td></tr>
+      </table></div>
+    </div>`:''}
+
+    <!-- GASTOS POR CATEGORÍA -->
+    ${catRows.length?`
+    <div style="background:white;border:1px solid #E8EAF6;border-radius:8px;padding:10px;margin-bottom:8px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <div style="font-size:10px;font-weight:800;color:#1565C0">🏷️ GASTOS POR CATEGORÍA</div>
+        <button onclick="imprimirInformeCartola('categorias')" style="padding:4px 10px;background:#E3F2FD;color:#1565C0;border:1px solid #BBDEFB;border-radius:5px;font-size:10px;font-weight:700;cursor:pointer">🖨️ PDF</button>
+      </div>
+      <table style="width:100%;border-collapse:collapse">
+        <tr><th style="${thS}">CATEGORÍA</th><th style="${thS};text-align:center">N°</th><th style="${thS};text-align:right">TOTAL ($)</th><th style="${thS};text-align:right">%</th></tr>
+        ${catRows.map(function(r){var pct2=totalEg?Math.round(r.total/totalEg*100):0;var barW=maxCat?Math.round(r.total/maxCat*100):0;return '<tr><td style="'+tdS+'"><div>'+r.cat+'</div><div style="background:#EEE;border-radius:2px;height:4px;margin-top:3px;overflow:hidden"><div style="background:#1565C0;height:100%;width:'+barW+'%"></div></div></td><td style="'+tdS+';text-align:center;color:#888">'+r.n+'</td><td style="'+tdS+';text-align:right;font-weight:700;color:#C62828">$'+r.total.toLocaleString('es-CL')+'</td><td style="'+tdS+';text-align:right;color:#888">'+pct2+'%</td></tr>';}).join('')}
+      </table>
+    </div>`:''}
+
+    <!-- GASTOS POR EQUIPO -->
+    ${eqRows.length?`
+    <div style="background:white;border:1px solid #E8EAF6;border-radius:8px;padding:10px;margin-bottom:8px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <div style="font-size:10px;font-weight:800;color:#1565C0">🚛 GASTOS POR EQUIPO</div>
+        <button onclick="imprimirInformeCartola('equipos')" style="padding:4px 10px;background:#E3F2FD;color:#1565C0;border:1px solid #BBDEFB;border-radius:5px;font-size:10px;font-weight:700;cursor:pointer">🖨️ PDF</button>
+      </div>
+      <table style="width:100%;border-collapse:collapse">
+        <tr><th style="${thS}">EQUIPO</th><th style="${thS};text-align:center">N° TX</th><th style="${thS};text-align:right">TOTAL GASTOS ($)</th></tr>
+        ${eqRows.map(function(r){return '<tr><td style="'+tdS+';font-weight:700">'+r.eq+'</td><td style="'+tdS+';text-align:center;color:#888">'+r.n+'</td><td style="'+tdS+';text-align:right;font-weight:700;color:#C62828">$'+r.total.toLocaleString('es-CL')+'</td></tr>';}).join('')}
+      </table>
+    </div>`:''}
+  </div>`;
+}
+
+function imprimirInformeCartola(tipo) {
+  var toda   = (appData.cartola||[]).filter(function(c){return c.revisado;});
+  var fDesde = uiState.cInfDesde || '';
+  var fHasta = uiState.cInfHasta || '';
+  var fCat   = uiState.cInfCat   || '';
+  var fEq    = uiState.cInfEq    || '';
+
+  function parseFechaNum(s) {
+    if (!s) return 0;
+    var p = String(s).replace(/\//g,'-').split('-');
+    if (p.length!==3) return 0;
+    return p[0].length===2 ? parseInt(p[2]+p[1]+p[0]) : parseInt(p[0]+p[1]+p[2]);
+  }
+  var dDesde = fDesde ? parseInt(fDesde.replace(/-/g,'')) : 0;
+  var dHasta = fHasta ? parseInt(fHasta.replace(/-/g,'')) : 0;
+
+  var datos = toda.filter(function(c){
+    var fd = parseFechaNum(c.fecha);
+    if (dDesde && fd < dDesde) return false;
+    if (dHasta && fd > dHasta) return false;
+    if (fCat && c.categoria!==fCat) return false;
+    if (fEq  && c.equipo!==fEq)     return false;
+    return true;
+  });
+
+  function egreso(c){return (c.egreso||0)+(c.monto&&!c.ingreso&&!c.egreso?c.monto:0);}
+  var totalIng = datos.reduce(function(a,c){return a+(c.ingreso||0);},0);
+  var totalEg  = datos.reduce(function(a,c){return a+egreso(c);},0);
+  var saldoNeto = totalIng - totalEg;
+  var periodoTxt = (fDesde||'inicio')+' al '+(fHasta||'hoy');
+  var hoy = new Date().toLocaleDateString('es-CL');
+  var filtros = [fCat,fEq].filter(Boolean).join(' · ');
+
+  var titulos = {resumen:'Resumen Ejecutivo',flujo:'Flujo de Caja',categorias:'Gastos por Categoría',equipos:'Gastos por Equipo'};
+  var titulo = titulos[tipo]||'Informe';
+
+  // Resumen para confirm
+  var resumen = titulo+'\n\nPeríodo: '+periodoTxt+(filtros?'\nFiltros: '+filtros:'')+'\nTransacciones: '+datos.length+'\nIngresos: $'+totalIng.toLocaleString('es-CL')+'\nEgresos:  $'+totalEg.toLocaleString('es-CL')+'\n\n¿Imprimir / guardar PDF?';
+  if (!confirm(resumen)) return;
+
+  var css = 'body{font-family:"Segoe UI",Arial,sans-serif;color:#222;margin:0;padding:24px;font-size:12px}h1{font-size:16px;font-weight:800;color:#0B2545;margin-bottom:2px}h2{font-size:12px;font-weight:700;color:#1565C0;margin:14px 0 6px}p{font-size:10px;color:#888;margin-bottom:12px}table{border-collapse:collapse;width:100%;margin-bottom:12px}th{background:#0B2545;color:white;padding:6px 8px;text-align:left;font-size:10px}td{padding:5px 8px;font-size:11px;border-bottom:1px solid #EEE}.kpi{display:inline-block;min-width:140px;background:#F5F5F5;border-radius:6px;padding:8px 12px;margin:4px;text-align:center}.kpi-v{font-size:16px;font-weight:800}.green{color:#2E7D32}.red{color:#C62828}.bar-bg{background:#EEE;border-radius:2px;height:6px;overflow:hidden;margin-top:3px}.bar-fill{background:#1565C0;height:100%}@media print{.no-print{display:none!important}body{padding:10px}}';
+  var header = '<h1>Global Solutions SpA — '+titulo+'</h1><p>Período: '+periodoTxt+(filtros?' &nbsp;|&nbsp; '+filtros:'')+' &nbsp;|&nbsp; Emisión: '+hoy+'</p>';
+
+  var body = '';
+  if (tipo==='resumen') {
+    body = '<div style="display:flex;flex-wrap:wrap;margin-bottom:14px">'
+      +'<div class="kpi"><div style="font-size:10px;color:#555">Ingresos</div><div class="kpi-v green">$'+totalIng.toLocaleString('es-CL')+'</div></div>'
+      +'<div class="kpi"><div style="font-size:10px;color:#555">Egresos</div><div class="kpi-v red">$'+totalEg.toLocaleString('es-CL')+'</div></div>'
+      +'<div class="kpi"><div style="font-size:10px;color:#555">Saldo Neto</div><div class="kpi-v '+(saldoNeto>=0?'green':'red')+'">'+(saldoNeto>=0?'+':'')+'$'+saldoNeto.toLocaleString('es-CL')+'</div></div>'
+      +'</div>';
+    var porCat2={};datos.forEach(function(c){var eg=egreso(c);if(!eg)return;var k=c.categoria||'Sin categoría';if(!porCat2[k])porCat2[k]=0;porCat2[k]+=eg;});
+    var catArr=Object.keys(porCat2).map(function(k){return {cat:k,total:porCat2[k]};}).sort(function(a,b){return b.total-a.total;}).slice(0,5);
+    var porEq2={};datos.forEach(function(c){var eg=egreso(c);if(!eg)return;var k=c.equipo||'N/A';if(!porEq2[k])porEq2[k]=0;porEq2[k]+=eg;});
+    var eqArr=Object.keys(porEq2).map(function(k){return {eq:k,total:porEq2[k]};}).sort(function(a,b){return b.total-a.total;}).slice(0,5);
+    if (catArr.length) { body+='<h2>Top Categorías de Gasto</h2><table><tr><th>Categoría</th><th style="text-align:right">Total ($)</th></tr>'+catArr.map(function(r){return '<tr><td>'+r.cat+'</td><td style="text-align:right">$'+r.total.toLocaleString('es-CL')+'</td></tr>';}).join('')+'</table>'; }
+    if (eqArr.length) { body+='<h2>Top Equipos</h2><table><tr><th>Equipo</th><th style="text-align:right">Total ($)</th></tr>'+eqArr.map(function(r){return '<tr><td>'+r.eq+'</td><td style="text-align:right">$'+r.total.toLocaleString('es-CL')+'</td></tr>';}).join('')+'</table>'; }
+  } else if (tipo==='flujo') {
+    var flujoDias2={};datos.forEach(function(c){var k=c.fecha||'—';if(!flujoDias2[k])flujoDias2[k]={ing:0,eg:0};flujoDias2[k].ing+=c.ingreso||0;flujoDias2[k].eg+=egreso(c);});
+    var dias2=Object.keys(flujoDias2).sort(function(a,b){return parseFechaNum(a)-parseFechaNum(b);});
+    var sAcum=0;
+    body='<table><tr><th>Fecha</th><th style="text-align:right">Ingresos</th><th style="text-align:right">Egresos</th><th style="text-align:right">Saldo</th></tr>'
+      +dias2.map(function(d){sAcum+=flujoDias2[d].ing-flujoDias2[d].eg;return '<tr><td>'+d+'</td><td style="text-align:right;color:'+(flujoDias2[d].ing?'#2E7D32':'#aaa')+'">'+(flujoDias2[d].ing?'$'+flujoDias2[d].ing.toLocaleString('es-CL'):'—')+'</td><td style="text-align:right;color:'+(flujoDias2[d].eg?'#C62828':'#aaa')+'">'+(flujoDias2[d].eg?'$'+flujoDias2[d].eg.toLocaleString('es-CL'):'—')+'</td><td style="text-align:right;font-weight:700;color:'+(sAcum>=0?'#2E7D32':'#C62828')+'">$'+sAcum.toLocaleString('es-CL')+'</td></tr>';}).join('')
+      +'<tr style="background:#F5F5F5"><td><strong>TOTAL</strong></td><td style="text-align:right;color:#2E7D32;font-weight:700">$'+totalIng.toLocaleString('es-CL')+'</td><td style="text-align:right;color:#C62828;font-weight:700">$'+totalEg.toLocaleString('es-CL')+'</td><td style="text-align:right;font-weight:700;color:'+(saldoNeto>=0?'#2E7D32':'#C62828')+'">'+(saldoNeto>=0?'+':'')+'$'+saldoNeto.toLocaleString('es-CL')+'</td></tr></table>';
+  } else if (tipo==='categorias') {
+    var porCat3={};datos.forEach(function(c){var eg=egreso(c);if(!eg)return;var k=c.categoria||'Sin categoría';if(!porCat3[k])porCat3[k]={n:0,total:0};porCat3[k].n++;porCat3[k].total+=eg;});
+    var catArr3=Object.keys(porCat3).map(function(k){return {cat:k,n:porCat3[k].n,total:porCat3[k].total};}).sort(function(a,b){return b.total-a.total;});
+    var mxCat3=catArr3.length?catArr3[0].total:1;
+    body='<table><tr><th>Categoría</th><th style="text-align:center">N°</th><th style="text-align:right">Total ($)</th><th style="text-align:right">%</th></tr>'
+      +catArr3.map(function(r){var pct2=totalEg?Math.round(r.total/totalEg*100):0;var bw=Math.round(r.total/mxCat3*100);return '<tr><td><div>'+r.cat+'</div><div class="bar-bg"><div class="bar-fill" style="width:'+bw+'%"></div></div></td><td style="text-align:center">'+r.n+'</td><td style="text-align:right;color:#C62828;font-weight:700">$'+r.total.toLocaleString('es-CL')+'</td><td style="text-align:right">'+pct2+'%</td></tr>';}).join('')
+      +'</table>';
+  } else if (tipo==='equipos') {
+    var porEq3={};datos.forEach(function(c){var eg=egreso(c);if(!eg)return;var k=c.equipo||'N/A';if(!porEq3[k])porEq3[k]={n:0,total:0};porEq3[k].n++;porEq3[k].total+=eg;});
+    var eqArr3=Object.keys(porEq3).map(function(k){return {eq:k,n:porEq3[k].n,total:porEq3[k].total};}).sort(function(a,b){return b.total-a.total;});
+    body='<table><tr><th>Equipo</th><th style="text-align:center">N° TX</th><th style="text-align:right">Total Gastos ($)</th></tr>'
+      +eqArr3.map(function(r){return '<tr><td style="font-weight:700">'+r.eq+'</td><td style="text-align:center">'+r.n+'</td><td style="text-align:right;font-weight:700;color:#C62828">$'+r.total.toLocaleString('es-CL')+'</td></tr>';}).join('')
+      +'</table>';
+  }
+
+  var btn = '<div class="no-print" style="margin-bottom:16px"><button onclick="window.print()" style="background:#0B2545;color:white;border:none;border-radius:8px;padding:10px 24px;font-size:13px;font-weight:700;cursor:pointer">🖨️ Imprimir / Guardar PDF</button></div>';
+  var w = window.open('','_blank');
+  w.document.write('<!DOCTYPE html><html><head><meta charset="UTF-8"><title>'+titulo+'</title><style>'+css+'</style></head><body>'+btn+header+body+'<script>setTimeout(function(){window.print();},500);<\/script></body></html>');
+  w.document.close();
 }
 
 // ─── TAB MANUAL ───────────────────────────────────────────────────────────────
