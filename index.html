@@ -2346,11 +2346,16 @@ function procesarCartolaExcel(input) {
         return {mes:String(hoy.getMonth()+1).padStart(2,'0'), anio:String(hoy.getFullYear())};
       };
 
+      // mostrar columnas detectadas en consola siempre
+      console.log('Cartola — header en fila', headerRowIdx, '| headers:', headers);
+      console.log('Cartola — columnas detectadas:', col);
+
       if (!appData.cartola) appData.cartola = [];
       var existingIds = {};
       (appData.cartola||[]).forEach(function(x){existingIds[x.id]=true;});
       var nuevas = [], agregados = 0, ignorados = 0;
-      rows.slice(1).forEach(function(row) {
+      // datos empiezan DESPUÉS del header real, no siempre después de fila 0
+      rows.slice(headerRowIdx+1).forEach(function(row) {
         if (!row || !row.some(function(c){return c!=='';})) return;
         var fecha   = col.fecha>=0   ? parseDate(row[col.fecha])            : '';
         var glosa   = col.glosa>=0   ? String(row[col.glosa]||'').trim()    : '';
@@ -2379,6 +2384,21 @@ function procesarCartolaExcel(input) {
         nuevas.push(tx);
         agregados++;
       });
+      // diagnóstico si no se importó nada y tampoco había duplicados
+      if (agregados===0 && ignorados===0) {
+        var primeraFila = rows[headerRowIdx+1] || [];
+        var diagMsg = 'DIAGNÓSTICO CARTOLA\n\n'
+          +'Header detectado en fila: '+headerRowIdx+'\n'
+          +'Headers: '+headers.slice(0,8).join(' | ')+'\n\n'
+          +'Columnas mapeadas:\n'
+          +'  fecha='+col.fecha+' tipo='+col.tipo+' glosa='+col.glosa+'\n'
+          +'  ingreso='+col.ingreso+' egreso='+col.egreso+' saldo='+col.saldo+'\n\n'
+          +'Primera fila de datos: '+JSON.stringify(primeraFila.slice(0,6))+'\n\n'
+          +'Total filas en archivo: '+rows.length;
+        alert(diagMsg);
+        console.warn(diagMsg);
+        return;
+      }
       saveData();
       upsertCartolaRowsSupabase(nuevas);
       pushCostosSupabase();
