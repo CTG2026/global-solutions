@@ -2268,6 +2268,16 @@ function procesarCartolaExcel(input) {
       var wb = XLSX.read(e.target.result, {type:'array', cellDates:true});
       var ws = wb.Sheets[wb.SheetNames[0]];
       var rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
+      // ── DIAGNÓSTICO ──────────────────────────────────────────────────────────
+      alert(
+        'Hoja: ' + wb.SheetNames[0] + '\n' +
+        'Filas encontradas: ' + rows.length + '\n\n' +
+        'Fila 0: ' + JSON.stringify(rows[0]) + '\n\n' +
+        'Fila 1: ' + JSON.stringify(rows[1]) + '\n\n' +
+        'Fila 2: ' + JSON.stringify(rows[2])
+      );
+      return; // ← quitar esta línea después del diagnóstico
+      // ─────────────────────────────────────────────────────────────────────────
       if (!rows.length) { showToastGeneral('⚠️ Archivo vacío','#E65100'); return; }
 
       // normalizar: minúsculas + sin tildes
