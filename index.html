@@ -2365,15 +2365,15 @@ function importarCartolaSeleccionados() {
 
 function cartolaSetCategoria(id, val) {
   var idx = (appData.cartola||[]).findIndex(function(t){return t.id===id;});
-  if (idx!==-1) { appData.cartola[idx].categoria = val; saveData(); pushCostosSupabase(); }
+  if (idx!==-1) { appData.cartola[idx].categoria = val; saveData(); upsertCartolaSupabase(appData.cartola[idx]); }
 }
 function cartolaSetEquipo(id, val) {
   var idx = (appData.cartola||[]).findIndex(function(t){return t.id===id;});
-  if (idx!==-1) { appData.cartola[idx].equipo = val; saveData(); pushCostosSupabase(); }
+  if (idx!==-1) { appData.cartola[idx].equipo = val; saveData(); upsertCartolaSupabase(appData.cartola[idx]); }
 }
 function cartolaSetRevisado(id, val) {
   var idx = (appData.cartola||[]).findIndex(function(t){return t.id===id;});
-  if (idx!==-1) { appData.cartola[idx].revisado = val; saveData(); pushCostosSupabase(); render(); }
+  if (idx!==-1) { appData.cartola[idx].revisado = val; saveData(); upsertCartolaSupabase(appData.cartola[idx]); render(); }
 }
 
 // ─── IMPORTAR COSTOS DESDE EXCEL ─────────────────────────────────────────────
@@ -3073,10 +3073,75 @@ function _costoTabCopec(mes, anio, flota) {
   :'<div style="text-align:center;color:#aaa;font-size:11px;padding:12px">Sin registros de combustible este mes</div>'}`;
 }
 
-// ─── CARTOLA SUPABASE HELPER ──────────────────────────────────────────────────
+// ─── CARTOLA SUPABASE ─────────────────────────────────────────────────────────
+// SQL (ejecutar en Supabase si la tabla no existe):
+// CREATE TABLE IF NOT EXISTS cartola (
+//   id TEXT PRIMARY KEY, fecha TEXT DEFAULT '', tipo TEXT DEFAULT '',
+//   glosa TEXT DEFAULT '', ingreso NUMERIC DEFAULT 0, egreso NUMERIC DEFAULT 0,
+//   saldo NUMERIC DEFAULT 0, nombre TEXT DEFAULT '', comentario TEXT DEFAULT '',
+//   categoria TEXT DEFAULT '', equipo TEXT DEFAULT '',
+//   revisado BOOLEAN DEFAULT false, mes TEXT DEFAULT '', anio TEXT DEFAULT '',
+//   created_at TIMESTAMP DEFAULT NOW()
+// );
+// ALTER TABLE cartola ADD COLUMN IF NOT EXISTS revisado BOOLEAN DEFAULT false;
+// ALTER TABLE cartola ADD COLUMN IF NOT EXISTS mes TEXT DEFAULT '';
+// ALTER TABLE cartola ADD COLUMN IF NOT EXISTS anio TEXT DEFAULT '';
+
+async function upsertCartolaSupabase(tx) {
+  if (!supa || !supaConectado) return;
+  try {
+    await supa.from('cartola').upsert({
+      id:          tx.id,
+      fecha:       tx.fecha       || '',
+      tipo:        tx.tipo        || '',
+      glosa:       tx.glosa       || '',
+      ingreso:     tx.ingreso     || 0,
+      egreso:      tx.egreso      || 0,
+      saldo:       tx.saldo       || 0,
+      nombre:      tx.nombre      || '',
+      comentario:  tx.comentario  || '',
+      categoria:   tx.categoria   || '',
+      equipo:      tx.equipo      || '',
+      revisado:    tx.revisado    || false,
+      mes:         tx.mes         || '',
+      anio:        tx.anio        || '',
+    }, { onConflict: 'id' });
+  } catch(e) { console.warn('Error upsert cartola Supabase:', e); }
+}
+
 async function upsertCartolaRowsSupabase(rows) {
-  // cartola se guarda dentro de config_panel/costos; delegamos al sync general
-  await pushCostosSupabase();
+  if (!rows || !rows.length) return;
+  for (var i = 0; i < rows.length; i++) {
+    await upsertCartolaSupabase(rows[i]);
+  }
+}
+
+async function syncCartolaDesdeSupabase() {
+  if (!supa || !supaConectado) return;
+  try {
+    var result = await supa.from('cartola').select('*').order('fecha');
+    if (!result.error && result.data && result.data.length > 0) {
+      appData.cartola = result.data.map(function(r) {
+        return {
+          id:         r.id,
+          fecha:      r.fecha      || '',
+          tipo:       r.tipo       || '',
+          glosa:      r.glosa      || '',
+          ingreso:    r.ingreso    || 0,
+          egreso:     r.egreso     || 0,
+          saldo:      r.saldo      || 0,
+          nombre:     r.nombre     || '',
+          comentario: r.comentario || '',
+          categoria:  r.categoria  || '',
+          equipo:     r.equipo     || '',
+          revisado:   r.revisado   || false,
+          mes:        r.mes        || '',
+          anio:       r.anio       || '',
+        };
+      });
+      saveData();
+    }
+  } catch(e) { console.warn('Error sync cartola desde Supabase:', e); }
 }
 
 // ─── CATEGORIZACIÓN IA ────────────────────────────────────────────────────────
@@ -3128,7 +3193,10 @@ async function categorizarConIA() {
     } catch(err) { console.warn('Error lote IA cartola lote '+li+':', err); }
   }
   uiState.categorizandoIA = false;
-  saveData(); pushCostosSupabase();
+  saveData();
+  // sync por fila para no sobreescribir datos de otros con blob completo
+  var categorizadas = (appData.cartola||[]).filter(function(t){return t.categoria;});
+  upsertCartolaRowsSupabase(categorizadas);
   showToastGeneral('✅ '+categorizados+' transacciones categorizadas con IA','#2E7D32');
   render();
 }
@@ -6362,6 +6430,7 @@ async function initSupabase() {
       await syncFacturasDesdeSupabase();
       await syncLiquidacionesDesdeSupabase();
       await syncCostosDesdeSupabase();
+      await syncCartolaDesdeSupabase();
       await syncRemuneracionesDesdeSupabase();
       await syncRendimientoCombDesdeSupabase();
       await syncConfigPanel();
