@@ -2270,16 +2270,28 @@ function procesarCartolaExcel(input) {
       var rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
       if (!rows.length) { showToastGeneral('⚠️ Archivo vacío','#E65100'); return; }
 
-      // normalizar header: minúsculas + sin tildes para comparación robusta
+      // normalizar: minúsculas + sin tildes
       function norm(s) {
         return String(s||'').trim().toLowerCase()
           .replace(/á/g,'a').replace(/é/g,'e').replace(/í/g,'i')
           .replace(/ó/g,'o').replace(/ú/g,'u').replace(/ñ/g,'n');
       }
-      var headers    = rows[0].map(function(h){return String(h||'').trim();});
-      var headersN   = headers.map(norm);
 
-      // busca la primera columna cuyo header normalizado contenga alguna de las variantes
+      // detectar fila header: algunos bancos tienen 2-5 filas metadata arriba
+      var HEADER_KEYWORDS = ['fecha','glosa','descripcion','cargo','abono','ingreso','egreso','saldo','monto'];
+      var headerRowIdx = 0;
+      for (var ri=0; ri<Math.min(10,rows.length); ri++) {
+        var matchCount = 0;
+        (rows[ri]||[]).forEach(function(cell){
+          var n = norm(cell);
+          HEADER_KEYWORDS.forEach(function(kw){ if(n.indexOf(kw)!==-1) matchCount++; });
+        });
+        if (matchCount >= 2) { headerRowIdx = ri; break; }
+      }
+
+      var headers  = (rows[headerRowIdx]||[]).map(function(h){return String(h||'').trim();});
+      var headersN = headers.map(norm);
+
       function findCol(variants) {
         for (var i=0; i<headersN.length; i++) {
           for (var v=0; v<variants.length; v++) {
@@ -2292,18 +2304,18 @@ function procesarCartolaExcel(input) {
       var col = {
         fecha:      findCol(['fecha de transaccion','fecha transaccion','fecha contable','fecha','date']),
         tipo:       findCol(['tipo de transaccion','tipo transaccion','tipo']),
-        glosa:      findCol(['glosa detalle','glosa','descripcion','description','detalle']),
-        ingreso:    findCol(['ingreso','credito','credit','abono','haber']),
-        egreso:     findCol(['egreso','debito','debit','cargo','debe']),
+        glosa:      findCol(['glosa detalle','glosa','descripcion','description','detalle','concepto']),
+        ingreso:    findCol(['ingreso','credito','abono','haber']),
+        egreso:     findCol(['egreso','debito','cargo','debe']),
         saldo:      findCol(['saldo contable','saldo','balance']),
         nombre:     findCol(['nombre','name']),
         comentario: findCol(['comentario transferencia','comentario','comment','referencia']),
       };
 
-      // diagnóstico si no se encontró ninguna columna útil
+      // si no se encontró nada útil, mostrar diagnóstico
       if (col.fecha===-1 && col.glosa===-1 && col.ingreso===-1 && col.egreso===-1) {
-        showToastGeneral('⚠️ No se reconocieron columnas.\nEncabezados encontrados: '+headers.slice(0,6).join(', '),'#E65100');
-        console.warn('Cartola headers:', headers);
+        showToastGeneral('⚠️ No se reconocieron columnas.\nEncabezados (fila '+headerRowIdx+'): '+headers.slice(0,6).join(', '),'#E65100');
+        console.warn('Cartola - fila header detectada:', headerRowIdx, 'headers:', headers);
         return;
       }
 
@@ -2370,6 +2382,11 @@ function procesarCartolaExcel(input) {
       saveData();
       upsertCartolaRowsSupabase(nuevas);
       pushCostosSupabase();
+      // auto-navegar al mes de las tx importadas para que aparezcan inmediatamente
+      if (nuevas.length > 0) {
+        var primerMes = nuevas[0].anio+'/'+nuevas[0].mes;
+        uiState.cartolaFiltroMes = primerMes;
+      }
       showToastGeneral('✅ '+agregados+' transacciones nuevas agregadas\n⏭️ '+ignorados+' ya existentes (ignoradas)','#2E7D32');
       render();
     } catch(err) { showToastGeneral('❌ Error leyendo Excel: '+err.message,'#C62828'); }
@@ -3264,10 +3281,9 @@ function _costoTabCartola(mes, anio) {
   });
   mesesDisp.sort().reverse();
 
-  // filtrado
+  // filtrado — sin fMes muestra todo
   var vista = toda.filter(function(c){
     if (fMes && (c.anio+'/'+c.mes)!==fMes) return false;
-    if (!fMes && (c.mes!==mes||c.anio!==anio)) return false;
     if (fCat && c.categoria!==fCat) return false;
     if (fEq  && c.equipo!==fEq)    return false;
     if (fSolo && c.revisado)        return false;
@@ -3327,7 +3343,7 @@ function _costoTabCartola(mes, anio) {
     <div style="font-size:9px;font-weight:700;color:#888;margin-bottom:5px">FILTROS</div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:6px">
       <select onchange="uiState.cartolaFiltroMes=this.value;render()" style="${inpS}">
-        <option value="">Mes actual</option>
+        <option value="">Todos los meses</option>
         ${mesesDisp.map(function(k){var p=k.split('/');return '<option value="'+k+'" '+(fMes===k?'selected':'')+'>'+p[1]+'/'+p[0]+'</option>';}).join('')}
       </select>
       <select onchange="uiState.cartolaFiltroCat=this.value;render()" style="${inpS}">
