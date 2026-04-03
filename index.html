@@ -2258,168 +2258,20 @@ const EQUIPOS_CARTOLA = ['GKFD84','WR9192','XR8555','GCFF12','BPBL35','XA1114','
 //   categoria TEXT DEFAULT '', equipo TEXT DEFAULT '',
 //   revisado BOOLEAN DEFAULT false, created_at TIMESTAMP DEFAULT NOW()
 // );
-function procesarCartolaExcel(input) {
-  var file = input.files[0]; if (!file) return;
-  input.value = '';
-  if (typeof XLSX === 'undefined') { showToastGeneral('⚠️ Librería Excel no disponible','#E65100'); return; }
+function importarCartola(event) {
+  var file = event.target.files[0];
+  if (!file) return;
   var reader = new FileReader();
   reader.onload = function(e) {
     try {
-      var wb = XLSX.read(e.target.result, {type:'array', cellDates:true});
+      var data = new Uint8Array(e.target.result);
+      var wb = XLSX.read(data, {type:'array'});
       var ws = wb.Sheets[wb.SheetNames[0]];
-      var rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
-      // ── DIAGNÓSTICO ──────────────────────────────────────────────────────────
-      alert(
-        'Hoja: ' + wb.SheetNames[0] + '\n' +
-        'Filas encontradas: ' + rows.length + '\n\n' +
-        'Fila 0: ' + JSON.stringify(rows[0]) + '\n\n' +
-        'Fila 1: ' + JSON.stringify(rows[1]) + '\n\n' +
-        'Fila 2: ' + JSON.stringify(rows[2])
-      );
-      return; // ← quitar esta línea después del diagnóstico
-      // ─────────────────────────────────────────────────────────────────────────
-      if (!rows.length) { showToastGeneral('⚠️ Archivo vacío','#E65100'); return; }
-
-      // normalizar: minúsculas + sin tildes
-      function norm(s) {
-        return String(s||'').trim().toLowerCase()
-          .replace(/á/g,'a').replace(/é/g,'e').replace(/í/g,'i')
-          .replace(/ó/g,'o').replace(/ú/g,'u').replace(/ñ/g,'n');
-      }
-
-      // detectar fila header: algunos bancos tienen 2-5 filas metadata arriba
-      var HEADER_KEYWORDS = ['fecha','glosa','descripcion','cargo','abono','ingreso','egreso','saldo','monto'];
-      var headerRowIdx = 0;
-      for (var ri=0; ri<Math.min(10,rows.length); ri++) {
-        var matchCount = 0;
-        (rows[ri]||[]).forEach(function(cell){
-          var n = norm(cell);
-          HEADER_KEYWORDS.forEach(function(kw){ if(n.indexOf(kw)!==-1) matchCount++; });
-        });
-        if (matchCount >= 2) { headerRowIdx = ri; break; }
-      }
-
-      var headers  = (rows[headerRowIdx]||[]).map(function(h){return String(h||'').trim();});
-      var headersN = headers.map(norm);
-
-      function findCol(variants) {
-        for (var i=0; i<headersN.length; i++) {
-          for (var v=0; v<variants.length; v++) {
-            if (headersN[i].indexOf(norm(variants[v])) !== -1) return i;
-          }
-        }
-        return -1;
-      }
-
-      var col = {
-        fecha:      findCol(['fecha de transaccion','fecha transaccion','fecha contable','fecha','date']),
-        tipo:       findCol(['tipo de transaccion','tipo transaccion','tipo']),
-        glosa:      findCol(['glosa detalle','glosa','descripcion','description','detalle','concepto']),
-        ingreso:    findCol(['ingreso','credito','abono','haber']),
-        egreso:     findCol(['egreso','debito','cargo','debe']),
-        saldo:      findCol(['saldo contable','saldo','balance']),
-        nombre:     findCol(['nombre','name']),
-        comentario: findCol(['comentario transferencia','comentario','comment','referencia']),
-      };
-
-      // si no se encontró nada útil, mostrar diagnóstico
-      if (col.fecha===-1 && col.glosa===-1 && col.ingreso===-1 && col.egreso===-1) {
-        showToastGeneral('⚠️ No se reconocieron columnas.\nEncabezados (fila '+headerRowIdx+'): '+headers.slice(0,6).join(', '),'#E65100');
-        console.warn('Cartola - fila header detectada:', headerRowIdx, 'headers:', headers);
-        return;
-      }
-
-      var parseNum = function(v) {
-        if (v===null||v===undefined||v==='') return 0;
-        if (v instanceof Date) return 0;
-        return Math.abs(parseFloat(String(v).replace(/\s/g,'').replace(/\./g,'').replace(',','.'))||0);
-      };
-      var parseDate = function(v) {
-        if (v instanceof Date) {
-          return String(v.getDate()).padStart(2,'0')+'-'+String(v.getMonth()+1).padStart(2,'0')+'-'+v.getFullYear();
-        }
-        var s = String(v||'').trim();
-        if (/^\d{5}$/.test(s)) {
-          var d = new Date((parseInt(s)-25569)*86400*1000);
-          return String(d.getDate()).padStart(2,'0')+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+d.getFullYear();
-        }
-        // DD/MM/YYYY o DD-MM-YYYY → normalizar a DD-MM-YYYY
-        return s.replace(/\//g,'-');
-      };
-      var getMesAnio = function(fecha) {
-        // fecha DD-MM-YYYY
-        var p = String(fecha||'').split('-');
-        if (p.length===3 && p[0].length===2) return {mes:p[1], anio:p[2]};
-        // fecha YYYY-MM-DD
-        if (p.length===3 && p[0].length===4) return {mes:p[1], anio:p[0]};
-        var hoy = new Date();
-        return {mes:String(hoy.getMonth()+1).padStart(2,'0'), anio:String(hoy.getFullYear())};
-      };
-
-      // mostrar columnas detectadas en consola siempre
-      console.log('Cartola — header en fila', headerRowIdx, '| headers:', headers);
-      console.log('Cartola — columnas detectadas:', col);
-
-      if (!appData.cartola) appData.cartola = [];
-      var existingIds = {};
-      (appData.cartola||[]).forEach(function(x){existingIds[x.id]=true;});
-      var nuevas = [], agregados = 0, ignorados = 0;
-      // datos empiezan DESPUÉS del header real, no siempre después de fila 0
-      rows.slice(headerRowIdx+1).forEach(function(row) {
-        if (!row || !row.some(function(c){return c!=='';})) return;
-        var fecha   = col.fecha>=0   ? parseDate(row[col.fecha])            : '';
-        var glosa   = col.glosa>=0   ? String(row[col.glosa]||'').trim()    : '';
-        var ingreso = col.ingreso>=0 ? parseNum(row[col.ingreso])           : 0;
-        var egreso  = col.egreso>=0  ? parseNum(row[col.egreso])            : 0;
-        var monto   = ingreso || egreso;
-        if (!fecha && !glosa && !monto) return;
-        var rawId = (fecha+'_'+glosa+'_'+monto).toLowerCase().replace(/\s+/g,'_').replace(/[^a-z0-9_\-]/g,'');
-        if (!rawId || rawId.replace(/_/g,'')==='' ) return;
-        if (existingIds[rawId]) { ignorados++; return; }
-        existingIds[rawId] = true;
-        var ma = getMesAnio(fecha);
-        var tx = {
-          id: rawId, fecha: fecha,
-          mes: ma.mes, anio: ma.anio,
-          tipo:       col.tipo>=0       ? String(row[col.tipo]||'').trim()       : '',
-          glosa:      glosa,
-          ingreso:    ingreso,
-          egreso:     egreso,
-          saldo:      col.saldo>=0      ? parseNum(row[col.saldo])               : 0,
-          nombre:     col.nombre>=0     ? String(row[col.nombre]||'').trim()     : '',
-          comentario: col.comentario>=0 ? String(row[col.comentario]||'').trim() : '',
-          categoria: '', equipo: '', revisado: false,
-        };
-        appData.cartola.push(tx);
-        nuevas.push(tx);
-        agregados++;
-      });
-      // diagnóstico si no se importó nada y tampoco había duplicados
-      if (agregados===0 && ignorados===0) {
-        var primeraFila = rows[headerRowIdx+1] || [];
-        var diagMsg = 'DIAGNÓSTICO CARTOLA\n\n'
-          +'Header detectado en fila: '+headerRowIdx+'\n'
-          +'Headers: '+headers.slice(0,8).join(' | ')+'\n\n'
-          +'Columnas mapeadas:\n'
-          +'  fecha='+col.fecha+' tipo='+col.tipo+' glosa='+col.glosa+'\n'
-          +'  ingreso='+col.ingreso+' egreso='+col.egreso+' saldo='+col.saldo+'\n\n'
-          +'Primera fila de datos: '+JSON.stringify(primeraFila.slice(0,6))+'\n\n'
-          +'Total filas en archivo: '+rows.length;
-        alert(diagMsg);
-        console.warn(diagMsg);
-        return;
-      }
-      saveData();
-      upsertCartolaRowsSupabase(nuevas);
-      pushCostosSupabase();
-      // auto-navegar al mes de las tx importadas para que aparezcan inmediatamente
-      if (nuevas.length > 0) {
-        var primerMes = nuevas[0].anio+'/'+nuevas[0].mes;
-        uiState.cartolaFiltroMes = primerMes;
-      }
-      showToastGeneral('✅ '+agregados+' transacciones nuevas agregadas\n⏭️ '+ignorados+' ya existentes (ignoradas)','#2E7D32');
-      render();
-    } catch(err) { showToastGeneral('❌ Error leyendo Excel: '+err.message,'#C62828'); }
+      var rows = XLSX.utils.sheet_to_json(ws, {defval:'', raw:false});
+      if (rows.length === 0) { alert('El archivo está vacío o no se pudo leer'); return; }
+      var columnas = Object.keys(rows[0]);
+      alert('Columnas detectadas:\n' + columnas.join('\n') + '\n\nPrimera fila:\n' + JSON.stringify(rows[0], null, 2));
+    } catch(err) { alert('Error leyendo archivo: ' + err.message); }
   };
   reader.readAsArrayBuffer(file);
 }
@@ -3344,7 +3196,7 @@ function _costoTabCartola(mes, anio) {
       <div>
         <div style="font-size:9px;font-weight:700;color:#1565C0;margin-bottom:3px">🏦 SUBIR CARTOLA</div>
         <button onclick="document.getElementById('cartola_excel_inp').click()" style="width:100%;padding:8px;background:#E3F2FD;color:#1565C0;border:1px solid #BBDEFB;border-radius:7px;font-size:11px;font-weight:700;cursor:pointer">📊 Subir Excel</button>
-        <input type="file" id="cartola_excel_inp" accept=".xlsx,.xls" style="display:none" onchange="procesarCartolaExcel(this)">
+        <input type="file" id="cartola_excel_inp" accept=".xlsx,.xls" style="display:none" onchange="importarCartola(event)">
       </div>
       <div>
         <div style="font-size:9px;font-weight:700;color:#6A1B9A;margin-bottom:3px">🤖 IA</div>
