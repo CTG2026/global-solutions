@@ -2240,6 +2240,15 @@ function editarCopecId(id) {
   if (idx!==-1) { appData.copec[idx].id_manual = nuevo.trim(); saveData(); pushCostosSupabase(); render(); }
 }
 
+// ─── CARTOLA CONSTANTES ───────────────────────────────────────────────────────
+const CATEGORIAS_CARTOLA = [
+  'Combustible','Mantención','Repuestos','Remuneraciones','Peajes / TAG',
+  'Arriendo / Bodega','GPS / Telecomunicaciones','Contador / Honorarios',
+  'Seguros','Factoring','Impuestos / SII','Gastos administrativos',
+  'Ingreso servicios','Ingreso factoring','Otros egresos','Otros ingresos'
+];
+const EQUIPOS_CARTOLA = ['GKFD84','WR9192','XR8555','GCFF12','BPBL35','XA1114','DSDV36','Distribución','N/A'];
+
 // ─── CARTOLA EXCEL ────────────────────────────────────────────────────────────
 // SQL Supabase (ejecutar una vez en el dashboard):
 // CREATE TABLE IF NOT EXISTS cartola (
@@ -2352,6 +2361,19 @@ function importarCartolaSeleccionados() {
   });
   saveData(); pushCostosSupabase();
   showToastGeneral(`✅ ${importados} movimientos importados a Costos`,'#2E7D32'); render();
+}
+
+function cartolaSetCategoria(id, val) {
+  var idx = (appData.cartola||[]).findIndex(function(t){return t.id===id;});
+  if (idx!==-1) { appData.cartola[idx].categoria = val; saveData(); pushCostosSupabase(); }
+}
+function cartolaSetEquipo(id, val) {
+  var idx = (appData.cartola||[]).findIndex(function(t){return t.id===id;});
+  if (idx!==-1) { appData.cartola[idx].equipo = val; saveData(); pushCostosSupabase(); }
+}
+function cartolaSetRevisado(id, val) {
+  var idx = (appData.cartola||[]).findIndex(function(t){return t.id===id;});
+  if (idx!==-1) { appData.cartola[idx].revisado = val; saveData(); pushCostosSupabase(); render(); }
 }
 
 // ─── IMPORTAR COSTOS DESDE EXCEL ─────────────────────────────────────────────
@@ -3051,37 +3073,198 @@ function _costoTabCopec(mes, anio, flota) {
   :'<div style="text-align:center;color:#aaa;font-size:11px;padding:12px">Sin registros de combustible este mes</div>'}`;
 }
 
+// ─── CARTOLA SUPABASE HELPER ──────────────────────────────────────────────────
+async function upsertCartolaRowsSupabase(rows) {
+  // cartola se guarda dentro de config_panel/costos; delegamos al sync general
+  await pushCostosSupabase();
+}
+
+// ─── CATEGORIZACIÓN IA ────────────────────────────────────────────────────────
+async function categorizarConIA() {
+  var apiKey = appData.config && appData.config.anthropicApiKey;
+  if (!apiKey) { showToastGeneral('⚠️ Configura tu API key de Anthropic en Ajustes','#E65100'); return; }
+  var sinCat = (appData.cartola||[]).filter(function(t){ return !t.categoria || t.categoria===''; });
+  if (!sinCat.length) { showToastGeneral('✅ Todas las transacciones ya tienen categoría','#2E7D32'); return; }
+  var lotes = [];
+  for (var i=0; i<sinCat.length; i+=20) lotes.push(sinCat.slice(i,i+20));
+  var resumen = sinCat.length+' transacciones sin categoría\nLotes: '+lotes.length+' (máx 20 c/u)\n\n¿Continuar?';
+  if (!confirm('🤖 Categorizar con IA\n\n'+resumen)) return;
+  uiState.categorizandoIA = true; render();
+  var categorizados = 0;
+  for (var li=0; li<lotes.length; li++) {
+    var lote = lotes[li];
+    try {
+      var resp = await fetch('https://api.anthropic.com/v1/messages', {
+        method:'POST',
+        headers:{'x-api-key':apiKey,'anthropic-version':'2023-06-01','content-type':'application/json'},
+        body: JSON.stringify({
+          model:'claude-sonnet-4-20250514', max_tokens:2000,
+          messages:[{role:'user',content:
+            'Eres un categorizador de transacciones bancarias para Global Solutions SpA, empresa de transporte de carga agroindustrial Chile.\n\n'+
+            'Flota: GKFD84, WR9192, XR8555, GCFF12, BPBL35, XA1114, DSDV36\n\n'+
+            'Categorías disponibles:\n'+CATEGORIAS_CARTOLA.join(', ')+'\n\n'+
+            'Para cada transacción asigna:\n'+
+            '1. categoria: una de las categorías listadas\n'+
+            '2. equipo: patente si el gasto es de un equipo específico, "Distribución" si es de toda la flota, "N/A" si no aplica\n\n'+
+            'Transacciones a categorizar:\n'+
+            JSON.stringify(lote.map(function(t){return {id:t.id,glosa:t.glosa,nombre:t.nombre,comentario:t.comentario,ingreso:t.ingreso,egreso:t.egreso};}))+
+            '\n\nResponde SOLO con JSON array sin markdown:\n[{"id":"...","categoria":"...","equipo":"..."}]'
+          }]
+        })
+      });
+      if (!resp.ok) throw new Error('HTTP '+resp.status);
+      var json = await resp.json();
+      var txt = json.content[0].text.trim().replace(/^```[a-z]*\n?/,'').replace(/\n?```$/,'');
+      var resultados = JSON.parse(txt);
+      resultados.forEach(function(r){
+        var idx = (appData.cartola||[]).findIndex(function(t){return t.id===r.id;});
+        if (idx!==-1) {
+          appData.cartola[idx].categoria = r.categoria||'';
+          appData.cartola[idx].equipo = r.equipo||'N/A';
+          appData.cartola[idx].revisado = false;
+          categorizados++;
+        }
+      });
+    } catch(err) { console.warn('Error lote IA cartola lote '+li+':', err); }
+  }
+  uiState.categorizandoIA = false;
+  saveData(); pushCostosSupabase();
+  showToastGeneral('✅ '+categorizados+' transacciones categorizadas con IA','#2E7D32');
+  render();
+}
+
 // ─── TAB CARTOLA ──────────────────────────────────────────────────────────────
 function _costoTabCartola(mes, anio) {
-  const cartola = (appData.cartola||[]).filter(c=>c.mes===mes&&c.anio===anio);
-  const pendientes = cartola.filter(c=>!c.importado);
-  const total = cartola.reduce((a,c)=>a+c.monto,0);
+  var toda = appData.cartola||[];
+  // filtros
+  var fMes  = uiState.cartolaFiltroMes  || '';
+  var fCat  = uiState.cartolaFiltroCat  || '';
+  var fEq   = uiState.cartolaFiltroEq   || '';
+  var fSolo = uiState.cartolaFiltroSolo || false;
+  var inpS  = 'width:100%;padding:5px 7px;border:1px solid #dde;border-radius:6px;font-size:11px;background:white';
+
+  // opciones de meses disponibles
+  var mesesDisp = [];
+  toda.forEach(function(c){
+    var key = (c.anio||'')+'/'+(c.mes||'');
+    if (key!=='/' && mesesDisp.indexOf(key)===-1) mesesDisp.push(key);
+  });
+  mesesDisp.sort().reverse();
+
+  // filtrado
+  var vista = toda.filter(function(c){
+    if (fMes && (c.anio+'/'+c.mes)!==fMes) return false;
+    if (!fMes && (c.mes!==mes||c.anio!==anio)) return false;
+    if (fCat && c.categoria!==fCat) return false;
+    if (fEq  && c.equipo!==fEq)    return false;
+    if (fSolo && c.revisado)        return false;
+    return true;
+  });
+
+  // progreso
+  var totalTx  = toda.length;
+  var revisadas = toda.filter(function(c){return c.revisado;}).length;
+  var pct = totalTx ? Math.round(revisadas/totalTx*100) : 0;
+  var sinCat = toda.filter(function(t){return !t.categoria||t.categoria==='';}).length;
+
+  // helper monto display
+  function _montoDisplay(c) {
+    var ing = c.ingreso||0, eg = c.egreso||0, mt = c.monto||0;
+    if (ing>0) return '<span style="color:#2E7D32;font-weight:700">+$'+ing.toLocaleString('es-CL')+'</span>';
+    if (eg>0)  return '<span style="color:#C62828;font-weight:700">-$'+eg.toLocaleString('es-CL')+'</span>';
+    if (mt>0)  return '<span style="color:#C62828;font-weight:700">$'+mt.toLocaleString('es-CL')+'</span>';
+    return '<span style="color:#aaa">—</span>';
+  }
+
+  var catOpts = CATEGORIAS_CARTOLA.map(function(c){return '<option value="'+c+'">'+c+'</option>';}).join('');
+  var eqOpts  = EQUIPOS_CARTOLA.map(function(e){return '<option value="'+e+'">'+e+'</option>';}).join('');
+
   return `
-  <div style="background:#F8F9FA;border-radius:10px;padding:12px;margin-bottom:10px">
-    <div style="font-size:11px;font-weight:800;color:#1565C0;margin-bottom:4px">🏦 SUBIR CARTOLA BANCARIA</div>
-    <div style="font-size:10px;color:#888;margin-bottom:8px">Excel con columnas: Fecha contable · Glosa · Monto · Categoría</div>
-    <button onclick="document.getElementById('cartola_excel_inp').click()" style="width:100%;padding:10px;background:#E3F2FD;color:#1565C0;border:1px solid #BBDEFB;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer">📊 Subir Excel</button>
-    <input type="file" id="cartola_excel_inp" accept=".xlsx,.xls" style="display:none" onchange="procesarCartolaExcel(this)">
-  </div>
-  ${cartola.length?`
-  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-    <div style="font-size:9px;font-weight:700;color:#888">${cartola.length} MOVIMIENTOS · $${total.toLocaleString('es-CL')}</div>
-    ${pendientes.length?`<button onclick="importarCartolaSeleccionados()" style="padding:6px 10px;background:#1565C0;color:white;border:none;border-radius:6px;font-size:10px;font-weight:700;cursor:pointer">⬆️ Importar sel.</button>`:''}
-  </div>
-  ${cartola.slice().reverse().map(c=>`
-  <div style="background:white;border:1px solid ${c.importado?'#C8E6C9':'#eee'};border-radius:8px;padding:8px 10px;margin-bottom:4px;display:flex;align-items:center;gap:8px">
-    ${!c.importado?`<input type="checkbox" ${uiState['cartola_sel_'+c.id]?'checked':''} onchange="uiState['cartola_sel_${c.id}']=this.checked" style="flex-shrink:0">`:`<span style="font-size:12px;color:#2E7D32">✓</span>`}
-    <div style="flex:1;min-width:0">
-      <div style="font-size:11px;font-weight:700;color:#333;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${c.glosa}</div>
-      <div style="font-size:10px;color:#888">${c.fecha}${c.categoria?' · '+c.categoria:''}</div>
+  <div style="background:#F8F9FA;border-radius:10px;padding:10px;margin-bottom:8px">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+      <div>
+        <div style="font-size:9px;font-weight:700;color:#1565C0;margin-bottom:3px">🏦 SUBIR CARTOLA</div>
+        <button onclick="document.getElementById('cartola_excel_inp').click()" style="width:100%;padding:8px;background:#E3F2FD;color:#1565C0;border:1px solid #BBDEFB;border-radius:7px;font-size:11px;font-weight:700;cursor:pointer">📊 Subir Excel</button>
+        <input type="file" id="cartola_excel_inp" accept=".xlsx,.xls" style="display:none" onchange="procesarCartolaExcel(this)">
+      </div>
+      <div>
+        <div style="font-size:9px;font-weight:700;color:#6A1B9A;margin-bottom:3px">🤖 IA</div>
+        ${uiState.categorizandoIA
+          ? `<button disabled style="width:100%;padding:8px;background:#EDE7F6;color:#6A1B9A;border:1px solid #CE93D8;border-radius:7px;font-size:11px;font-weight:700">⏳ Categorizando…</button>`
+          : sinCat>0
+            ? `<button onclick="categorizarConIA()" style="width:100%;padding:8px;background:#EDE7F6;color:#6A1B9A;border:1px solid #CE93D8;border-radius:7px;font-size:11px;font-weight:700;cursor:pointer">🤖 Categorizar con IA <span style="background:#6A1B9A;color:white;border-radius:10px;padding:1px 6px;font-size:10px">${sinCat}</span></button>`
+            : `<button disabled style="width:100%;padding:8px;background:#F3E5F5;color:#AB47BC;border:1px solid #E1BEE7;border-radius:7px;font-size:11px;font-weight:700">✅ Todo categorizado</button>`
+        }
+      </div>
     </div>
-    <div style="display:flex;flex-direction:column;align-items:flex-end;gap:3px;flex-shrink:0">
-      <div style="font-size:12px;font-weight:700;color:#C62828">$${c.monto.toLocaleString('es-CL')}</div>
-      ${c.importado?`<span style="font-size:9px;color:#2E7D32;font-weight:700">IMPORTADO</span>`:`<button onclick="eliminarCartola('${c.id}')" style="font-size:10px;padding:2px 6px;background:#FFEBEE;color:#C62828;border:1px solid #FFCDD2;border-radius:4px;cursor:pointer">🗑️</button>`}
+  </div>
+
+  ${totalTx>0?`
+  <div style="background:white;border:1px solid #E8EAF6;border-radius:8px;padding:10px;margin-bottom:8px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+      <div style="font-size:10px;font-weight:700;color:#333">${revisadas} de ${totalTx} transacciones revisadas</div>
+      <div style="font-size:10px;color:#888">${pct}%</div>
     </div>
-  </div>`).join('')}
-  <button onclick="limpiarCartolaMes('${mes}','${anio}')" style="width:100%;margin-top:8px;padding:7px;background:#FFEBEE;color:#C62828;border:1px solid #FFCDD2;border-radius:7px;font-size:11px;font-weight:700;cursor:pointer">🗑️ Limpiar todos del mes</button>`
-  :'<div style="text-align:center;color:#aaa;font-size:11px;padding:20px">Sin movimientos — sube un Excel para comenzar</div>'}`;
+    <div style="background:#EEE;border-radius:4px;height:6px;overflow:hidden">
+      <div style="background:#2E7D32;height:100%;width:${pct}%;transition:width 0.3s"></div>
+    </div>
+  </div>
+
+  <div style="background:white;border:1px solid #dde;border-radius:8px;padding:8px;margin-bottom:8px">
+    <div style="font-size:9px;font-weight:700;color:#888;margin-bottom:5px">FILTROS</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:6px">
+      <select onchange="uiState.cartolaFiltroMes=this.value;render()" style="${inpS}">
+        <option value="">Mes actual</option>
+        ${mesesDisp.map(function(k){var p=k.split('/');return '<option value="'+k+'" '+(fMes===k?'selected':'')+'>'+p[1]+'/'+p[0]+'</option>';}).join('')}
+      </select>
+      <select onchange="uiState.cartolaFiltroCat=this.value;render()" style="${inpS}">
+        <option value="">Todas las categorías</option>
+        ${CATEGORIAS_CARTOLA.map(function(c){return '<option value="'+c+'" '+(fCat===c?'selected':'')+'>'+c+'</option>';}).join('')}
+      </select>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;align-items:center">
+      <select onchange="uiState.cartolaFiltroEq=this.value;render()" style="${inpS}">
+        <option value="">Todos los equipos</option>
+        ${EQUIPOS_CARTOLA.map(function(e){return '<option value="'+e+'" '+(fEq===e?'selected':'')+'>'+e+'</option>';}).join('')}
+      </select>
+      <label style="display:flex;align-items:center;gap:5px;font-size:10px;cursor:pointer">
+        <input type="checkbox" ${fSolo?'checked':''} onchange="uiState.cartolaFiltroSolo=this.checked;render()">
+        Solo no revisadas
+      </label>
+    </div>
+  </div>
+
+  <div style="font-size:9px;font-weight:700;color:#888;margin-bottom:4px">${vista.length} TRANSACCIONES VISIBLES</div>
+  ${vista.slice().reverse().map(function(c){
+    var rowBg = c.revisado ? '#F1F8E9' : 'white';
+    var borBg = c.revisado ? '#C5E1A5' : '#eee';
+    return `<div style="background:${rowBg};border:1px solid ${borBg};border-radius:8px;padding:8px;margin-bottom:5px">
+      <div style="display:flex;align-items:flex-start;gap:6px">
+        <input type="checkbox" title="Revisado" ${c.revisado?'checked':''} onchange="cartolaSetRevisado('${c.id}',this.checked)" style="margin-top:2px;flex-shrink:0;cursor:pointer">
+        <div style="flex:1;min-width:0">
+          <div style="font-size:11px;font-weight:700;color:#333;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${c.glosa||'—'}</div>
+          ${c.nombre?`<div style="font-size:9px;color:#888;margin-top:1px">${c.nombre}</div>`:''}
+          <div style="font-size:9px;color:#888">${c.fecha||''}${c.tipo?' · '+c.tipo:''}</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-top:5px">
+            <select onchange="cartolaSetCategoria('${c.id}',this.value)" style="padding:4px;border:1px solid #dde;border-radius:5px;font-size:10px;background:white">
+              <option value="">— Categoría —</option>
+              ${CATEGORIAS_CARTOLA.map(function(cat){return '<option value="'+cat+'" '+(c.categoria===cat?'selected':'')+'>'+cat+'</option>';}).join('')}
+            </select>
+            <select onchange="cartolaSetEquipo('${c.id}',this.value)" style="padding:4px;border:1px solid #dde;border-radius:5px;font-size:10px;background:white">
+              <option value="">— Equipo —</option>
+              ${EQUIPOS_CARTOLA.map(function(eq){return '<option value="'+eq+'" '+(c.equipo===eq?'selected':'')+'>'+eq+'</option>';}).join('')}
+            </select>
+          </div>
+        </div>
+        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0">
+          ${_montoDisplay(c)}
+          <button onclick="eliminarCartola('${c.id}')" style="font-size:9px;padding:2px 6px;background:#FFEBEE;color:#C62828;border:1px solid #FFCDD2;border-radius:4px;cursor:pointer">🗑️</button>
+        </div>
+      </div>
+    </div>`;
+  }).join('')}
+  <button onclick="limpiarCartolaMes('${mes}','${anio}')" style="width:100%;margin-top:6px;padding:7px;background:#FFEBEE;color:#C62828;border:1px solid #FFCDD2;border-radius:7px;font-size:10px;font-weight:700;cursor:pointer">🗑️ Limpiar mes actual</button>
+  ` : '<div style="text-align:center;color:#aaa;font-size:11px;padding:20px">Sin movimientos — sube un Excel para comenzar</div>'}`;
 }
 
 // ─── TAB MANUAL ───────────────────────────────────────────────────────────────
