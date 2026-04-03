@@ -2241,35 +2241,83 @@ function editarCopecId(id) {
 }
 
 // ─── CARTOLA EXCEL ────────────────────────────────────────────────────────────
+// SQL Supabase (ejecutar una vez en el dashboard):
+// CREATE TABLE IF NOT EXISTS cartola (
+//   id TEXT PRIMARY KEY, fecha TEXT, tipo TEXT DEFAULT '', glosa TEXT DEFAULT '',
+//   ingreso NUMERIC DEFAULT 0, egreso NUMERIC DEFAULT 0, saldo NUMERIC DEFAULT 0,
+//   nombre TEXT DEFAULT '', comentario TEXT DEFAULT '',
+//   categoria TEXT DEFAULT '', equipo TEXT DEFAULT '',
+//   revisado BOOLEAN DEFAULT false, created_at TIMESTAMP DEFAULT NOW()
+// );
 function procesarCartolaExcel(input) {
-  const file = input.files[0]; if (!file) return;
-  if (typeof XLSX === 'undefined') { showToastGeneral('⚠️ Librería Excel no disponible, recarga la página','#E65100'); return; }
-  const reader = new FileReader();
+  var file = input.files[0]; if (!file) return;
+  input.value = '';
+  if (typeof XLSX === 'undefined') { showToastGeneral('⚠️ Librería Excel no disponible','#E65100'); return; }
+  var reader = new FileReader();
   reader.onload = function(e) {
     try {
-      const wb = XLSX.read(e.target.result, {type:'array'});
-      const ws = wb.Sheets[wb.SheetNames[0]];
-      const rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
-      const dataRows = (rows[0] && typeof rows[0][0]==='string' && isNaN(rows[0][0])) ? rows.slice(1) : rows;
+      var wb = XLSX.read(e.target.result, {type:'array'});
+      var ws = wb.Sheets[wb.SheetNames[0]];
+      var rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
+      if (!rows.length) { showToastGeneral('⚠️ Archivo vacío','#E65100'); return; }
+      var headers = rows[0].map(function(h){return String(h||'').trim();});
+      var col = {
+        fecha:      headers.indexOf('Fecha de transacción'),
+        tipo:       headers.indexOf('Tipo de transacción'),
+        glosa:      headers.indexOf('Glosa detalle'),
+        ingreso:    headers.indexOf('Ingreso (+)'),
+        egreso:     headers.indexOf('Egreso (-)'),
+        saldo:      headers.indexOf('Saldo contable'),
+        nombre:     headers.indexOf('Nombre'),
+        comentario: headers.indexOf('Comentario transferencia'),
+      };
+      var parseNum = function(v) {
+        if (v===null||v===undefined||v==='') return 0;
+        return Math.abs(parseFloat(String(v).replace(/\s/g,'').replace(/\./g,'').replace(',','.'))||0);
+      };
+      var parseDate = function(v) {
+        var s = String(v||'').trim();
+        if (/^\d{5}$/.test(s)) {
+          var d = new Date((parseInt(s)-25569)*86400*1000);
+          return String(d.getDate()).padStart(2,'0')+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+d.getFullYear();
+        }
+        return s.replace(/\//g,'-');
+      };
       if (!appData.cartola) appData.cartola = [];
-      const hoy = new Date(); let agregados = 0;
-      dataRows.forEach(row => {
-        if (!row || row.length < 3) return;
-        const fechaRaw = String(row[0]||'').trim();
-        const glosa = String(row[1]||'').trim();
-        const montoRaw = parseFloat(String(row[2]||'').replace(/\./g,'').replace(',','.')) || 0;
-        const categoria = String(row[3]||'').trim();
-        if (!fechaRaw || !glosa || !montoRaw) return;
-        let fecha = fechaRaw.includes('/') ? fechaRaw.replace(/\//g,'-') : fechaRaw;
-        if (/^\d{5}$/.test(fecha)) { const d=new Date((parseInt(fecha)-25569)*86400*1000); fecha=`${String(d.getDate()).padStart(2,'0')}-${String(d.getMonth()+1).padStart(2,'0')}-${d.getFullYear()}`; }
-        const p = fecha.split('-');
-        const mes = p.length===3 ? p[1] : String(hoy.getMonth()+1).padStart(2,'0');
-        const anio = p.length===3 ? p[2] : String(hoy.getFullYear());
-        appData.cartola.push({ id:_genIdCartola(), fecha, glosa, monto:Math.abs(montoRaw), categoria, mes, anio, importado:false });
+      var existingIds = {};
+      (appData.cartola||[]).forEach(function(x){existingIds[x.id]=true;});
+      var nuevas = [], agregados = 0, ignorados = 0;
+      rows.slice(1).forEach(function(row) {
+        if (!row || !row.some(function(c){return c!=='';})) return;
+        var fecha   = col.fecha>=0   ? parseDate(row[col.fecha])            : '';
+        var glosa   = col.glosa>=0   ? String(row[col.glosa]||'').trim()    : '';
+        var ingreso = col.ingreso>=0 ? parseNum(row[col.ingreso])           : 0;
+        var egreso  = col.egreso>=0  ? parseNum(row[col.egreso])            : 0;
+        var monto   = ingreso || egreso;
+        if (!fecha && !glosa && !monto) return;
+        var rawId = (fecha+'_'+glosa+'_'+monto).toLowerCase().replace(/\s+/g,'_').replace(/[^a-z0-9_\-]/g,'');
+        if (existingIds[rawId]) { ignorados++; return; }
+        existingIds[rawId] = true;
+        var tx = {
+          id: rawId, fecha: fecha,
+          tipo:       col.tipo>=0       ? String(row[col.tipo]||'').trim()       : '',
+          glosa:      glosa,
+          ingreso:    ingreso,
+          egreso:     egreso,
+          saldo:      col.saldo>=0      ? parseNum(row[col.saldo])               : 0,
+          nombre:     col.nombre>=0     ? String(row[col.nombre]||'').trim()     : '',
+          comentario: col.comentario>=0 ? String(row[col.comentario]||'').trim() : '',
+          categoria: '', equipo: '', revisado: false,
+        };
+        appData.cartola.push(tx);
+        nuevas.push(tx);
         agregados++;
       });
-      saveData(); pushCostosSupabase();
-      showToastGeneral(`✅ ${agregados} movimientos importados`,'#2E7D32'); render();
+      saveData();
+      upsertCartolaRowsSupabase(nuevas);
+      pushCostosSupabase();
+      showToastGeneral('✅ '+agregados+' transacciones nuevas agregadas\n⏭️ '+ignorados+' ya existentes (ignoradas)','#2E7D32');
+      render();
     } catch(err) { showToastGeneral('❌ Error leyendo Excel: '+err.message,'#C62828'); }
   };
   reader.readAsArrayBuffer(file);
