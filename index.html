@@ -2435,6 +2435,101 @@ function cancelarImportacionCostos() {
   render();
 }
 
+function confirmarImportacionCartola() {
+  const preview = uiState.costosExcelPreview || [];
+  if (!preview.length) return;
+  if (!appData.cartola) appData.cartola = [];
+  preview.forEach(c => { appData.cartola.push(c); upsertCartolaSupabase(c); });
+  uiState.costosExcelPreview = null;
+  saveData();
+  showToastGeneral(`✅ ${preview.length} movimientos importados a Cartola`, '#1565C0');
+  render();
+}
+
+async function limpiarCartola() {
+  if (!confirm('¿Borrar TODOS los movimientos de Cartola? Esta acción no se puede deshacer.')) return;
+  appData.cartola = [];
+  saveData();
+  if (supa && supaConectado) { await supa.from('cartola').delete().neq('id',''); }
+  showToastGeneral('🗑️ Cartola vaciada', '#555');
+  render();
+}
+
+function importarCartolaViaHistorial(input) {
+  var file = input.files[0]; if (!file) return;
+  input.value = '';
+  if (typeof XLSX === 'undefined') { showToastGeneral('⚠️ Librería Excel no disponible'); return; }
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      var wb = XLSX.read(e.target.result, {type:'array'});
+      var ws = wb.Sheets[wb.SheetNames[0]];
+      var rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
+      if (!rows.length) { showToastGeneral('⚠️ El archivo está vacío','#E65100'); return; }
+      // Detectar fila de encabezado (primera fila con texto)
+      var headerIdx = 0;
+      for (var i = 0; i < Math.min(5, rows.length); i++) {
+        if (rows[i].some(function(c){ return typeof c === 'string' && c.trim().length > 0; })) { headerIdx = i; break; }
+      }
+      var header = rows[headerIdx].map(function(c){ return String(c||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,''); });
+      // Detectar columnas por nombre o usar posición
+      function col(names) {
+        for (var n = 0; n < names.length; n++) {
+          var idx = header.indexOf(names[n]);
+          if (idx >= 0) return idx;
+        }
+        return -1;
+      }
+      var iF  = col(['fecha','fecha de transaccion','date']); if (iF  < 0) iF  = 0;
+      var iG  = col(['glosa','descripcion','detalle','concepto']); if (iG  < 0) iG  = 1;
+      var iEg = col(['cargo','debito','egreso','monto cargo']); if (iEg < 0) iEg = 2;
+      var iIn = col(['abono','credito','ingreso','monto abono']); if (iIn < 0) iIn = 3;
+      var iSa = col(['saldo']); if (iSa < 0) iSa = 4;
+      var dataRows = rows.slice(headerIdx + 1);
+      var preview = [];
+      dataRows.forEach(function(row) {
+        if (!row || row.every(function(c){ return !c; })) return;
+        var fechaRaw = String(row[iF]||'').trim();
+        var glosa    = String(row[iG]||'').trim();
+        var egresoRaw= String(row[iEg]||'').replace(/\./g,'').replace(',','.').trim();
+        var ingresoRaw=String(row[iIn]||'').replace(/\./g,'').replace(',','.').trim();
+        var saldoRaw = String(row[iSa]||'').replace(/\./g,'').replace(',','.').trim();
+        var egreso   = Math.abs(parseFloat(egresoRaw)||0);
+        var ingreso  = Math.abs(parseFloat(ingresoRaw)||0);
+        var saldo    = parseFloat(saldoRaw)||0;
+        if (!fechaRaw && !glosa && !egreso && !ingreso) return;
+        // Normalizar fecha
+        var fecha = fechaRaw;
+        if (/^\d{5}$/.test(fecha)) {
+          var d = new Date((parseInt(fecha)-25569)*86400*1000);
+          fecha = String(d.getDate()).padStart(2,'0')+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+d.getFullYear();
+        } else if (fecha.includes('/')) {
+          fecha = fecha.replace(/\//g,'-');
+        }
+        var parts = fecha.split('-');
+        var mes, anio;
+        if (parts.length === 3) {
+          if (parts[0].length === 4) { anio = parts[0]; mes = parts[1]; }
+          else { mes = parts[1]; anio = parts[2]; }
+        } else { var hoy=new Date(); mes=String(hoy.getMonth()+1).padStart(2,'0'); anio=String(hoy.getFullYear()); }
+        var tipo = ingreso > 0 ? 'Abono' : 'Cargo';
+        preview.push({
+          id: 'car_'+Date.now()+'_'+Math.random().toString(36).substr(2,6),
+          fecha: fecha, mes: mes, anio: anio,
+          glosa: glosa, tipo: tipo,
+          ingreso: ingreso, egreso: egreso, saldo: saldo,
+          nombre: '', comentario: '', categoria: '', equipo: '', revisado: false
+        });
+      });
+      if (!preview.length) { showToastGeneral('⚠️ No se encontraron filas válidas. Revisa el formato del archivo.','#E65100'); return; }
+      uiState.costosExcelPreview = preview;
+      uiState.costoTab = 'historial';
+      render();
+    } catch(err) { showToastGeneral('❌ Error leyendo archivo: '+err.message,'#C62828'); }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
 // ─── TAB HISTORIAL ────────────────────────────────────────────────────────────
 function _costoTabHistorial(mes, anio) {
   const fMes  = uiState.costoFiltroMes  || mes;
@@ -2448,31 +2543,35 @@ function _costoTabHistorial(mes, anio) {
   const MNOMBRES = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
   const selStyle = 'padding:7px;border:1px solid #dde;border-radius:6px;font-size:12px';
   const preview = uiState.costosExcelPreview || [];
-  const tPreview = preview.reduce((a,c)=>a+c.total,0);
+  const tIngresos = preview.reduce((a,c)=>a+(c.ingreso||0),0);
+  const tEgresos  = preview.reduce((a,c)=>a+(c.egreso||0),0);
   return `
   ${preview.length ? `
   <div style="background:#E3F2FD;border:2px solid #1565C0;border-radius:10px;padding:12px;margin-bottom:12px">
-    <div style="font-size:12px;font-weight:800;color:#1565C0;margin-bottom:6px">📋 VISTA PREVIA — ${preview.length} registros leídos · Total $${tPreview.toLocaleString('es-CL')}</div>
+    <div style="font-size:12px;font-weight:800;color:#1565C0;margin-bottom:6px">📋 VISTA PREVIA CARTOLA — ${preview.length} filas · Ingresos $${tIngresos.toLocaleString('es-CL')} · Egresos $${tEgresos.toLocaleString('es-CL')}</div>
     <div style="max-height:600px;overflow-y:auto;margin-bottom:10px">
       ${preview.map(c=>`
       <div style="background:white;border:1px solid #BBDEFB;border-radius:6px;padding:6px 8px;margin-bottom:4px;display:flex;justify-content:space-between;align-items:center">
         <div style="flex:1;min-width:0">
-          <div style="font-size:11px;font-weight:700;color:#333">${c.empresa}</div>
-          <div style="font-size:10px;color:#888">${c.fecha} · ${c.equipo==='flota_completa'?'Flota completa':c.equipo} · ${c.tipo_costo||c.categoria}</div>
+          <div style="font-size:11px;font-weight:700;color:#333">${c.glosa||'—'}</div>
+          <div style="font-size:10px;color:#888">${c.fecha} · ${c.tipo}</div>
         </div>
-        <div style="font-size:12px;font-weight:700;color:#C62828;flex-shrink:0;margin-left:8px">$${c.total.toLocaleString('es-CL')}</div>
+        <div style="font-size:12px;font-weight:700;color:${c.ingreso?'#2E7D32':'#C62828'};flex-shrink:0;margin-left:8px">${c.ingreso?'+':'−'}$${(c.ingreso||c.egreso||0).toLocaleString('es-CL')}</div>
       </div>`).join('')}
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-      <button onclick="confirmarImportacionCostos()" style="padding:10px;background:#1565C0;color:white;border:none;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer">✅ Confirmar e importar al historial</button>
+      <button onclick="confirmarImportacionCartola()" style="padding:10px;background:#1565C0;color:white;border:none;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer">✅ Confirmar e importar Cartola</button>
       <button onclick="cancelarImportacionCostos()" style="padding:10px;background:#FFEBEE;color:#C62828;border:1px solid #FFCDD2;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer">✕ Cancelar</button>
     </div>
   </div>` : `
-  <div style="background:#E8F5E9;border:1px solid #A5D6A7;border-radius:8px;padding:10px;margin-bottom:10px">
-    <div style="font-size:10px;font-weight:700;color:#2E7D32;margin-bottom:6px">📥 IMPORTAR COSTOS DESDE EXCEL</div>
-    <div style="font-size:10px;color:#555;margin-bottom:8px">Columnas: <b>Fecha · Empresa · Monto neto · Equipo · Categoría · Tipo · Descripción</b></div>
-    <button onclick="document.getElementById('costos_excel_inp').click()" style="width:100%;padding:9px;background:#2E7D32;color:white;border:none;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer">📊 Subir Excel de costos</button>
-    <input type="file" id="costos_excel_inp" accept=".xlsx,.xls" style="display:none" onchange="importarCostosDesdeExcel(this)">
+  <div style="background:#E3F2FD;border:1px solid #90CAF9;border-radius:8px;padding:10px;margin-bottom:10px">
+    <div style="font-size:10px;font-weight:700;color:#1565C0;margin-bottom:4px">🏦 IMPORTAR CARTOLA BANCARIA</div>
+    <div style="font-size:10px;color:#555;margin-bottom:4px">Columnas: <b>Fecha · Glosa · Egreso · Ingreso · Saldo</b></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+    <button onclick="document.getElementById('costos_excel_inp').click()" style="padding:9px;background:#1565C0;color:white;border:none;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer">🏦 Subir Cartola Bancaria</button>
+    <button onclick="limpiarCartola()" style="padding:9px;background:#FFEBEE;color:#C62828;border:1px solid #FFCDD2;border-radius:7px;font-size:11px;font-weight:700;cursor:pointer">🗑️ Borrar todo Cartola</button>
+    </div>
+    <input type="file" id="costos_excel_inp" accept=".xlsx,.xls" style="display:none" onchange="importarCartolaViaHistorial(this)">
   </div>`}
   <div style="background:#1565C0;border:3px solid #0D47A1;border-radius:8px;padding:12px;margin-bottom:10px">
     <div style="font-size:12px;font-weight:900;color:#fff;margin-bottom:6px">🏦 IMPORTAR CARTOLA BANCARIA</div>
