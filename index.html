@@ -2258,9 +2258,9 @@ const EQUIPOS_CARTOLA = ['GKFD84','WR9192','XR8555','GCFF12','BPBL35','XA1114','
 //   categoria TEXT DEFAULT '', equipo TEXT DEFAULT '',
 //   revisado BOOLEAN DEFAULT false, created_at TIMESTAMP DEFAULT NOW()
 // );
-function importarCartola(event) {
-  var file = event.target.files[0];
-  if (!file) return;
+function importarCartola(input) {
+  var file = input.files[0]; if (!file) return;
+  input.value = '';
   if (typeof XLSX === 'undefined') { showToastGeneral('⚠️ Librería Excel no disponible, recarga la página','#E65100'); return; }
   var reader = new FileReader();
   reader.onload = function(e) {
@@ -2269,135 +2269,44 @@ function importarCartola(event) {
       var ws = wb.Sheets[wb.SheetNames[0]];
       var rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
       if (!rows.length) { showToastGeneral('⚠️ Archivo vacío','#E65100'); return; }
-
-      // normalizar texto: minúsculas sin tildes
-      function norm(s) {
-        return String(s||'').trim().toLowerCase()
-          .replace(/á/g,'a').replace(/é/g,'e').replace(/í/g,'i')
-          .replace(/ó/g,'o').replace(/ú/g,'u').replace(/ñ/g,'n');
-      }
-
-      // detectar fila header escaneando las primeras 10 filas
+      function norm(s) { return String(s||''). trim().toLowerCase().replace(/á/g,'a').replace(/é/g,'e').replace(/í/g,'i').replace(/ó/g,'o').replace(/ú/g,'u').replace(/ñ/g,'n'); }
       var KEYS = ['fecha','glosa','descripcion','cargo','abono','ingreso','egreso','saldo','monto','nombre','tipo'];
       var headerRowIdx = 0, bestScore = 0;
-      for (var ri = 0; ri < Math.min(10, rows.length); ri++) {
-        var score = 0;
-        (rows[ri]||[]).forEach(function(cell) {
-          var n = norm(cell);
-          KEYS.forEach(function(k){ if (n.indexOf(k) !== -1) score++; });
-        });
-        if (score > bestScore) { bestScore = score; headerRowIdx = ri; }
-      }
-
-      var headers  = (rows[headerRowIdx]||[]).map(function(h){ return String(h||'').trim(); });
+      for (var ri = 0; ri < Math.min(10, rows.length); ri++) { var score = 0; (rows[ri]||[]).forEach(function(cell){ var n=norm(cell); KEYS.forEach(function(k){ if(n.indexOf(k)!==-1) score++; }); }); if (score > bestScore) { bestScore = score; headerRowIdx = ri; } }
+      var headers = (rows[headerRowIdx]||[]).map(function(h){ return String(h||''). trim(); });
       var headersN = headers.map(norm);
-
-      function findCol(variants) {
-        for (var i = 0; i < headersN.length; i++) {
-          for (var v = 0; v < variants.length; v++) {
-            if (headersN[i] && headersN[i].indexOf(norm(variants[v])) !== -1) return i;
-          }
-        }
-        return -1;
-      }
-
-      var col = {
-        fecha:      findCol(['fecha de transaccion','fecha transaccion','fecha contable','fecha','date']),
-        tipo:       findCol(['tipo de transaccion','tipo transaccion','tipo']),
-        glosa:      findCol(['glosa detalle','glosa','descripcion','descripci','detalle','concepto','comercio']),
-        ingreso:    findCol(['ingreso','credito','abono','haber']),
-        egreso:     findCol(['egreso','debito','cargo','debe']),
-        saldo:      findCol(['saldo contable','saldo','balance']),
-        nombre:     findCol(['nombre','name','razon social']),
-        comentario: findCol(['comentario transferencia','comentario','referencia','numero doc']),
-      };
-
-      // si no detectó header por nombre, asumir posiciones por defecto según formato bancario común
-      // fecha=0, glosa=1, egreso=2, ingreso=3, saldo=4
-      if (col.fecha===-1 && col.glosa===-1) {
-        col.fecha = 0; col.glosa = 1; col.egreso = 2; col.ingreso = 3; col.saldo = 4;
-        headerRowIdx = 0; // fila 0 es datos directamente
-      }
-
-      var parseNum = function(v) {
-        if (!v && v!==0) return 0;
-        var s = String(v).replace(/\s/g,'').replace(/\./g,'').replace(',','.');
-        return Math.abs(parseFloat(s)||0);
-      };
-      var parseDate = function(v) {
-        if (!v) return '';
-        var s = String(v).trim();
-        if (/^\d{5}$/.test(s)) {
-          var d = new Date((parseInt(s)-25569)*86400*1000);
-          return String(d.getDate()).padStart(2,'0')+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+d.getFullYear();
-        }
-        return s.replace(/\//g,'-');
-      };
-      var getMesAnio = function(fecha) {
-        var p = String(fecha||'').split('-');
-        if (p.length===3 && p[0].length===2) return {mes:p[1], anio:p[2]};
-        if (p.length===3 && p[0].length===4) return {mes:p[1], anio:p[0]};
-        var hoy = new Date();
-        return {mes:String(hoy.getMonth()+1).padStart(2,'0'), anio:String(hoy.getFullYear())};
-      };
-
-      if (!appData.cartola) appData.cartola = [];
-      var existingIds = {};
-      (appData.cartola||[]).forEach(function(x){ existingIds[x.id] = true; });
-      var nuevas = [], agregados = 0, ignorados = 0;
-
-      rows.slice(headerRowIdx + 1).forEach(function(row) {
-        if (!row || row.every(function(c){ return c==='' || c===null || c===undefined; })) return;
-        var fecha   = col.fecha>=0   ? parseDate(row[col.fecha])              : '';
-        var glosa   = col.glosa>=0   ? String(row[col.glosa]||'').trim()      : '';
-        var ingreso = col.ingreso>=0 ? parseNum(row[col.ingreso])             : 0;
-        var egreso  = col.egreso>=0  ? parseNum(row[col.egreso])              : 0;
-        // si solo hay una columna de monto (sin separar ingreso/egreso), detectar por signo o contexto
-        if (!ingreso && !egreso && col.egreso>=0) {
-          var raw = String(row[col.egreso]||'').trim();
-          var n = parseNum(raw);
-          if (raw.indexOf('-')!==-1 || raw.indexOf('cargo')!==-1) egreso = n;
-          else ingreso = n;
-        }
-        var monto = ingreso || egreso;
-        if (!fecha && !glosa && !monto) return;
-        var rawId = (fecha+'_'+glosa+'_'+monto).toLowerCase()
-          .replace(/\s+/g,'_').replace(/[^a-z0-9_\-]/g,'').slice(0,80);
-        if (!rawId || rawId.replace(/_/g,'')==='') return;
-        if (existingIds[rawId]) { ignorados++; return; }
-        existingIds[rawId] = true;
-        var ma = getMesAnio(fecha);
-        var tx = {
-          id: rawId, fecha: fecha, mes: ma.mes, anio: ma.anio,
-          tipo:       col.tipo>=0       ? String(row[col.tipo]||'').trim()       : '',
-          glosa:      glosa,
-          ingreso:    ingreso,
-          egreso:     egreso,
-          saldo:      col.saldo>=0      ? parseNum(row[col.saldo])               : 0,
-          nombre:     col.nombre>=0     ? String(row[col.nombre]||'').trim()     : '',
-          comentario: col.comentario>=0 ? String(row[col.comentario]||'').trim() : '',
-          categoria: '', equipo: '', revisado: false,
-        };
-        appData.cartola.push(tx);
-        nuevas.push(tx);
+      function findCol(variants) { for (var i=0;i<headersN.length;i++) for (var v=0;v<variants.length;v++) if (headersN[i]&&headersN[i].indexOf(norm(variants[v]))!==-1) return i; return -1; }
+      var col = { fecha:findCol(['fecha de transaccion','fecha transaccion','fecha contable','fecha','date']), tipo:findCol(['tipo de transaccion','tipo transaccion','tipo']), glosa:findCol(['glosa detalle','glosa','descripcion','descripci','detalle','concepto','comercio']), ingreso:findCol(['ingreso','credito','abono','haber']), egreso:findCol(['egreso','debito','cargo','debe']), saldo:findCol(['saldo contable','saldo','balance']), nombre:findCol(['nombre','name','razon social']), comentario:findCol(['comentario transferencia','comentario','referencia']), };
+      if (col.fecha===-1&&col.glosa===-1&&col.ingreso===-1&&col.egreso===-1) { col.fecha=0;col.glosa=1;col.egreso=2;col.ingreso=3;col.saldo=4;col.nombre=5; headerRowIdx=(rows[0]&&rows[0].some(function(c){return c!=='';})&&isNaN(rows[0][0]))?0:-1; }
+      var parseNum=function(v){if(!v&&v!==0)return 0;return Math.abs(parseFloat(String(v).replace(/\s/g,'').replace(/\./g,'').replace(',','.'))||0);};
+      var parseDate=function(v){if(!v)return '';var s=String(v).trim();if(/^\d{5}$/.test(s)){var d=new Date((parseInt(s)-25569)*86400*1000);return String(d.getDate()).padStart(2,'0')+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+d.getFullYear();}return s.replace(/\//g,'-');};
+      var getMesAnio=function(fecha){var p=String(fecha||'').split('-');if(p.length===3&&p[0].length===2)return{mes:p[1],anio:p[2]};if(p.length===3&&p[0].length===4)return{mes:p[1],anio:p[0]};var hoy=new Date();return{mes:String(hoy.getMonth()+1).padStart(2,'0'),anio:String(hoy.getFullYear())};};
+      if(!appData.cartola)appData.cartola=[];
+      var existingIds={};(appData.cartola||[]).forEach(function(x){existingIds[x.id]=true;});
+      var nuevas=[],agregados=0,ignorados=0;
+      rows.slice(headerRowIdx+1).forEach(function(row){
+        if(!row||row.every(function(c){return c===''||c===null||c===undefined;}))return;
+        var fecha=col.fecha>=0?parseDate(row[col.fecha]):'';
+        var glosa=col.glosa>=0?String(row[col.glosa]||'').trim():'';
+        var ingreso=col.ingreso>=0?parseNum(row[col.ingreso]):0;
+        var egreso=col.egreso>=0?parseNum(row[col.egreso]):0;
+        var monto=ingreso||egreso;
+        if(!fecha&&!glosa&&!monto)return;
+        var rawId=(fecha+'_'+glosa+'_'+monto).toLowerCase().replace(/\s+/g,'_').replace(/[^a-z0-9_\-]/g,'').slice(0,80);
+        if(!rawId||rawId.replace(/_/g,'')==='')return;
+        if(existingIds[rawId]){ignorados++;return;}
+        existingIds[rawId]=true;
+        var ma=getMesAnio(fecha);
+        appData.cartola.push({id:rawId,fecha:fecha,mes:ma.mes,anio:ma.anio,tipo:col.tipo>=0?String(row[col.tipo]||'').trim():'',glosa:glosa,ingreso:ingreso,egreso:egreso,saldo:col.saldo>=0?parseNum(row[col.saldo]):0,nombre:col.nombre>=0?String(row[col.nombre]||'').trim():'',comentario:col.comentario>=0?String(row[col.comentario]||'').trim():'',categoria:'',equipo:'',revisado:false});
+        nuevas.push(appData.cartola[appData.cartola.length-1]);
         agregados++;
       });
-
-      if (agregados === 0 && ignorados === 0) {
-        // mostrar diagnóstico para ajuste fino
-        var h = headers.slice(0,8).join(' | ') || '(sin headers detectados — fila '+headerRowIdx+')';
-        var sample = JSON.stringify((rows[headerRowIdx+1]||[]).slice(0,5));
-        alert('DIAGNÓSTICO:\nHeader fila '+headerRowIdx+': '+h+'\nColumnas: fecha='+col.fecha+' glosa='+col.glosa+' egreso='+col.egreso+' ingreso='+col.ingreso+'\nPrimera fila datos: '+sample);
-        return;
-      }
-
-      saveData();
-      upsertCartolaRowsSupabase(nuevas);
-      pushCostosSupabase();
-      if (nuevas.length > 0) uiState.cartolaFiltroMes = nuevas[0].anio+'/'+nuevas[0].mes;
-      showToastGeneral('✅ '+agregados+' transacciones importadas\n⏭️ '+ignorados+' ya existentes (ignoradas)','#2E7D32');
+      if(agregados===0&&ignorados===0){alert('DIAGNÓSTICO\nHeader fila: '+headerRowIdx+'\nHeaders: '+headers.slice(0,8).join(' | ')+'\nCols: fecha='+col.fecha+' glosa='+col.glosa+' egreso='+col.egreso+' ingreso='+col.ingreso+'\nPrimera fila datos: '+JSON.stringify((rows[headerRowIdx+1]||[]).slice(0,6)));return;}
+      saveData();upsertCartolaRowsSupabase(nuevas);pushCostosSupabase();
+      if(nuevas.length>0)uiState.cartolaFiltroMes=nuevas[0].anio+'/'+nuevas[0].mes;
+      showToastGeneral('✅ '+agregados+' transacciones importadas · '+ignorados+' ignoradas','#2E7D32');
       render();
-    } catch(err) { showToastGeneral('❌ Error leyendo Excel: '+err.message,'#C62828'); }
+    } catch(err){showToastGeneral('❌ Error: '+err.message,'#C62828');}
   };
   reader.readAsArrayBuffer(file);
 }
@@ -3322,7 +3231,7 @@ function _costoTabCartola(mes, anio) {
       <div>
         <div style="font-size:9px;font-weight:700;color:#1565C0;margin-bottom:3px">🏦 SUBIR CARTOLA</div>
         <button onclick="document.getElementById('cartola_excel_inp').click()" style="width:100%;padding:8px;background:#E3F2FD;color:#1565C0;border:1px solid #BBDEFB;border-radius:7px;font-size:11px;font-weight:700;cursor:pointer">📊 Subir Excel</button>
-        <input type="file" id="cartola_excel_inp" accept=".xlsx,.xls" style="display:none" onchange="importarCartola(event)">
+        <input type="file" id="cartola_excel_inp" accept=".xlsx,.xls" style="display:none" onchange="importarCartola(this)">
       </div>
       <div>
         <div style="font-size:9px;font-weight:700;color:#6A1B9A;margin-bottom:3px">🤖 IA</div>
