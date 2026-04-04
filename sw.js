@@ -2,7 +2,7 @@
 // Estrategia: Network First para HTML (siempre versión más reciente)
 // Fallback a caché SW si no hay red (modo offline)
 
-const CACHE_NAME = 'gs-panel-v1';
+const CACHE_NAME = 'gs-panel-v3';
 
 // Instalar: tomar control inmediato sin esperar a que se cierren otras pestañas
 self.addEventListener('install', () => {
