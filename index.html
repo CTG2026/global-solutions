@@ -2473,13 +2473,13 @@ function _costoTabHistorial(mes, anio) {
     <div style="font-size:10px;color:#555;margin-bottom:8px">Columnas: <b>Fecha · Empresa · Monto neto · Equipo · Categoría · Tipo · Descripción</b></div>
     <button onclick="document.getElementById('costos_excel_inp').click()" style="width:100%;padding:9px;background:#2E7D32;color:white;border:none;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer">📊 Subir Excel de costos</button>
     <input type="file" id="costos_excel_inp" accept=".xlsx,.xls" style="display:none" onchange="importarCostosDesdeExcel(this)">
-  </div>
+  </div>`}
   <div style="background:#E3F2FD;border:1px solid #90CAF9;border-radius:8px;padding:10px;margin-bottom:10px">
     <div style="font-size:10px;font-weight:700;color:#1565C0;margin-bottom:6px">🏦 IMPORTAR CARTOLA BANCARIA</div>
     <div style="font-size:10px;color:#555;margin-bottom:8px">Excel del banco — detecta columnas automáticamente</div>
     <button onclick="document.getElementById('cartola_hist_inp').click()" style="width:100%;padding:9px;background:#1565C0;color:white;border:none;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer">🏦 Subir Cartola Bancaria</button>
     <input type="file" id="cartola_hist_inp" accept=".xlsx,.xls" style="display:none" onchange="importarCartola(this)">
-  </div>`}
+  </div>
   <div style="display:flex;gap:6px;margin-bottom:6px;flex-wrap:wrap">
     <button onclick="uiState.costoFiltroTodos=!uiState.costoFiltroTodos;render()" style="padding:7px 10px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;border:1px solid ${todosLosMeses?'#4527A0':'#dde'};background:${todosLosMeses?'#EDE7F6':'#fff'};color:${todosLosMeses?'#4527A0':'#666'}">
       ${todosLosMeses?'✅ Todos':'📅 Todos'}
