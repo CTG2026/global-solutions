@@ -5,11 +5,11 @@
   <meta http-equiv="cache-control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="pragma" content="no-cache">
   <meta http-equiv="expires" content="1775443645">
-  <meta name="version" content="1775443645">
+  <meta name="version" content="1775445127">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <script>
 (function() {
-  var VERSION = '1775443645';
+  var VERSION = '1775445127';
   var stored = localStorage.getItem('gs_app_version');
   if (stored !== VERSION) {
     var session = localStorage.getItem('gs_session');
@@ -2245,9 +2245,11 @@ const CATEGORIAS_CARTOLA = [
   'Combustible','Mantención','Repuestos','Remuneraciones','Peajes / TAG',
   'Arriendo / Bodega','GPS / Telecomunicaciones','Contador / Honorarios',
   'Seguros','Factoring','Impuestos / SII','Gastos administrativos',
-  'Ingreso servicios','Ingreso factoring','Otros egresos','Otros ingresos'
+  'Préstamo interno','Pago préstamo interno',
+  'Ingreso servicios','Ingreso factoring','Otros egresos','Otros ingresos',
+  'Sin identificar','Otro (manual)...'
 ];
-const EQUIPOS_CARTOLA = ['GKFD84','WR9192','XR8555','GCFF12','BPBL35','XA1114','DSDV36','Distribución','N/A'];
+const EQUIPOS_CARTOLA = ['GKFD84','WR9192','XR8555','GCFF12','BPBL35','XA1114','DSDV36','Distribución','Flota','Sin identificar','N/A'];
 
 // ─── CARTOLA EXCEL ────────────────────────────────────────────────────────────
 // SQL Supabase (ejecutar una vez en el dashboard):
@@ -2317,8 +2319,13 @@ function importarCartolaSeleccionados() {
 }
 
 function cartolaSetCategoria(id, val) {
+  if (val === 'Otro (manual)...') {
+    var cat = prompt('Ingresa la categoría:');
+    if (!cat || !cat.trim()) return;
+    val = cat.trim();
+  }
   var idx = (appData.cartola||[]).findIndex(function(t){return t.id===id;});
-  if (idx!==-1) { appData.cartola[idx].categoria = val; saveData(); upsertCartolaSupabase(appData.cartola[idx]); }
+  if (idx!==-1) { appData.cartola[idx].categoria = val; saveData(); upsertCartolaSupabase(appData.cartola[idx]); render(); }
 }
 function cartolaSetEquipo(id, val) {
   var idx = (appData.cartola||[]).findIndex(function(t){return t.id===id;});
@@ -3538,6 +3545,16 @@ function _cartolaInformes() {
   var thS = 'padding:5px 7px;text-align:left;font-size:9px;font-weight:700;color:#888;border-bottom:1px solid #eee;background:#FAFAFA';
   var tdS = 'padding:5px 7px;font-size:10px;border-bottom:1px solid #F5F5F5';
   var filtBadge = [fCat,fEq].filter(Boolean).map(function(x){return ' · '+x;}).join('');
+  // Período del informe
+  var hoyEmision = (function(){ var d=new Date(); return String(d.getDate()).padStart(2,'0')+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+d.getFullYear(); })();
+  var periodoStr = (fDesde||fHasta) ? ((fDesde||'inicio')+' al '+(fHasta||'hoy')) : (datos.length ? (function(){
+    var fechas = datos.map(function(c){return c.fecha||'';}).filter(Boolean).sort();
+    return fechas[0]+' al '+fechas[fechas.length-1];
+  })() : 'Sin datos');
+  // Nombre del mes si todos son del mismo mes
+  var mesesInf = {}; datos.forEach(function(c){if(c.mes&&c.anio) mesesInf[c.anio+'/'+c.mes]=true;});
+  var MNOM=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+  var mesNombreStr = Object.keys(mesesInf).length===1 ? (function(){var p=Object.keys(mesesInf)[0].split('/'); return MNOM[parseInt(p[1])-1]+' '+p[0];})()+' · ' : '';
 
   return `
   <div style="border-top:2px solid #E8EAF6;margin-top:14px;padding-top:10px">
@@ -3563,9 +3580,13 @@ function _cartolaInformes() {
 
     <!-- RESUMEN EJECUTIVO -->
     <div style="background:white;border:1px solid #E8EAF6;border-radius:8px;padding:10px;margin-bottom:8px">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
         <div style="font-size:10px;font-weight:800;color:#1565C0">📋 RESUMEN EJECUTIVO${filtBadge}</div>
         <button onclick="imprimirInformeCartola('resumen')" style="padding:4px 10px;background:#E3F2FD;color:#1565C0;border:1px solid #BBDEFB;border-radius:5px;font-size:10px;font-weight:700;cursor:pointer">🖨️ PDF</button>
+      </div>
+      <div style="font-size:9px;color:#888;margin-bottom:8px">
+        <span style="font-weight:700;color:#37474F">${mesNombreStr}Período:</span> ${periodoStr} &nbsp;|&nbsp;
+        <span style="font-weight:700;color:#37474F">Emitido:</span> ${hoyEmision}
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:5px;margin-bottom:8px">
         <div style="background:#E8F5E9;border-radius:6px;padding:7px;text-align:center">
