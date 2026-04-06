@@ -5,11 +5,11 @@
   <meta http-equiv="cache-control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="pragma" content="no-cache">
   <meta http-equiv="expires" content="0">
-  <meta name="version" content="1775438129">
+  <meta name="version" content="1775442186">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <script>
 (function() {
-  var VERSION = '1775438129';
+  var VERSION = '1775442186';
   var stored = localStorage.getItem('gs_app_version');
   if (stored !== VERSION) {
     var session = localStorage.getItem('gs_session');
@@ -2259,7 +2259,6 @@ const EQUIPOS_CARTOLA = ['GKFD84','WR9192','XR8555','GCFF12','BPBL35','XA1114','
 //   revisado BOOLEAN DEFAULT false, created_at TIMESTAMP DEFAULT NOW()
 // );
 function importarCartola(input) {
-  // v4 — clon exacto de importarCostosDesdeExcel que funciona
   var file = input.files[0]; if (!file) return;
   input.value = '';
   if (typeof XLSX === 'undefined') { showToastGeneral('⚠️ Librería Excel no disponible, recarga la página','#E65100'); return; }
@@ -2267,68 +2266,13 @@ function importarCartola(input) {
   reader.onload = function(e) {
     try {
       var wb = XLSX.read(e.target.result, {type:'array'});
-      var ws = wb.Sheets[wb.SheetNames[0]];
-      var rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
-      // saltar fila de encabezados igual que importarCostosDesdeExcel
-      var dataRows = (rows[0] && typeof rows[0][0]==='string' && isNaN(rows[0][0])) ? rows.slice(1) : rows;
-      if (!dataRows.length) { showToastGeneral('⚠️ Sin datos en el archivo','#E65100'); return; }
-      var hoy = new Date();
-      var parseNum = function(v) {
-        return Math.abs(parseFloat(String(v||'').replace(/\s/g,'').replace(/\./g,'').replace(',','.'))||0);
-      };
-      var parseDate = function(v) {
-        var s = String(v||'').trim();
-        if (/^\d{5}$/.test(s)) {
-          var d = new Date((parseInt(s)-25569)*86400*1000);
-          return String(d.getDate()).padStart(2,'0')+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+d.getFullYear();
-        }
-        return s.replace(/\//g,'-');
-      };
-      var getMesAnio = function(fecha) {
-        var p = String(fecha||'').split('-');
-        if (p.length===3 && p[0].length===2) return {mes:p[1], anio:p[2]};
-        if (p.length===3 && p[0].length===4) return {mes:p[1], anio:p[0]};
-        return {mes:String(hoy.getMonth()+1).padStart(2,'0'), anio:String(hoy.getFullYear())};
-      };
-      if (!appData.cartola) appData.cartola = [];
-      var existingIds = {};
-      (appData.cartola||[]).forEach(function(x){ existingIds[x.id]=true; });
-      var nuevas=[], agregados=0, ignorados=0;
-      dataRows.forEach(function(row) {
-        if (!row || row.every(function(c){return !c;})) return;
-        var fecha  = parseDate(row[0]);
-        var glosa  = String(row[1]||'').trim();
-        var egreso = parseNum(row[2]);
-        var ingreso= parseNum(row[3]);
-        var saldo  = parseNum(row[4]);
-        var nombre = String(row[5]||'').trim();
-        if (!glosa && !egreso && !ingreso) return;
-        var rawId = (fecha+'_'+glosa+'_'+(egreso||ingreso)).toLowerCase()
-          .replace(/\s+/g,'_').replace(/[^a-z0-9_\-]/g,'').slice(0,80);
-        if (!rawId || rawId.replace(/_/g,'')==='') return;
-        if (existingIds[rawId]) { ignorados++; return; }
-        existingIds[rawId] = true;
-        var ma = getMesAnio(fecha);
-        appData.cartola.push({
-          id:rawId, fecha:fecha, mes:ma.mes, anio:ma.anio,
-          glosa:glosa, tipo:'', ingreso:ingreso, egreso:egreso,
-          saldo:saldo, nombre:nombre, comentario:'',
-          categoria:'', equipo:'', revisado:false
-        });
-        nuevas.push(appData.cartola[appData.cartola.length-1]);
-        agregados++;
-      });
-      if (agregados===0 && ignorados===0) {
-        alert('DIAGNÓSTICO v4\nFilas leídas: '+dataRows.length+
-          '\nFila 0: '+JSON.stringify((dataRows[0]||[]).slice(0,6))+
-          '\nFila 1: '+JSON.stringify((dataRows[1]||[]).slice(0,6)));
-        return;
-      }
-      saveData(); upsertCartolaRowsSupabase(nuevas); pushCostosSupabase();
-      if (nuevas.length>0) uiState.cartolaFiltroMes = nuevas[0].anio+'/'+nuevas[0].mes;
-      showToastGeneral('✅ '+agregados+' filas importadas a Cartola','#2E7D32');
+      var rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], {header:1, defval:''});
+      var items = _parsearArchivoBancario(rows);
+      if (!items.length) { showToastGeneral('⚠️ No se encontraron filas con fecha válida. Revisa el archivo.','#E65100'); return; }
+      uiState.cartolaPreview = items;
+      uiState.costoTab = 'cartola';
       render();
-    } catch(err) { showToastGeneral('❌ Error Cartola: '+err.message,'#C62828'); }
+    } catch(err) { showToastGeneral('❌ Error leyendo archivo: '+err.message,'#C62828'); }
   };
   reader.readAsArrayBuffer(file);
 }
@@ -2435,6 +2379,92 @@ function cancelarImportacionCostos() {
   render();
 }
 
+// ─── PARSER COMPARTIDO CARTOLA BANCARIA ───────────────────────────────────────
+function _parsearArchivoBancario(rows) {
+  if (!rows || !rows.length) return [];
+  // Detectar fila de encabezado (primera con texto)
+  var headerIdx = 0;
+  for (var i = 0; i < Math.min(8, rows.length); i++) {
+    if (rows[i].some(function(c){ return typeof c==='string' && c.trim().length>1; })) { headerIdx=i; break; }
+  }
+  var norm = function(s){ return String(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim(); };
+  var header = rows[headerIdx].map(norm);
+  // Detección por nombre (partial match)
+  var findCol = function(terms, skip) {
+    for (var ti=0;ti<terms.length;ti++) {
+      for (var hi=0;hi<header.length;hi++) {
+        if (hi===skip) continue;
+        if (header[hi]===terms[ti]||header[hi].includes(terms[ti])) return hi;
+      }
+    }
+    return -1;
+  };
+  var iF  = findCol(['fecha'],-1); if (iF<0)  iF=0;
+  var iG  = findCol(['descripcion','glosa','detalle','concepto'],-1); if (iG<0) iG=1;
+  var iGD = findCol(['glosa','detalle'],iG); // segunda columna con "glosa" o "detalle"
+  var iEg = findCol(['cargo','debito','egreso'],-1); if (iEg<0) iEg=2;
+  var iIn = findCol(['abono','credito','ingreso'],-1); if (iIn<0) iIn=3;
+  var iSa = findCol(['saldo'],-1); if (iSa<0) iSa=4;
+  var iCT = findCol(['comentario','referencia'],-1);
+  var parseNum = function(v) {
+    return Math.abs(parseFloat(String(v||'').replace(/\s/g,'').replace(/\./g,'').replace(',','.'))||0);
+  };
+  var parseDate = function(v) {
+    if (typeof v==='number' && v>40000) {
+      var d=new Date((v-25569)*86400*1000);
+      return String(d.getDate()).padStart(2,'0')+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+d.getFullYear();
+    }
+    var s=String(v||'').trim().replace(/\//g,'-');
+    return s;
+  };
+  var getMesAnio = function(fecha) {
+    var p=String(fecha||'').split('-'); var hoy=new Date();
+    if (p.length===3&&p[0].length===4) return {mes:p[1],anio:p[0]};
+    if (p.length===3&&p[2].length===4) return {mes:p[1],anio:p[2]};
+    return {mes:String(hoy.getMonth()+1).padStart(2,'0'),anio:String(hoy.getFullYear())};
+  };
+  var items=[]; var ts=Date.now(); var cnt=0;
+  rows.slice(headerIdx+1).forEach(function(row) {
+    if (!row||!row.length) return;
+    var fecha=parseDate(row[iF]);
+    if (!fecha||fecha.length<4||fecha==='-') return; // requiere fecha válida
+    var glosa   = norm(row[iG]) ? String(row[iG]||'').trim() : '';
+    var glosaD  = iGD>=0 ? String(row[iGD]||'').trim() : '';
+    var egreso  = parseNum(row[iEg]);
+    var ingreso = parseNum(row[iIn]);
+    var saldo   = parseNum(row[iSa]);
+    var coment  = iCT>=0 ? String(row[iCT]||'').trim() : '';
+    // Glosa completa = glosa principal + detalle si existe
+    var glosaFull = glosa+(glosaD&&glosaD!==glosa?' | '+glosaD:'');
+    var tipo=ingreso>0?'Abono':'Cargo';
+    var ma=getMesAnio(fecha); cnt++;
+    items.push({
+      id:'car_'+ts+'_'+(cnt)+'_'+Math.random().toString(36).substr(2,4),
+      fecha:fecha, mes:ma.mes, anio:ma.anio,
+      glosa:glosaFull, tipo:tipo,
+      ingreso:ingreso, egreso:egreso, saldo:saldo,
+      nombre:coment, comentario:'', categoria:'', equipo:'', revisado:false
+    });
+  });
+  return items;
+}
+
+function confirmarImportacionCartolaTab() {
+  var preview = uiState.cartolaPreview || [];
+  if (!preview.length) return;
+  if (!appData.cartola) appData.cartola = [];
+  preview.forEach(function(c){ appData.cartola.push(c); upsertCartolaSupabase(c); });
+  uiState.cartolaPreview = null;
+  saveData();
+  showToastGeneral('✅ '+preview.length+' movimientos importados a Cartola','#1565C0');
+  render();
+}
+
+function cancelarImportacionCartolaTab() {
+  uiState.cartolaPreview = null;
+  render();
+}
+
 function confirmarImportacionCartola() {
   const preview = uiState.costosExcelPreview || [];
   if (!preview.length) return;
@@ -2463,66 +2493,10 @@ function importarCartolaViaHistorial(input) {
   reader.onload = function(e) {
     try {
       var wb = XLSX.read(e.target.result, {type:'array'});
-      var ws = wb.Sheets[wb.SheetNames[0]];
-      var rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
-      if (!rows.length) { showToastGeneral('⚠️ El archivo está vacío','#E65100'); return; }
-      // Detectar fila de encabezado (primera fila con texto)
-      var headerIdx = 0;
-      for (var i = 0; i < Math.min(5, rows.length); i++) {
-        if (rows[i].some(function(c){ return typeof c === 'string' && c.trim().length > 0; })) { headerIdx = i; break; }
-      }
-      var header = rows[headerIdx].map(function(c){ return String(c||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,''); });
-      // Detectar columnas por nombre o usar posición
-      function col(names) {
-        for (var n = 0; n < names.length; n++) {
-          var idx = header.indexOf(names[n]);
-          if (idx >= 0) return idx;
-        }
-        return -1;
-      }
-      var iF  = col(['fecha','fecha de transaccion','date']); if (iF  < 0) iF  = 0;
-      var iG  = col(['glosa','descripcion','detalle','concepto']); if (iG  < 0) iG  = 1;
-      var iEg = col(['cargo','debito','egreso','monto cargo']); if (iEg < 0) iEg = 2;
-      var iIn = col(['abono','credito','ingreso','monto abono']); if (iIn < 0) iIn = 3;
-      var iSa = col(['saldo']); if (iSa < 0) iSa = 4;
-      var dataRows = rows.slice(headerIdx + 1);
-      var preview = [];
-      dataRows.forEach(function(row) {
-        if (!row || row.every(function(c){ return !c; })) return;
-        var fechaRaw = String(row[iF]||'').trim();
-        var glosa    = String(row[iG]||'').trim();
-        var egresoRaw= String(row[iEg]||'').replace(/\./g,'').replace(',','.').trim();
-        var ingresoRaw=String(row[iIn]||'').replace(/\./g,'').replace(',','.').trim();
-        var saldoRaw = String(row[iSa]||'').replace(/\./g,'').replace(',','.').trim();
-        var egreso   = Math.abs(parseFloat(egresoRaw)||0);
-        var ingreso  = Math.abs(parseFloat(ingresoRaw)||0);
-        var saldo    = parseFloat(saldoRaw)||0;
-        if (!fechaRaw && !glosa && !egreso && !ingreso) return;
-        // Normalizar fecha
-        var fecha = fechaRaw;
-        if (/^\d{5}$/.test(fecha)) {
-          var d = new Date((parseInt(fecha)-25569)*86400*1000);
-          fecha = String(d.getDate()).padStart(2,'0')+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+d.getFullYear();
-        } else if (fecha.includes('/')) {
-          fecha = fecha.replace(/\//g,'-');
-        }
-        var parts = fecha.split('-');
-        var mes, anio;
-        if (parts.length === 3) {
-          if (parts[0].length === 4) { anio = parts[0]; mes = parts[1]; }
-          else { mes = parts[1]; anio = parts[2]; }
-        } else { var hoy=new Date(); mes=String(hoy.getMonth()+1).padStart(2,'0'); anio=String(hoy.getFullYear()); }
-        var tipo = ingreso > 0 ? 'Abono' : 'Cargo';
-        preview.push({
-          id: 'car_'+Date.now()+'_'+Math.random().toString(36).substr(2,6),
-          fecha: fecha, mes: mes, anio: anio,
-          glosa: glosa, tipo: tipo,
-          ingreso: ingreso, egreso: egreso, saldo: saldo,
-          nombre: '', comentario: '', categoria: '', equipo: '', revisado: false
-        });
-      });
-      if (!preview.length) { showToastGeneral('⚠️ No se encontraron filas válidas. Revisa el formato del archivo.','#E65100'); return; }
-      uiState.costosExcelPreview = preview;
+      var rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], {header:1, defval:''});
+      var items = _parsearArchivoBancario(rows);
+      if (!items.length) { showToastGeneral('⚠️ No se encontraron filas con fecha válida.','#E65100'); return; }
+      uiState.costosExcelPreview = items;
       uiState.costoTab = 'historial';
       render();
     } catch(err) { showToastGeneral('❌ Error leyendo archivo: '+err.message,'#C62828'); }
@@ -2551,12 +2525,15 @@ function _costoTabHistorial(mes, anio) {
     <div style="font-size:12px;font-weight:800;color:#1565C0;margin-bottom:6px">📋 VISTA PREVIA CARTOLA — ${preview.length} filas · Ingresos $${tIngresos.toLocaleString('es-CL')} · Egresos $${tEgresos.toLocaleString('es-CL')}</div>
     <div style="max-height:600px;overflow-y:auto;margin-bottom:10px">
       ${preview.map(c=>`
-      <div style="background:white;border:1px solid #BBDEFB;border-radius:6px;padding:6px 8px;margin-bottom:4px;display:flex;justify-content:space-between;align-items:center">
-        <div style="flex:1;min-width:0">
+      <div style="background:white;border:1px solid #BBDEFB;border-radius:6px;padding:6px 8px;margin-bottom:4px;display:flex;justify-content:space-between;align-items:flex-start">
+        <div style="flex:1;min-width:0;margin-right:8px">
           <div style="font-size:11px;font-weight:700;color:#333">${c.glosa||'—'}</div>
-          <div style="font-size:10px;color:#888">${c.fecha} · ${c.tipo}</div>
+          <div style="font-size:10px;color:#888">${c.fecha} · ${c.tipo}${c.nombre?' · '+c.nombre:''}</div>
         </div>
-        <div style="font-size:12px;font-weight:700;color:${c.ingreso?'#2E7D32':'#C62828'};flex-shrink:0;margin-left:8px">${c.ingreso?'+':'−'}$${(c.ingreso||c.egreso||0).toLocaleString('es-CL')}</div>
+        <div style="font-size:12px;font-weight:700;color:${c.ingreso>0?'#2E7D32':'#C62828'};flex-shrink:0;text-align:right">
+          ${c.ingreso>0?`<div>+$${c.ingreso.toLocaleString('es-CL')}</div>`:''}
+          ${c.egreso>0?`<div>-$${c.egreso.toLocaleString('es-CL')}</div>`:''}
+        </div>
       </div>`).join('')}
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
@@ -3351,13 +3328,37 @@ function _costoTabCartola(mes, anio) {
 
   var catOpts = CATEGORIAS_CARTOLA.map(function(c){return '<option value="'+c+'">'+c+'</option>';}).join('');
   var eqOpts  = EQUIPOS_CARTOLA.map(function(e){return '<option value="'+e+'">'+e+'</option>';}).join('');
+  var cprev   = uiState.cartolaPreview || [];
+  var cpTIng  = cprev.reduce(function(a,c){return a+(c.ingreso||0);},0);
+  var cpTEg   = cprev.reduce(function(a,c){return a+(c.egreso||0);},0);
 
   return `
+  ${cprev.length ? `
+  <div style="background:#E3F2FD;border:2px solid #1565C0;border-radius:10px;padding:12px;margin-bottom:10px">
+    <div style="font-size:12px;font-weight:800;color:#1565C0;margin-bottom:6px">📋 VISTA PREVIA — ${cprev.length} filas · +$${cpTIng.toLocaleString('es-CL')} ingresos · -$${cpTEg.toLocaleString('es-CL')} egresos</div>
+    <div style="max-height:400px;overflow-y:auto;margin-bottom:10px">
+      ${cprev.map(function(c){return `
+      <div style="background:white;border:1px solid #BBDEFB;border-radius:6px;padding:6px 8px;margin-bottom:4px;display:flex;justify-content:space-between;align-items:flex-start">
+        <div style="flex:1;min-width:0;margin-right:8px">
+          <div style="font-size:11px;font-weight:700;color:#333">${c.glosa||'—'}</div>
+          <div style="font-size:10px;color:#888">${c.fecha} · ${c.tipo}${c.nombre?' · '+c.nombre:''}</div>
+        </div>
+        <div style="font-size:12px;font-weight:700;text-align:right;flex-shrink:0">
+          ${c.ingreso>0?`<div style="color:#2E7D32">+$${c.ingreso.toLocaleString('es-CL')}</div>`:''}
+          ${c.egreso>0?`<div style="color:#C62828">-$${c.egreso.toLocaleString('es-CL')}</div>`:''}
+        </div>
+      </div>`;}).join('')}
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+      <button onclick="confirmarImportacionCartolaTab()" style="padding:10px;background:#1565C0;color:white;border:none;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer">✅ Confirmar e importar ${cprev.length} movimientos</button>
+      <button onclick="cancelarImportacionCartolaTab()" style="padding:10px;background:#FFEBEE;color:#C62828;border:1px solid #FFCDD2;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer">✕ Cancelar</button>
+    </div>
+  </div>` : ''}
   <div style="background:#F8F9FA;border-radius:10px;padding:10px;margin-bottom:8px">
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
       <div>
         <div style="font-size:9px;font-weight:700;color:#1565C0;margin-bottom:3px">🏦 SUBIR CARTOLA</div>
-        <button onclick="document.getElementById('cartola_excel_inp').click()" style="width:100%;padding:8px;background:#E3F2FD;color:#1565C0;border:1px solid #BBDEFB;border-radius:7px;font-size:11px;font-weight:700;cursor:pointer">📊 Subir Excel</button>
+        <button onclick="document.getElementById('cartola_excel_inp').click()" style="width:100%;padding:8px;background:#1565C0;color:white;border:1px solid #BBDEFB;border-radius:7px;font-size:11px;font-weight:700;cursor:pointer">🏦 Subir Excel</button>
         <input type="file" id="cartola_excel_inp" accept=".xlsx,.xls" style="display:none" onchange="importarCartola(this)">
       </div>
       <div>
