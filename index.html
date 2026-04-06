@@ -4,12 +4,12 @@
 <meta charset="UTF-8">
   <meta http-equiv="cache-control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="pragma" content="no-cache">
-  <meta http-equiv="expires" content="0">
-  <meta name="version" content="1775442186">
+  <meta http-equiv="expires" content="1775443645">
+  <meta name="version" content="1775443645">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <script>
 (function() {
-  var VERSION = '1775442186';
+  var VERSION = '1775443645';
   var stored = localStorage.getItem('gs_app_version');
   if (stored !== VERSION) {
     var session = localStorage.getItem('gs_session');
@@ -1562,7 +1562,7 @@ function pdfRendicion(id) {
   const html = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
   <meta http-equiv="cache-control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="pragma" content="no-cache">
-  <meta http-equiv="expires" content="0"><title>${ren.id} — Global Solutions SpA</title>
+  <meta http-equiv="expires" content="1775443645"><title>${ren.id} — Global Solutions SpA</title>
   <style>* {box-sizing:border-box;margin:0;padding:0;} body {font-family:'Segoe UI',Arial,sans-serif;color:#222;background:white;} .page {max-width:860px;margin:0 auto;padding:40px;} table {border-collapse:collapse;width:100%;} @media print {.no-print{display:none!important} .page{padding:20px}}</style>
   </head><body><div class="page">
     <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:24px;padding-bottom:16px;border-bottom:3px solid #0B2545">
@@ -2281,10 +2281,18 @@ function eliminarCartola(id) {
   appData.cartola = (appData.cartola||[]).filter(x=>x.id!==id);
   saveData(); pushCostosSupabase(); render();
 }
-function limpiarCartolaMes(mes, anio) {
-  if (!confirm('¿Eliminar TODOS los movimientos del mes?')) return;
-  appData.cartola = (appData.cartola||[]).filter(c=>!(c.mes===mes&&c.anio===anio));
-  saveData(); pushCostosSupabase(); render();
+async function limpiarCartolaMes(mes, anio) {
+  if (!confirm('¿Eliminar TODOS los movimientos de '+mes+'/'+anio+'?')) return;
+  var eliminados = (appData.cartola||[]).filter(function(c){return c.mes===mes&&c.anio===anio;});
+  appData.cartola = (appData.cartola||[]).filter(function(c){return !(c.mes===mes&&c.anio===anio);});
+  saveData();
+  if (supa && supaConectado) {
+    for (var i=0; i<eliminados.length; i++) {
+      await supa.from('cartola').delete().eq('id', eliminados[i].id);
+    }
+  }
+  showToastGeneral('🗑️ '+eliminados.length+' movimientos eliminados','#555');
+  render();
 }
 function importarCartolaSeleccionados() {
   const ids = Object.keys(uiState).filter(k=>k.startsWith('cartola_sel_')&&uiState[k]).map(k=>k.replace('cartola_sel_',''));
@@ -3293,6 +3301,9 @@ function _costoTabCartola(mes, anio) {
   var fEq   = uiState.cartolaFiltroEq   || '';
   var fSolo = uiState.cartolaFiltroSolo || false;
   var inpS  = 'width:100%;padding:5px 7px;border:1px solid #dde;border-radius:6px;font-size:11px;background:white';
+  var fMesSplit = fMes ? fMes.split('/') : [anio, mes];
+  var fAnioStr  = fMesSplit[0] || anio;
+  var fMesStr   = fMesSplit[1] || mes;
 
   // opciones de meses disponibles
   var mesesDisp = [];
@@ -3355,10 +3366,10 @@ function _costoTabCartola(mes, anio) {
     </div>
   </div>` : ''}
   <div style="background:#F8F9FA;border-radius:10px;padding:10px;margin-bottom:8px">
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px">
       <div>
         <div style="font-size:9px;font-weight:700;color:#1565C0;margin-bottom:3px">🏦 SUBIR CARTOLA</div>
-        <button onclick="document.getElementById('cartola_excel_inp').click()" style="width:100%;padding:8px;background:#1565C0;color:white;border:1px solid #BBDEFB;border-radius:7px;font-size:11px;font-weight:700;cursor:pointer">🏦 Subir Excel</button>
+        <button onclick="document.getElementById('cartola_excel_inp').click()" style="width:100%;padding:8px;background:#1565C0;color:white;border:none;border-radius:7px;font-size:11px;font-weight:700;cursor:pointer">🏦 Subir Excel</button>
         <input type="file" id="cartola_excel_inp" accept=".xlsx,.xls" style="display:none" onchange="importarCartola(this)">
       </div>
       <div>
@@ -3369,6 +3380,10 @@ function _costoTabCartola(mes, anio) {
             ? `<button onclick="categorizarConIA()" style="width:100%;padding:8px;background:#EDE7F6;color:#6A1B9A;border:1px solid #CE93D8;border-radius:7px;font-size:11px;font-weight:700;cursor:pointer">🤖 Categorizar con IA <span style="background:#6A1B9A;color:white;border-radius:10px;padding:1px 6px;font-size:10px">${sinCat}</span></button>`
             : `<button disabled style="width:100%;padding:8px;background:#F3E5F5;color:#AB47BC;border:1px solid #E1BEE7;border-radius:7px;font-size:11px;font-weight:700">✅ Todo categorizado</button>`
         }
+      </div>
+      <div>
+        <div style="font-size:9px;font-weight:700;color:#C62828;margin-bottom:3px">🗑️ LIMPIAR</div>
+        <button onclick="limpiarCartolaMes('${fMesStr}','${fAnioStr}')" style="width:100%;padding:8px;background:#FFEBEE;color:#C62828;border:1px solid #FFCDD2;border-radius:7px;font-size:11px;font-weight:700;cursor:pointer">🗑️ Borrar mes</button>
       </div>
     </div>
   </div>
@@ -3437,7 +3452,6 @@ function _costoTabCartola(mes, anio) {
       </div>
     </div>`;
   }).join('')}
-  <button onclick="limpiarCartolaMes('${mes}','${anio}')" style="width:100%;margin-top:6px;padding:7px;background:#FFEBEE;color:#C62828;border:1px solid #FFCDD2;border-radius:7px;font-size:10px;font-weight:700;cursor:pointer">🗑️ Limpiar mes actual</button>
   ` : '<div style="text-align:center;color:#aaa;font-size:11px;padding:20px">Sin movimientos — sube un Excel para comenzar</div>'}` + _cartolaInformes();
 }
 
@@ -4240,7 +4254,7 @@ function descargarLiqV2(liqId) {
   const html = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
   <meta http-equiv="cache-control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="pragma" content="no-cache">
-  <meta http-equiv="expires" content="0">
+  <meta http-equiv="expires" content="1775443645">
   <title>${liq.id} — Global Solutions SpA</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -4792,7 +4806,7 @@ function abrirPreviewCotV2(){
   win.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8">
   <meta http-equiv="cache-control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="pragma" content="no-cache">
-  <meta http-equiv="expires" content="0"><title>${numero}</title><style>body{font-family:'Segoe UI',sans-serif;padding:30px;max-width:680px;margin:0 auto}@media print{.no-print{display:none!important}}</style></head><body>${html}<script>setTimeout(()=>window.print(),400);<\/script></body></html>`);
+  <meta http-equiv="expires" content="1775443645"><title>${numero}</title><style>body{font-family:'Segoe UI',sans-serif;padding:30px;max-width:680px;margin:0 auto}@media print{.no-print{display:none!important}}</style></head><body>${html}<script>setTimeout(()=>window.print(),400);<\/script></body></html>`);
   win.document.close();
   // Guardar cotización
   if(!appData.cotizaciones) appData.cotizaciones=[];
@@ -4807,7 +4821,7 @@ function abrirPreviewCot(cotObj){
   win.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8">
   <meta http-equiv="cache-control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="pragma" content="no-cache">
-  <meta http-equiv="expires" content="0"><title>${cotObj.numero}</title><style>body{font-family:'Segoe UI',sans-serif;padding:30px;max-width:680px;margin:0 auto}@media print{.no-print{display:none!important}}</style></head><body>${html}<script>setTimeout(()=>window.print(),400);<\/script></body></html>`);
+  <meta http-equiv="expires" content="1775443645"><title>${cotObj.numero}</title><style>body{font-family:'Segoe UI',sans-serif;padding:30px;max-width:680px;margin:0 auto}@media print{.no-print{display:none!important}}</style></head><body>${html}<script>setTimeout(()=>window.print(),400);<\/script></body></html>`);
   win.document.close();
 }
 
