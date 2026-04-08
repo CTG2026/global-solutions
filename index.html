@@ -4,12 +4,20 @@
 <meta charset="UTF-8">
   <meta http-equiv="cache-control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="pragma" content="no-cache">
-  <meta http-equiv="expires" content="1775443645">
-  <meta name="version" content="1775445127">
+  <meta http-equiv="expires" content="1775685937">
+  <meta name="version" content="1775685937">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <script>
+// Desregistrar cualquier Service Worker existente de forma inmediata
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.getRegistrations().then(function(regs) {
+    regs.forEach(function(reg) { reg.unregister(); });
+  });
+}
+</script>
+<script>
 (function() {
-  var VERSION = '1775445127';
+  var VERSION = '1775685937';
   var stored = localStorage.getItem('gs_app_version');
   if (stored !== VERSION) {
     var session = localStorage.getItem('gs_session');
@@ -2249,7 +2257,7 @@ const CATEGORIAS_CARTOLA = [
   'Ingreso servicios','Ingreso factoring','Otros egresos','Otros ingresos',
   'Sin identificar','Otro (manual)...'
 ];
-const EQUIPOS_CARTOLA = ['GKFD84','WR9192','XR8555','GCFF12','BPBL35','XA1114','DSDV36','Distribución','Flota','Sin identificar','N/A'];
+const EQUIPOS_CARTOLA = ['GKFD84','WR9192','XR8555','GCFF12','BPBL35','XA1114','DSDV36','Distribución','Flota','Manuel Madrid','Felipe Vidal','Felipe Madariaga','Sebastián Zúñiga','Carlos Torres','Sin identificar','N/A'];
 
 // ─── CARTOLA EXCEL ────────────────────────────────────────────────────────────
 // SQL Supabase (ejecutar una vez en el dashboard):
@@ -2925,6 +2933,40 @@ function _costoTabRemuneraciones(mes, anio) {
       <button onclick="guardarLiquidacionRem()" style="padding:11px;background:#0B2545;color:white;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer">💾 Guardar</button>
       <button onclick="imprimirLiquidacionRem('${empId}','${remMes}','${remAnio}')" style="padding:11px;background:#546E7A;color:white;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer">🖨️ PDF</button>
     </div>
+
+    <!-- MOVIMIENTOS CARTOLA VINCULADOS -->
+    ${(function(){
+      var empNombre = emp.nombre || '';
+      var palabras = empNombre.toLowerCase().split(' ').filter(function(p){ return p.length > 2; });
+      var movs = (appData.cartola||[]).filter(function(c){
+        if (c.mes !== remMes || c.anio !== remAnio) return false;
+        var glosa   = (c.glosa  ||'').toLowerCase();
+        var nombre  = (c.nombre ||'').toLowerCase();
+        var categ   = (c.categoria||'').toLowerCase();
+        var coincideNombre = palabras.some(function(p){ return glosa.includes(p) || nombre.includes(p); });
+        var coincideCateg  = categ === 'remuneraciones';
+        return coincideNombre || (coincideCateg && nombre.includes(palabras[0]||'___'));
+      });
+      if (!movs.length) return '<div style="margin-top:10px;padding:10px;background:#F9F9F9;border:1px dashed #ddd;border-radius:8px;text-align:center;font-size:10px;color:#aaa">Sin movimientos de cartola vinculados para este período</div>';
+      var totalEg = movs.reduce(function(a,c){ return a+(c.egreso||0); },0);
+      var totalIn = movs.reduce(function(a,c){ return a+(c.ingreso||0); },0);
+      var filas = movs.map(function(c){
+        var monto = c.egreso ? '-$'+c.egreso.toLocaleString('es-CL') : '+$'+(c.ingreso||0).toLocaleString('es-CL');
+        var color = c.egreso ? '#C62828' : '#2E7D32';
+        return '<div style="display:grid;grid-template-columns:auto 1fr auto;gap:6px;align-items:center;padding:5px 0;border-bottom:1px solid #f0f0f0">'
+          +'<div style="font-size:9px;color:#888;white-space:nowrap">'+( c.fecha||'' )+'</div>'
+          +'<div style="font-size:10px;color:#333;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+(c.glosa||'')+'">'+( c.glosa||'' )+'</div>'
+          +'<div style="font-size:11px;font-weight:700;color:'+color+';white-space:nowrap">'+monto+'</div>'
+          +'</div>';
+      }).join('');
+      return '<div style="margin-top:12px;background:#EDE7F6;border-radius:10px;padding:12px">'
+        +'<div style="font-size:10px;font-weight:800;color:#4A148C;letter-spacing:0.5px;margin-bottom:8px;border-bottom:2px solid #CE93D8;padding-bottom:4px">CARTOLA VINCULADA — '+mesLabelRem+'</div>'
+        + filas
+        +'<div style="margin-top:6px;display:flex;justify-content:space-between;padding:5px 0">'
+        +(totalIn>0?'<span style="font-size:10px;font-weight:700;color:#2E7D32">Ingresos: +$'+totalIn.toLocaleString('es-CL')+'</span>':'<span></span>')
+        +(totalEg>0?'<span style="font-size:10px;font-weight:700;color:#C62828">Egresos: -$'+totalEg.toLocaleString('es-CL')+'</span>':'<span></span>')
+        +'</div></div>';
+    })()}
     ${_histHtml}`;
   }
 
@@ -5673,8 +5715,20 @@ async function addServicio() {
   const origen = origenSel === 'manual'
     ? (document.getElementById('srv_origen_manual')?.value.trim() || uiState.srvForm?.origenManual || '')
     : origenSel;
-  // Guías
-  const guiasRaw = uiState.srv_guias || [];
+  // Guías — leer desde DOM para capturar valores aunque no hayan disparado oninput
+  const guiasRaw = (uiState.srv_guias || []).map(function(g, i) {
+    var numEl  = document.getElementById('srv_guia_num_'  + i);
+    var destEl = document.getElementById('srv_guia_dest_' + i);
+    var fgEl   = document.getElementById('srv_guia_fg_'   + i);
+    return {
+      num:            numEl  ? (numEl.value  || g.num  || '') : (g.num  || ''),
+      destino:        destEl ? (destEl.value || g.destino || '') : (g.destino || ''),
+      fecha_guia:     fgEl   ? (fgEl.value   || g.fecha_guia || '') : (g.fecha_guia || ''),
+      fecha_descarga: g.fecha_descarga || '',
+      kg:             g.kg || '',
+      imagen_url:     g.imagen_url || ''
+    };
+  });
   // Validaciones en orden
   const markRed = id => { const el=document.getElementById(id); if(el){el.style.border='2px solid #C62828';} };
   if (!fechaRaw) { alert('⚠️ Ingresa la fecha del servicio.'); return; }
@@ -9780,30 +9834,15 @@ document.addEventListener('touchend', async e => {
   }
 }, {passive:true});
 
-// Registrar Service Worker — Network First para siempre cargar versión más reciente
+// Registrar Service Worker de auto-eliminación (limpia cachés y se desregistra solo)
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', function() {
     navigator.serviceWorker.register('./sw.js')
       .then(function(reg) {
-        // Forzar búsqueda de actualización en cada carga
+        // Forzar activación inmediata si hay nuevo SW esperando
         reg.update();
-        // Cuando hay un nuevo SW esperando, recargar automáticamente
-        reg.addEventListener('updatefound', function() {
-          var newWorker = reg.installing;
-          newWorker.addEventListener('statechange', function() {
-            if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-              // Nueva versión instalada — recargar para activarla
-              window.location.reload();
-            }
-          });
-        });
       })
-      .catch(function(err) { console.warn('SW registro fallido:', err); });
-
-    // Si el SW se actualiza en otra pestaña, recargar esta también
-    navigator.serviceWorker.addEventListener('controllerchange', function() {
-      window.location.reload();
-    });
+      .catch(function(err) { console.warn('SW:', err); });
   });
 }
 // Limpiar localStorage de servicios al arrancar — Supabase es la única fuente
