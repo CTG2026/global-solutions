@@ -4,8 +4,8 @@
 <meta charset="UTF-8">
   <meta http-equiv="cache-control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="pragma" content="no-cache">
-  <meta http-equiv="expires" content="1775685937">
-  <meta name="version" content="1775685937">
+  <meta http-equiv="expires" content="1775689898">
+  <meta name="version" content="1775689898">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <script>
 // Desregistrar cualquier Service Worker existente de forma inmediata
@@ -17,7 +17,7 @@ if ('serviceWorker' in navigator) {
 </script>
 <script>
 (function() {
-  var VERSION = '1775685937';
+  var VERSION = '1775689898';
   var stored = localStorage.getItem('gs_app_version');
   if (stored !== VERSION) {
     var session = localStorage.getItem('gs_session');
@@ -3971,7 +3971,7 @@ function renderLiquidacionesV2() {
       </div>
       ${isOpen?`<div style="padding:6px 10px">
         ${svcs.map(s=>{
-          const guias=(s.guias||[]).map(g=>g.num).filter(Boolean).join(', ')||'—';
+          const guias=(s.guias||s.puntos||[]).map(g=>g.num||g.guia).filter(Boolean).join(', ')||'—';
           return `<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid #f5f5f5">
             <input type="checkbox" ${seleccionados.includes(s.id)?'checked':''} onchange="toggleSrvLiq('${s.id}',this.checked)" style="cursor:pointer">
             <div style="flex:1"><span style="font-size:11px;font-weight:700;color:#455A64">${s.id}</span>
@@ -4999,11 +4999,13 @@ function editarServicio(id) {
   // Copiar puntos del servicio a uiState para edición
   const s = (appData.servicios||[]).find(sv=>sv.id===id);
   if (!s) return;
-  uiState.edit_srv_puntos = JSON.parse(JSON.stringify(s.puntos||s.guias||[{origen:'',destino:'',tipo:'descarga',guia:'',fecha_guia:'',fecha_descarga:'',kg:'',imagen_url:''}]));
-  // Normalizar puntos al formato nuevo
+  const pts = s.puntos||s.guias||[];
+  uiState.edit_srv_puntos = JSON.parse(JSON.stringify(pts.length ? pts : [{origen:'',destino:'',tipo:'descarga',guia:'',fecha_guia:'',fecha_descarga:'',kg:'',imagen_url:''}]));
+  // Normalizar puntos al formato nuevo (guardar tanto guia como num)
   uiState.edit_srv_puntos = uiState.edit_srv_puntos.map(p=>({
     origen: p.origen||'', destino: p.destino||'', tipo: p.tipo||'descarga',
-    guia: p.guia||p.num||'', fecha_guia: p.fecha_guia||'', fecha_descarga: p.fecha_descarga||'',
+    guia: p.guia||p.num||'', num: p.num||p.guia||'',
+    fecha_guia: p.fecha_guia||'', fecha_descarga: p.fecha_descarga||'',
     kg: p.kg||'', imagen_url: p.imagen_url||''
   }));
   render();
@@ -5016,6 +5018,9 @@ function cancelarEditarServicio() {
 function updEditPunto(pi, campo, valor) {
   if (!uiState.edit_srv_puntos) return;
   uiState.edit_srv_puntos[pi][campo] = valor;
+  // Sincronizar num y guia para que el display siempre los encuentre
+  if (campo === 'guia') uiState.edit_srv_puntos[pi].num = valor;
+  if (campo === 'num')  uiState.edit_srv_puntos[pi].guia = valor;
 }
 function addEditPunto() {
   if (!uiState.edit_srv_puntos) uiState.edit_srv_puntos = [];
@@ -5110,7 +5115,7 @@ function renderEditarServicio(id) {
         <div style="grid-column:1/-1"><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">DESTINO</div>
           <input value="${p.destino||''}" onchange="updEditPunto(${pi},'destino',this.value)" placeholder="ej: Marchigue" style="width:100%;border:1px solid #dde;border-radius:5px;padding:6px 8px;font-size:12px;outline:none;font-family:inherit"></div>
         <div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">N° GUÍA</div>
-          <input value="${p.guia||''}" onchange="updEditPunto(${pi},'guia',this.value)" placeholder="ej: 123456" style="width:100%;border:1px solid #dde;border-radius:5px;padding:6px 8px;font-size:12px;outline:none;font-family:inherit"></div>
+          <input value="${p.guia||p.num||''}" oninput="updEditPunto(${pi},'guia',this.value)" onchange="updEditPunto(${pi},'guia',this.value)" placeholder="ej: 123456" style="width:100%;border:1px solid #dde;border-radius:5px;padding:6px 8px;font-size:12px;outline:none;font-family:inherit;font-size:14px;font-weight:700"></div>
         <div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">KG TRASLADADOS</div>
           <input value="${p.kg||''}" onchange="updEditPunto(${pi},'kg',this.value)" type="number" placeholder="ej: 20000" style="width:100%;border:1px solid #dde;border-radius:5px;padding:6px 8px;font-size:12px;outline:none;font-family:inherit"></div>
         <div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">FECHA GUÍA</div>
