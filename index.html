@@ -4,8 +4,8 @@
 <meta charset="UTF-8">
   <meta http-equiv="cache-control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="pragma" content="no-cache">
-  <meta http-equiv="expires" content="1775757263">
-  <meta name="version" content="1775757263">
+  <meta http-equiv="expires" content="1775758565">
+  <meta name="version" content="1775758565">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <script>
 // Desregistrar cualquier Service Worker existente de forma inmediata
@@ -17,7 +17,7 @@ if ('serviceWorker' in navigator) {
 </script>
 <script>
 (function() {
-  var VERSION = '1775758341';
+  var VERSION = '1775758565';
   var stored = localStorage.getItem('gs_app_version');
   if (stored !== VERSION) {
     var session = localStorage.getItem('gs_session');
@@ -1578,7 +1578,7 @@ function pdfRendicion(id) {
   const html = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
   <meta http-equiv="cache-control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="pragma" content="no-cache">
-  <meta http-equiv="expires" content="1775443645"><title>${ren.id} — Global Solutions SpA</title>
+  <meta http-equiv="expires" content="1775758565"><title>${ren.id} — Global Solutions SpA</title>
   <style>* {box-sizing:border-box;margin:0;padding:0;} body {font-family:'Segoe UI',Arial,sans-serif;color:#222;background:white;} .page {max-width:860px;margin:0 auto;padding:40px;} table {border-collapse:collapse;width:100%;} @media print {.no-print{display:none!important} .page{padding:20px}}</style>
   </head><body><div class="page">
     <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:24px;padding-bottom:16px;border-bottom:3px solid #0B2545">
@@ -4373,7 +4373,7 @@ function descargarLiqV2(liqId) {
   const html = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
   <meta http-equiv="cache-control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="pragma" content="no-cache">
-  <meta http-equiv="expires" content="1775443645">
+  <meta http-equiv="expires" content="1775758565">
   <title>${liq.id} — Global Solutions SpA</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -4735,10 +4735,14 @@ function renderCalculadoraServicios() {
     <div style="${sec}">IDENTIFICACIÓN</div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:6px">
       <div style="grid-column:1/-1"><div style="${lbl}">CLIENTE</div>
-        <select onchange="if(!uiState.calc)uiState.calc={};uiState.calc.cliente=this.value" style="${inp};-webkit-appearance:auto">
+        <select onchange="(function(v){if(!uiState.calc)uiState.calc={};uiState.calc.cliente=v==='__nuevo__'?'':v;uiState.calc._clienteNuevo=(v==='__nuevo__');render();})(this.value)" style="${inp};-webkit-appearance:auto">
           <option value="">Seleccionar cliente...</option>
-          ${clientesLista.map(cl=>`<option value="${cl}" ${c.cliente===cl?'selected':''}>${cl}</option>`).join('')}
-        </select></div>
+          ${clientesLista.map(cl=>`<option value="${cl}" ${c.cliente===cl&&!c._clienteNuevo?'selected':''}>${cl}</option>`).join('')}
+          <option value="__nuevo__" ${c._clienteNuevo?'selected':''}>+ Crear nuevo cliente...</option>
+        </select>
+        ${c._clienteNuevo ? `<input value="${c.cliente||''}" oninput="if(!uiState.calc)uiState.calc={};uiState.calc.cliente=this.value" placeholder="Nombre del nuevo cliente" style="${inp};margin-top:5px;border-color:#FFA726;background:#FFFDE7">
+        <button onclick="(function(){const n=(uiState.calc&&uiState.calc.cliente||'').trim();if(!n){alert('Escribe el nombre del cliente.');return;}if(!appData.pipeline)appData.pipeline=[];if(!appData.pipeline.some(p=>p.cliente===n)){appData.pipeline.push({cliente:n,contacto:'',email:'',emailFactura:'',telefono:'',estado:'activo',notas:''});saveData();showToastGeneral('✅ Cliente '+n+' agregado al pipeline','#2E7D32');}uiState.calc._clienteNuevo=false;render();})()" style="width:100%;margin-top:5px;padding:8px;background:#E65100;color:white;border:none;border-radius:7px;font-size:11px;font-weight:700;cursor:pointer">+ Confirmar y agregar cliente</button>` : ''}
+        </div>
       <div><div style="${lbl}">TRAMO / DESCRIPCIÓN</div>
         <input value="${c.tramo||''}" oninput="if(!uiState.calc)uiState.calc={};uiState.calc.tramo=this.value" placeholder="ej: Casablanca–Santiago" style="${inp}"></div>
       <div><div style="${lbl}">FECHA</div>
@@ -4925,7 +4929,7 @@ function abrirPreviewCotV2(){
   win.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8">
   <meta http-equiv="cache-control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="pragma" content="no-cache">
-  <meta http-equiv="expires" content="1775443645"><title>${numero}</title><style>body{font-family:'Segoe UI',sans-serif;padding:30px;max-width:680px;margin:0 auto}@media print{.no-print{display:none!important}}</style></head><body>${html}<script>setTimeout(()=>window.print(),400);<\/script></body></html>`);
+  <meta http-equiv="expires" content="1775758565"><title>${numero}</title><style>body{font-family:'Segoe UI',sans-serif;padding:30px;max-width:680px;margin:0 auto}@media print{.no-print{display:none!important}}</style></head><body>${html}<script>setTimeout(()=>window.print(),400);<\/script></body></html>`);
   win.document.close();
   // Guardar cotización
   if(!appData.cotizaciones) appData.cotizaciones=[];
@@ -4940,7 +4944,7 @@ function abrirPreviewCot(cotObj){
   win.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8">
   <meta http-equiv="cache-control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="pragma" content="no-cache">
-  <meta http-equiv="expires" content="1775443645"><title>${cotObj.numero}</title><style>body{font-family:'Segoe UI',sans-serif;padding:30px;max-width:680px;margin:0 auto}@media print{.no-print{display:none!important}}</style></head><body>${html}<script>setTimeout(()=>window.print(),400);<\/script></body></html>`);
+  <meta http-equiv="expires" content="1775758565"><title>${cotObj.numero}</title><style>body{font-family:'Segoe UI',sans-serif;padding:30px;max-width:680px;margin:0 auto}@media print{.no-print{display:none!important}}</style></head><body>${html}<script>setTimeout(()=>window.print(),400);<\/script></body></html>`);
   win.document.close();
 }
 
