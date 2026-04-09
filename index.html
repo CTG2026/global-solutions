@@ -17,7 +17,7 @@ if ('serviceWorker' in navigator) {
 </script>
 <script>
 (function() {
-  var VERSION = '1775757743';
+  var VERSION = '1775758341';
   var stored = localStorage.getItem('gs_app_version');
   if (stored !== VERSION) {
     var session = localStorage.getItem('gs_session');
@@ -1238,6 +1238,16 @@ function imprimirInformeRC() {
 }
 
 // ── CIERRE DE SERVICIOS v36 ───────────────────────────────
+function updCS(id, campo, val) {
+  if (!uiState.cs_draft) uiState.cs_draft = {};
+  if (!uiState.cs_draft[id]) uiState.cs_draft[id] = {};
+  uiState.cs_draft[id][campo] = val;
+}
+function _csVal(s, campo, fallback) {
+  const d = uiState.cs_draft && uiState.cs_draft[s.id];
+  if (d && d[campo] !== undefined && d[campo] !== null) return d[campo];
+  return s[campo] !== undefined && s[campo] !== null ? s[campo] : (fallback !== undefined ? fallback : '');
+}
 function renderCierreServicios() {
   const CF_MES = (appData.config && appData.config.costosFijosMes) || 5080000;
   const estadoOrden = s => s.cerrado ? 2 : s.precio ? 1 : 0;
@@ -1275,19 +1285,19 @@ function renderCierreServicios() {
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px">
             <div style="grid-column:1/-1">
               <div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">PRECIO NETO ($)</div>
-              <input id="cs_precio_${s.id}" type="number" value="${s.precio||''}" placeholder="ej: 450000"
-                oninput="(function(v){const c=document.getElementById('cs_comision_${s.id}');if(c)c.textContent='Comisión conductor (10%): $'+Math.round((parseInt(v)||0)*0.1).toLocaleString('es-CL');})(this.value)"
+              <input id="cs_precio_${s.id}" type="number" value="${_csVal(s,'precio','')}" placeholder="ej: 450000"
+                oninput="updCS('${s.id}','precio',this.value);(function(v){const c=document.getElementById('cs_comision_${s.id}');if(c)c.textContent='Comisión conductor (10%): $'+Math.round((parseInt(v)||0)*0.1).toLocaleString('es-CL');})(this.value)"
                 style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:14px;font-weight:700;outline:none;font-family:inherit">
               <div id="cs_comision_${s.id}" style="font-size:10px;color:#1565C0;font-weight:600;margin-top:3px;padding:4px 8px;background:#E3F2FD;border-radius:5px">
                 ${s.precio ? 'Comisión conductor (10%): $'+Math.round(s.precio*0.1).toLocaleString('es-CL') : 'Ingresa el precio para ver la comisión'}
               </div>
             </div>
             <div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">KILÓMETROS</div>
-              <input id="cs_km_${s.id}" type="number" value="${s.km||''}" placeholder="ej: 320" style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit"></div>
+              <input id="cs_km_${s.id}" type="number" value="${_csVal(s,'km','')}" placeholder="ej: 320" oninput="updCS('${s.id}','km',this.value)" style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit"></div>
             <div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">TAG</div>
-              <input id="cs_tag_${s.id}" value="${s.tag||''}" placeholder="ej: TAG-001" style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit"></div>
+              <input id="cs_tag_${s.id}" value="${_csVal(s,'tag','')}" placeholder="ej: TAG-001" oninput="updCS('${s.id}','tag',this.value)" style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit"></div>
             <div style="grid-column:1/-1"><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">OC (Orden de Compra del broker/cliente) <span style="font-weight:400;color:#aaa">— opcional</span></div>
-              <input id="cs_oc_${s.id}" value="${s.oc||''}" placeholder="ej: OC-2026-001" style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit"></div>
+              <input id="cs_oc_${s.id}" value="${_csVal(s,'oc','')}" placeholder="ej: OC-2026-001" oninput="updCS('${s.id}','oc',this.value)" style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit"></div>
             ${(s.puntos&&s.puntos.length>1)?`<div style="grid-column:1/-1">
               <div style="font-size:9px;font-weight:700;color:#1565C0;margin-bottom:6px;background:#E3F2FD;padding:4px 8px;border-radius:5px">PUNTOS DE RUTA — costos por punto</div>
               ${(s.puntos||s.guias||[]).map((p,pi)=>`
@@ -1303,24 +1313,25 @@ function renderCierreServicios() {
                 </div>`).join('')}
             </div>`:''}
             <div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">PEAJES ($)</div>
-              <input id="cs_peajes_${s.id}" type="number" value="${s.peajes||''}" placeholder="ej: 8000" style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit"></div>
+              <input id="cs_peajes_${s.id}" type="number" value="${_csVal(s,'peajes','')}" placeholder="ej: 8000" oninput="updCS('${s.id}','peajes',this.value)" style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit"></div>
             <div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">VIÁTICOS ($)</div>
-              <input id="cs_via_${s.id}" type="number" value="${s.viaticos||''}" placeholder="ej: 15000" style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit"></div>
+              <input id="cs_via_${s.id}" type="number" value="${_csVal(s,'viaticos','')}" placeholder="ej: 15000" oninput="updCS('${s.id}','viaticos',this.value)" style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit"></div>
             <div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">ADICIONAL ($)</div>
-              <input id="cs_adic_${s.id}" type="number" value="${s.adicional||''}" placeholder="ej: 30000" style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit"></div>
+              <input id="cs_adic_${s.id}" type="number" value="${_csVal(s,'adicional','')}" placeholder="ej: 30000" oninput="updCS('${s.id}','adicional',this.value)" style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit"></div>
           </div>
           <!-- PETRÓLEO -->
           <div style="font-size:9px;font-weight:700;color:#E65100;margin:8px 0 5px;background:#FFF3E0;padding:4px 8px;border-radius:5px">⛽ COMBUSTIBLE</div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px">
             <div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">LITROS CARGADOS</div>
-              <input id="cs_litros_${s.id}" type="number" value="${s.litros||''}" placeholder="ej: 120" style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit"></div>
+              <input id="cs_litros_${s.id}" type="number" value="${_csVal(s,'litros','')}" placeholder="ej: 120" oninput="updCS('${s.id}','litros',this.value)" style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit"></div>
             <div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">MONTO PETRÓLEO ($)</div>
-              <input id="cs_petroleo_${s.id}" type="number" value="${s.petroleo||''}" placeholder="ej: 95000" style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit"></div>
+              <input id="cs_petroleo_${s.id}" type="number" value="${_csVal(s,'petroleo','')}" placeholder="ej: 95000" oninput="updCS('${s.id}','petroleo',this.value)" style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit"></div>
           </div>
           <!-- CF EDITABLE -->
           <div style="margin-bottom:8px">
             <div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">CF PRORRATEADO ($) <span style="font-weight:400;color:#aaa">— por defecto $50.800</span></div>
-            <input id="cs_cf_${s.id}" type="number" value="${s.cfProrrateado||50800}" placeholder="50800"
+            <input id="cs_cf_${s.id}" type="number" value="${_csVal(s,'cfProrrateado',50800)}" placeholder="50800"
+              oninput="updCS('${s.id}','cfProrrateado',this.value)"
               style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit">
           </div>
           <!-- RESUMEN COSTOS -->
@@ -1369,17 +1380,24 @@ function renderCierreServicios() {
 }
 function _leerCamposCierre(id, idx) {
   const s = appData.servicios[idx];
+  const dr = (uiState.cs_draft && uiState.cs_draft[id]) || {};
+  const _v = (domId, campo, def) => {
+    const el = document.getElementById(domId);
+    if (el && el.value !== '') return el.value;
+    if (dr[campo] !== undefined && dr[campo] !== '') return dr[campo];
+    return s && s[campo] !== undefined ? s[campo] : def;
+  };
   return {
-    precio: parseInt(document.getElementById('cs_precio_'+id)?.value)||0,
-    km: parseInt(document.getElementById('cs_km_'+id)?.value)||s?.km||0,
-    tag: document.getElementById('cs_tag_'+id)?.value.trim()||s?.tag||'',
-    oc: document.getElementById('cs_oc_'+id)?.value.trim()||s?.oc||'',
-    peajes: parseInt(document.getElementById('cs_peajes_'+id)?.value)||s?.peajes||0,
-    viaticos: parseInt(document.getElementById('cs_via_'+id)?.value)||s?.viaticos||0,
-    adicional: parseInt(document.getElementById('cs_adic_'+id)?.value)||s?.adicional||0,
-    litros: parseInt(document.getElementById('cs_litros_'+id)?.value)||s?.litros||0,
-    petroleo: parseInt(document.getElementById('cs_petroleo_'+id)?.value)||s?.petroleo||0,
-    cfProrrateado: parseInt(document.getElementById('cs_cf_'+id)?.value)||s?.cfProrrateado||50800,
+    precio:       parseInt(_v('cs_precio_'  +id,'precio',   0))||0,
+    km:           parseInt(_v('cs_km_'      +id,'km',       0))||0,
+    tag:          (_v('cs_tag_'     +id,'tag',      '')||'').trim(),
+    oc:           (_v('cs_oc_'      +id,'oc',       '')||'').trim(),
+    peajes:       parseInt(_v('cs_peajes_'  +id,'peajes',   0))||0,
+    viaticos:     parseInt(_v('cs_via_'     +id,'viaticos', 0))||0,
+    adicional:    parseInt(_v('cs_adic_'    +id,'adicional',0))||0,
+    litros:       parseInt(_v('cs_litros_'  +id,'litros',   0))||0,
+    petroleo:     parseInt(_v('cs_petroleo_'+id,'petroleo', 0))||0,
+    cfProrrateado:parseInt(_v('cs_cf_'      +id,'cfProrrateado',50800))||50800,
   };
 }
 
@@ -1399,18 +1417,8 @@ async function guardarBorradorCierre(id) {
     litros: d.litros, petroleo: d.petroleo, cfProrrateado: d.cfProrrateado,
     comisionConductor, cerrado: false, estado: 'borrador'
   });
-  // Preservar valores en uiState para que no se borren al render
-  const _s2 = appData.servicios[idx];
-  uiState['cs_precio_'+id] = _s2.precio||'';
-  uiState['cs_km_'+id] = _s2.km||'';
-  uiState['cs_tag_'+id] = _s2.tag||'';
-  uiState['cs_oc_'+id] = _s2.oc||'';
-  uiState['cs_peajes_'+id] = _s2.peajes||'';
-  uiState['cs_via_'+id] = _s2.viaticos||'';
-  uiState['cs_adic_'+id] = _s2.adicional||'';
-  uiState['cs_litros_'+id] = _s2.litros||'';
-  uiState['cs_petroleo_'+id] = _s2.petroleo||'';
-  uiState['cs_cf_'+id] = _s2.cfProrrateado||50800;
+  // Limpiar borrador ya que los datos quedaron en appData
+  if (uiState.cs_draft) delete uiState.cs_draft[id];
   saveData();
   await upsertServicioSupabase(appData.servicios[idx]);
   showToastGeneral('💾 Borrador guardado correctamente','#E65100');
@@ -1434,6 +1442,7 @@ async function guardarCierre(id) {
   });
   appData.dashboard.ventas_mes=(appData.servicios||[]).filter(s=>s.cerrado&&s.precio).reduce((a,s)=>a+(s.precio||0),0);
   uiState['cs_'+id]=false;
+  if (uiState.cs_draft) delete uiState.cs_draft[id];
   saveData();
   await upsertServicioSupabase(appData.servicios[idx]);
   showToastGeneral('✅ Servicio cerrado correctamente','#2E7D32');
