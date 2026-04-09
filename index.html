@@ -5,7 +5,7 @@
   <meta http-equiv="cache-control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="pragma" content="no-cache">
   <meta http-equiv="expires" content="1775758565">
-  <meta name="version" content="1775758565">
+  <meta name="version" content="1775759262">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <script>
 // Desregistrar cualquier Service Worker existente de forma inmediata
@@ -17,7 +17,7 @@ if ('serviceWorker' in navigator) {
 </script>
 <script>
 (function() {
-  var VERSION = '1775758565';
+  var VERSION = '1775759262';
   var stored = localStorage.getItem('gs_app_version');
   if (stored !== VERSION) {
     var session = localStorage.getItem('gs_session');
@@ -7213,11 +7213,11 @@ function renderPipeline() {
   });
 
   const filas = pipeline.map((c) => {
-    // Usar índice real en appData.pipeline para operaciones
-    const ci = appData.pipeline.findIndex(x => x.id ? x.id === c.id : x.cliente === c.cliente);
+    // indexOf compara por referencia de objeto (slice preserva referencias) → siempre único
+    const ci = appData.pipeline.indexOf(c);
     const col = ETAPA_COLORES[c.etapa] || '#607D8B';
     const editando = uiState[`pip_edit_${ci}`];
-        const isOpenPip = !!uiState['pip_open_'+ci];
+    const isOpenPip = !!uiState['pip_open_'+ci];
     return `<div style="border:1px solid ${isOpenPip?'#90A4AE':'#eee'};border-radius:8px;margin-bottom:6px;background:white;overflow:hidden">
       <div onclick="uiState['pip_open_${ci}']=!uiState['pip_open_${ci}'];render()" style="padding:10px 12px;cursor:pointer;background:${isOpenPip?'#ECEFF1':'white'}">
         <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px">
@@ -7236,7 +7236,6 @@ function renderPipeline() {
         </div>
           <span style="font-size:10px;color:#aaa">${isOpenPip?'▲':'▼'}</span>
         </div>
-      </div>
       </div>
       ${(isOpenPip||editando) ? `<div style="padding:10px 12px;border-top:1px solid #eee;background:#FAFAFA" onclick="event.stopPropagation()">
         ${editando ? `
