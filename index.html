@@ -5,7 +5,7 @@
   <meta http-equiv="cache-control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="pragma" content="no-cache">
   <meta http-equiv="expires" content="1775758565">
-  <meta name="version" content="1775769124">
+  <meta name="version" content="1775776609">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <script>
 // Desregistrar cualquier Service Worker existente de forma inmediata
@@ -17,7 +17,7 @@ if ('serviceWorker' in navigator) {
 </script>
 <script>
 (function() {
-  var VERSION = '1775769124';
+  var VERSION = '1775776609';
   var stored = localStorage.getItem('gs_app_version');
   if (stored !== VERSION) {
     var session = localStorage.getItem('gs_session');
@@ -3947,18 +3947,55 @@ function renderCajaResumen() {
     <span style="font-size:14px;font-weight:900;color:${color}">${fmt(val)}</span>
   </div>`;
 
-  const subrow = (label, val) => val ? `<div style="display:flex;justify-content:space-between;padding:4px 14px;font-size:11px;color:#777">
-    <span>${label}</span><span style="font-weight:700;color:#C62828">${fmt(val)}</span>
-  </div>` : '';
+  // Acordeón nivel 1: Gastos a la fecha
+  const gfOpen = !!uiState.caja_gf_open;
+
+  // Datos detalle combustible por patente
+  const combPorPatente = {};
+  (appData.copec||[]).filter(c=>c.mes===mesPadded&&c.anio===anioStr).forEach(c=>{
+    const k = c.patente||'Sin patente';
+    combPorPatente[k] = (combPorPatente[k]||0) + (c.monto||0);
+  });
+  const combOpen = !!uiState.caja_gf_comb_open;
+
+  // Datos detalle viáticos por servicio
+  const viaOpen  = !!uiState.caja_gf_via_open;
+  const svcsConVia    = svcsCierre.filter(s=>s.viaticos>0);
+
+  // Datos detalle peajes por servicio
+  const peajOpen = !!uiState.caja_gf_peaj_open;
+  const svcsConPeaj   = svcsCierre.filter(s=>s.peajes>0);
+
+  // Sub-item acordeón nivel 2
+  const subAcord = (label, total, openKey, detalles) => {
+    if (!total) return '';
+    const isOpen = !!uiState[openKey];
+    return `<div style="border-top:1px solid #FFCDD2">
+      <div onclick="uiState['${openKey}']=!uiState['${openKey}'];render()" style="display:flex;justify-content:space-between;align-items:center;padding:7px 14px;cursor:pointer;background:#FFF3F3">
+        <span style="font-size:11px;font-weight:700;color:#B71C1C">${isOpen?'▾':'▸'} ${label}</span>
+        <span style="font-size:12px;font-weight:800;color:#C62828">${fmt(total)}</span>
+      </div>
+      ${isOpen ? `<div style="background:#FFF8F8;padding:4px 0 6px">
+        ${detalles.map(d=>`<div style="display:flex;justify-content:space-between;padding:3px 22px;font-size:10px;color:#777">
+          <span>${d.label}</span><span style="font-weight:700">−${fmt(d.val)}</span>
+        </div>`).join('')}
+      </div>` : ''}
+    </div>`;
+  };
 
   const gastosDetalle = `<div style="background:#FFF8F8;border:1px solid #FFCDD2;border-radius:8px;margin-bottom:5px;overflow:hidden">
-    <div style="display:flex;justify-content:space-between;align-items:center;padding:9px 12px">
-      <span style="font-size:12px;font-weight:700;color:#546E7A">Gastos a la fecha</span>
+    <div onclick="uiState.caja_gf_open=!uiState.caja_gf_open;render()" style="display:flex;justify-content:space-between;align-items:center;padding:9px 12px;cursor:pointer">
+      <span style="font-size:12px;font-weight:700;color:#546E7A">${gfOpen?'▾':'▸'} Gastos a la fecha</span>
       <span style="font-size:14px;font-weight:900;color:#C62828">${fmt(gastosFecha)}</span>
     </div>
-    ${subrow('Combustible del mes', gastoCopec)}
-    ${subrow('Viáticos', gastoViaticos)}
-    ${subrow('Peajes', gastoPeajes)}
+    ${gfOpen ? `
+      ${subAcord('Combustible del mes', gastoCopec, 'caja_gf_comb_open',
+          Object.entries(combPorPatente).map(([k,v])=>({label:k,val:v})))}
+      ${subAcord('Viáticos', gastoViaticos, 'caja_gf_via_open',
+          svcsConVia.map(s=>({label: s.id+(s.cliente?' — '+s.cliente:''), val:s.viaticos})))}
+      ${subAcord('Peajes', gastoPeajes, 'caja_gf_peaj_open',
+          svcsConPeaj.map(s=>({label: s.id+(s.cliente?' — '+s.cliente:''), val:s.peajes})))}
+    ` : ''}
   </div>`;
 
   return '<div style="padding:2px">'
