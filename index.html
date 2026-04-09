@@ -5,7 +5,7 @@
   <meta http-equiv="cache-control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="pragma" content="no-cache">
   <meta http-equiv="expires" content="1775758565">
-  <meta name="version" content="1775762267">
+  <meta name="version" content="1775762537">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <script>
 // Desregistrar cualquier Service Worker existente de forma inmediata
@@ -17,7 +17,7 @@ if ('serviceWorker' in navigator) {
 </script>
 <script>
 (function() {
-  var VERSION = '1775762267';
+  var VERSION = '1775762537';
   var stored = localStorage.getItem('gs_app_version');
   if (stored !== VERSION) {
     var session = localStorage.getItem('gs_session');
@@ -3905,10 +3905,10 @@ function renderCajaResumen() {
   const svcsPag     = svcsCierre.filter(s=>s.liquidado).reduce((a,s)=>a+(s.precio||0),0);
   const svcsPorCobr = svcsTotal - svcsCobr;
 
-  // Gastos a la fecha (costos + combustible)
-  const gastoManuales    = (appData.costos||[]).filter(c=>c.mes===mesPadded&&c.anio===anioStr).reduce((a,c)=>a+(c.total||0),0);
-  const gastoCombustible = (appData.copec||[]).filter(c=>c.mes===mesPadded&&c.anio===anioStr).reduce((a,c)=>a+(c.monto||0),0);
-  const gastosFecha      = gastoManuales + gastoCombustible;
+  // Gastos a la fecha: costos ingresados en cierre de servicios (borrador o cerrado) del mes
+  // Campos: petróleo + peajes + viáticos + adicional + comisión conductor
+  const gastosFecha = svcsCierre.reduce((a,s)=>
+    a + (s.petroleo||0) + (s.peajes||0) + (s.viaticos||0) + (s.adicional||0) + (s.comisionConductor||0), 0);
 
   // Caja efectiva y proyectada
   const d = appData.dashboardData || {};
