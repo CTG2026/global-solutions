@@ -5,7 +5,7 @@
   <meta http-equiv="cache-control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="pragma" content="no-cache">
   <meta http-equiv="expires" content="1775758565">
-  <meta name="version" content="1775759262">
+  <meta name="version" content="1775762267">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <script>
 // Desregistrar cualquier Service Worker existente de forma inmediata
@@ -17,7 +17,7 @@ if ('serviceWorker' in navigator) {
 </script>
 <script>
 (function() {
-  var VERSION = '1775759262';
+  var VERSION = '1775762267';
   var stored = localStorage.getItem('gs_app_version');
   if (stored !== VERSION) {
     var session = localStorage.getItem('gs_session');
@@ -3895,11 +3895,14 @@ function renderCajaResumen() {
   const parseFecha = f => { if(!f) return null; const p=f.split('-'); return p[0].length===2?new Date(parseInt(p[2]),parseInt(p[1])-1,parseInt(p[0])):new Date(parseInt(p[0]),parseInt(p[1])-1,parseInt(p[2])); };
   const esMes = s => { const d=parseFecha(s.fecha||''); return d&&(d.getMonth()+1)===parseInt(mesPadded)&&d.getFullYear()===parseInt(anioStr); };
 
-  // Servicios
+  // Servicios: solo los ingresados en cierre de servicios (borrador o cerrado)
+  // Si el mismo servicio pasó de borrador a cerrado es el mismo registro actualizado → no hay duplicidad
+  // Prioridad natural: cerrado sobreescribe borrador en el mismo objeto
   const svcs        = (appData.servicios||[]).filter(esMes);
-  const svcsTotal   = svcs.reduce((a,s)=>a+(s.precio||0),0);
-  const svcsCobr    = svcs.filter(s=>s.cobrado).reduce((a,s)=>a+(s.precio||0),0);
-  const svcsPag     = svcs.filter(s=>s.liquidado).reduce((a,s)=>a+(s.precio||0),0);
+  const svcsCierre  = svcs.filter(s => (s.estado==='cerrado' || s.estado==='borrador') && s.precio);
+  const svcsTotal   = svcsCierre.reduce((a,s)=>a+(s.precio||0),0);
+  const svcsCobr    = svcsCierre.filter(s=>s.cobrado).reduce((a,s)=>a+(s.precio||0),0);
+  const svcsPag     = svcsCierre.filter(s=>s.liquidado).reduce((a,s)=>a+(s.precio||0),0);
   const svcsPorCobr = svcsTotal - svcsCobr;
 
   // Gastos a la fecha (costos + combustible)
@@ -3924,7 +3927,6 @@ function renderCajaResumen() {
     { label:'Gastos a la fecha',     val: gastosFecha,      color:'#C62828' },
     { label:'Caja efectiva',         val: cajaEfectiva,     color: clr(cajaEfectiva)   },
     { label:'Gastos proyectados',    val: gastosProyectados,color:'#C62828' },
-    { label:'Caja Proyectada',       val: cajaProyectada,   color: clr(cajaProyectada) },
     { label:'Caja proyectada',       val: cajaProyectada,   color: clr(cajaProyectada) },
   ];
 
