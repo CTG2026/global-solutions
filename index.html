@@ -5,7 +5,7 @@
   <meta http-equiv="cache-control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="pragma" content="no-cache">
   <meta http-equiv="expires" content="1775758565">
-  <meta name="version" content="1775764599">
+  <meta name="version" content="1775765022">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <script>
 // Desregistrar cualquier Service Worker existente de forma inmediata
@@ -17,7 +17,7 @@ if ('serviceWorker' in navigator) {
 </script>
 <script>
 (function() {
-  var VERSION = '1775764599';
+  var VERSION = '1775765022';
   var stored = localStorage.getItem('gs_app_version');
   if (stored !== VERSION) {
     var session = localStorage.getItem('gs_session');
@@ -3913,9 +3913,9 @@ function renderCajaResumen() {
   const svcsPag     = svcsCierre.filter(s=>s.liquidado).reduce((a,s)=>a+(s.precio||0),0);
   const svcsPorCobr = svcsTotal - svcsCobr;
 
-  // Gastos a la fecha: viáticos de servicios en cierre + combustible ingresado en sección petróleo (Copec)
+  // Gastos a la fecha: viáticos + peajes de servicios en cierre + combustible sección petróleo (Copec)
   const gastoCopec   = (appData.copec||[]).filter(c=>c.mes===mesPadded&&c.anio===anioStr).reduce((a,c)=>a+(c.monto||0),0);
-  const gastosFecha  = svcsCierre.reduce((a,s) => a + (s.viaticos||0), 0) + gastoCopec;
+  const gastosFecha  = svcsCierre.reduce((a,s) => a + (s.viaticos||0) + (s.peajes||0), 0) + gastoCopec;
 
   // Gastos proyectados: base chofer + comisión chofer + CF prorrateado + costo financiero + TAG
   // Solo suma valores explícitamente ingresados (sin defaults automáticos)
