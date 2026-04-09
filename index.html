@@ -17,7 +17,7 @@ if ('serviceWorker' in navigator) {
 </script>
 <script>
 (function() {
-  var VERSION = '1775757263';
+  var VERSION = '1775757743';
   var stored = localStorage.getItem('gs_app_version');
   if (stored !== VERSION) {
     var session = localStorage.getItem('gs_session');
@@ -6418,7 +6418,7 @@ function renderFase(fase) {
           // Solo mostrar servicios NO cerrados en módulo Operacional
           const serviciosPendientes = serviciosOrdenados.filter(s=>!s.cerrado);
           const serviciosMes = serviciosPendientes.filter(s=>s.mes===hoyMes&&s.anio===hoyAnio);
-          const ultimos5 = verTodos ? serviciosPendientes : serviciosMes.slice(0,10);
+          const ultimos5 = verTodos ? serviciosPendientes : serviciosMes;
           const lista=ultimos5.length?ultimos5.map((s)=>{const idxReal=servicios.indexOf(s);const isExpanded=!!uiState['srv_exp_'+s.id];const expandKey='srv_exp_'+s.id;const isEditing=uiState.editando_srv_id===s.id;return '<div style="border-radius:8px;margin-bottom:4px;border:1px solid '+(isEditing?'#7E57C2':isExpanded?'#C7D2FE':'#e8eaec')+'">'+(isEditing?renderEditarServicio(s.id):('<div onclick="uiState[\'' +expandKey+ '\']=!uiState[\'' +expandKey+ '\'];render()" style="cursor:pointer;background:'+(isExpanded?'#EEF2FF':'white')+';border-radius:8px">'+srvVista(s)+'</div>'+(isExpanded?`<div style="padding:8px 12px;border-top:1px solid #eee;background:#f8f9fa">${srvDetalle(s)}<div style="display:flex;gap:6px;margin-top:8px"><button onclick="event.stopPropagation();editarServicio('${s.id}')" style="flex:1;background:#455A64;color:white;border:none;border-radius:6px;padding:8px;font-size:11px;font-weight:700;cursor:pointer">✎ Editar servicio</button><button onclick="event.stopPropagation();delServicio(${idxReal})" style="background:#FFEBEE;color:#C62828;border:1px solid #FFCDD2;border-radius:6px;padding:8px 12px;font-size:11px;cursor:pointer;font-weight:700">× Eliminar</button></div></div>`:'')))+'</div>';}).join(''):'<div style="font-size:11px;color:#bbb;padding:6px 0;text-align:center">Sin servicios registrados aún</div>';
           return '<div style="margin-bottom:10px;padding:10px 12px;background:#f4f6f8;border-radius:10px;border:1px solid #dde4e8">'
             +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:10px"><div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">ID SERVICIO</div><div style="background:#455A64;color:white;border-radius:6px;padding:7px 9px;font-size:14px;font-weight:700;letter-spacing:2px">'+nextId+'</div></div>'
