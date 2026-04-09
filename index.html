@@ -5,7 +5,7 @@
   <meta http-equiv="cache-control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="pragma" content="no-cache">
   <meta http-equiv="expires" content="1775758565">
-  <meta name="version" content="1775778246">
+  <meta name="version" content="1775778732">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <script>
 // Desregistrar cualquier Service Worker existente de forma inmediata
@@ -17,7 +17,7 @@ if ('serviceWorker' in navigator) {
 </script>
 <script>
 (function() {
-  var VERSION = '1775778246';
+  var VERSION = '1775778732';
   var stored = localStorage.getItem('gs_app_version');
   if (stored !== VERSION) {
     var session = localStorage.getItem('gs_session');
@@ -5753,7 +5753,21 @@ function updGuia(gi, campo, valor) {
 }
 
 function renderListadoRegistros(serviciosOrdenados) {
-  const modo = uiState.srv_lista_modo || 'todos';
+  const modo   = uiState.srv_lista_modo || 'todos';
+  const desde  = uiState.srv_lista_desde || '';
+  const hasta  = uiState.srv_lista_hasta || '';
+
+  // Filtrar por período seleccionado
+  const parseFechaYMD = f => { if(!f) return null; const p=f.split('-'); return p[0].length===4 ? new Date(f) : new Date(p[2],p[1]-1,p[0]); };
+  const svcsFiltered = serviciosOrdenados.filter(s => {
+    if (!desde && !hasta) return true;
+    const fd = parseFechaYMD(s.fecha);
+    if (!fd) return true;
+    if (desde && fd < parseFechaYMD(desde)) return false;
+    if (hasta && fd > parseFechaYMD(hasta)) return false;
+    return true;
+  });
+
   const th = 'padding:5px 7px;font-size:9px;font-weight:700;color:#607D8B;background:#ECEFF1;border-bottom:2px solid #CFD8DC;text-align:left;white-space:nowrap';
   const td = 'padding:5px 7px;border-bottom:1px solid #eee;font-size:10px;vertical-align:middle';
   const badge = s => s.cerrado
@@ -5783,26 +5797,100 @@ function renderListadoRegistros(serviciosOrdenados) {
   const tabla = svcs => `<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse">${thead}${svcs.map(fila).join('')}</table></div>`;
   let cuerpo = '';
   if (modo === 'todos') {
-    cuerpo = tabla(serviciosOrdenados);
+    cuerpo = svcsFiltered.length ? tabla(svcsFiltered) : '<div style="text-align:center;color:#aaa;font-size:11px;padding:12px">Sin registros en el período seleccionado</div>';
   } else {
     const porCliente = {};
-    serviciosOrdenados.forEach(s => { const k=s.cliente||'Sin cliente'; if(!porCliente[k])porCliente[k]=[]; porCliente[k].push(s); });
-    cuerpo = Object.entries(porCliente).map(([cl,svcs])=>`
+    svcsFiltered.forEach(s => { const k=s.cliente||'Sin cliente'; if(!porCliente[k])porCliente[k]=[]; porCliente[k].push(s); });
+    cuerpo = Object.keys(porCliente).length ? Object.entries(porCliente).map(([cl,svcs])=>`
       <div style="margin-bottom:10px">
         <div style="font-size:10px;font-weight:800;color:#455A64;background:#ECEFF1;padding:5px 8px;border-radius:5px;margin-bottom:4px">${cl} <span style="font-weight:400;color:#888">(${svcs.length})</span></div>
         ${tabla(svcs)}
-      </div>`).join('');
+      </div>`).join('') : '<div style="text-align:center;color:#aaa;font-size:11px;padding:12px">Sin registros en el período seleccionado</div>';
   }
+  const inpDate = 'border:1px solid #CFD8DC;border-radius:5px;padding:4px 7px;font-size:11px;font-family:inherit;outline:none;background:white';
   return `<div style="margin-top:14px;border-top:2px solid #CFD8DC;padding-top:10px">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:wrap;gap:6px">
       <div style="font-size:11px;font-weight:800;color:#455A64;letter-spacing:1px">LISTADO DE REGISTROS</div>
-      <div style="display:flex;gap:4px">
+      <div style="display:flex;gap:4px;flex-wrap:wrap;align-items:center">
         <button onclick="uiState.srv_lista_modo='todos';render()" style="padding:4px 10px;border-radius:5px;font-size:10px;font-weight:700;cursor:pointer;border:1px solid #CFD8DC;background:${modo==='todos'?'#455A64':'white'};color:${modo==='todos'?'white':'#607D8B'}">Todos los registros</button>
         <button onclick="uiState.srv_lista_modo='cliente';render()" style="padding:4px 10px;border-radius:5px;font-size:10px;font-weight:700;cursor:pointer;border:1px solid #CFD8DC;background:${modo==='cliente'?'#455A64':'white'};color:${modo==='cliente'?'white':'#607D8B'}">Por cliente</button>
       </div>
     </div>
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap;background:#F4F6F8;border-radius:8px;padding:8px 10px">
+      <div style="font-size:10px;font-weight:700;color:#607D8B">PERÍODO:</div>
+      <div style="display:flex;align-items:center;gap:5px">
+        <span style="font-size:10px;color:#888">Desde</span>
+        <input type="date" value="${desde}" onchange="uiState.srv_lista_desde=this.value;render()" style="${inpDate}">
+      </div>
+      <div style="display:flex;align-items:center;gap:5px">
+        <span style="font-size:10px;color:#888">Hasta</span>
+        <input type="date" value="${hasta}" onchange="uiState.srv_lista_hasta=this.value;render()" style="${inpDate}">
+      </div>
+      ${desde||hasta ? `<button onclick="uiState.srv_lista_desde='';uiState.srv_lista_hasta='';render()" style="padding:4px 8px;border-radius:5px;font-size:10px;cursor:pointer;border:1px solid #FFCDD2;background:#FFEBEE;color:#C62828;font-weight:700">✕ Limpiar</button>` : ''}
+      <div style="margin-left:auto">
+        <button onclick="pdfListadoRegistros()" style="padding:5px 12px;border-radius:5px;font-size:10px;font-weight:700;cursor:pointer;border:none;background:#0B2545;color:white">🖨️ Generar PDF</button>
+      </div>
+    </div>
+    <div style="font-size:10px;color:#888;margin-bottom:6px">${svcsFiltered.length} registro${svcsFiltered.length!==1?'s':''} ${desde||hasta?'en el período':'en total'}</div>
     ${cuerpo}
   </div>`;
+}
+
+function pdfListadoRegistros() {
+  const modo  = uiState.srv_lista_modo || 'todos';
+  const desde = uiState.srv_lista_desde || '';
+  const hasta = uiState.srv_lista_hasta || '';
+  const parseFechaYMD = f => { if(!f) return null; const p=f.split('-'); return p[0].length===4 ? new Date(f) : new Date(p[2],p[1]-1,p[0]); };
+  const todos = (appData.servicios||[]).slice().sort((a,b)=>{
+    const fa=(a.fecha||'').split('-').reverse().join('');
+    const fb=(b.fecha||'').split('-').reverse().join('');
+    return fa.localeCompare(fb);
+  }).filter(s => {
+    if (!desde && !hasta) return true;
+    const fd = parseFechaYMD(s.fecha);
+    if (!fd) return true;
+    if (desde && fd < parseFechaYMD(desde)) return false;
+    if (hasta && fd > parseFechaYMD(hasta)) return false;
+    return true;
+  });
+  const periodoTxt = desde||hasta ? `${desde||'inicio'} al ${hasta||'hoy'}` : 'Todos los períodos';
+  const fmtP = v => v ? '$'+parseInt(v).toLocaleString('es-CL') : '—';
+  const badgeTxt = s => s.cerrado ? 'CERRADO' : s.estado==='borrador' ? 'BORRADOR' : 'PENDIENTE';
+  const filaHTML = s => {
+    const pts=(s.puntos&&s.puntos.length)?s.puntos:(s.guias&&s.guias.length)?s.guias:[];
+    const gd=pts.map(g=>g.num||g.guia).filter(Boolean).join(', ')||'—';
+    const orig=pts[0]?.origen||s.origen||'—';
+    const dest=pts[pts.length-1]?.destino||'—';
+    return `<tr><td>${s.id}</td><td>${s.fecha||'—'}</td><td>${s.cliente||'—'}</td><td>${s.conductor||'—'}</td><td>${s.patente||'—'}</td><td>${gd}</td><td>${orig} → ${dest}</td><td>${fmtP(s.precio)}</td><td>${badgeTxt(s)}</td></tr>`;
+  };
+  const tablaHTML = svcs => `<table><thead><tr><th>ID</th><th>Fecha</th><th>Cliente</th><th>Conductor</th><th>Patente</th><th>N° Guía</th><th>Origen → Destino</th><th>Precio</th><th>Estado</th></tr></thead><tbody>${svcs.map(filaHTML).join('')}</tbody></table>`;
+  let body = '';
+  if (modo === 'todos') {
+    body = `<h3>Todos los registros (${todos.length})</h3>${tablaHTML(todos)}`;
+  } else {
+    const porCliente = {};
+    todos.forEach(s => { const k=s.cliente||'Sin cliente'; if(!porCliente[k])porCliente[k]=[]; porCliente[k].push(s); });
+    body = Object.entries(porCliente).map(([cl,svcs])=>`<h3>${cl} (${svcs.length})</h3>${tablaHTML(svcs)}`).join('');
+  }
+  const total = todos.filter(s=>s.precio).reduce((a,s)=>a+(s.precio||0),0);
+  const css = `body{font-family:Arial,sans-serif;font-size:10px;margin:20px;color:#222}
+    h1{font-size:16px;color:#0B2545;margin-bottom:4px}h3{font-size:12px;color:#455A64;margin:14px 0 4px;border-bottom:1px solid #ddd;padding-bottom:3px}
+    table{width:100%;border-collapse:collapse;margin-bottom:12px}
+    th{background:#ECEFF1;color:#455A64;font-size:9px;padding:5px 7px;text-align:left;border-bottom:2px solid #CFD8DC}
+    td{padding:4px 7px;border-bottom:1px solid #eee;font-size:9px}
+    tr:nth-child(even)td{background:#FAFAFA}
+    .total{font-weight:700;font-size:11px;margin-top:10px;text-align:right;color:#0B2545}
+    .no-print{margin-bottom:12px}@media print{.no-print{display:none}}`;
+  const w = window.open('','_blank');
+  w.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Listado de Registros</title><style>${css}</style></head><body>
+    <div class="no-print"><button onclick="window.print()" style="background:#0B2545;color:white;border:none;border-radius:6px;padding:8px 20px;font-size:12px;font-weight:700;cursor:pointer">🖨️ Imprimir / Guardar PDF</button></div>
+    <h1>Global Solutions SpA — Listado de Registros</h1>
+    <p style="color:#888;font-size:10px">Período: ${periodoTxt} &nbsp;|&nbsp; Vista: ${modo==='todos'?'Todos los registros':'Por cliente'} &nbsp;|&nbsp; Total registros: ${todos.length}</p>
+    ${body}
+    <div class="total">TOTAL FACTURADO: ${fmtP(total)}</div>
+    <script>setTimeout(function(){window.print();},500);<\/script>
+  </body></html>`);
+  w.document.close();
 }
 
 function buildGuiasRegistroHTML() {
