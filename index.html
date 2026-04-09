@@ -4,8 +4,8 @@
 <meta charset="UTF-8">
   <meta http-equiv="cache-control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="pragma" content="no-cache">
-  <meta http-equiv="expires" content="1775689898">
-  <meta name="version" content="1775689898">
+  <meta http-equiv="expires" content="1775704180">
+  <meta name="version" content="1775704180">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <script>
 // Desregistrar cualquier Service Worker existente de forma inmediata
@@ -17,7 +17,7 @@ if ('serviceWorker' in navigator) {
 </script>
 <script>
 (function() {
-  var VERSION = '1775689898';
+  var VERSION = '1775704180';
   var stored = localStorage.getItem('gs_app_version');
   if (stored !== VERSION) {
     var session = localStorage.getItem('gs_session');
@@ -4999,8 +4999,9 @@ function editarServicio(id) {
   // Copiar puntos del servicio a uiState para edición
   const s = (appData.servicios||[]).find(sv=>sv.id===id);
   if (!s) return;
-  const pts = s.puntos||s.guias||[];
-  uiState.edit_srv_puntos = JSON.parse(JSON.stringify(pts.length ? pts : [{origen:'',destino:'',tipo:'descarga',guia:'',fecha_guia:'',fecha_descarga:'',kg:'',imagen_url:''}]));
+  // Seleccionar fuente de puntos de forma segura ([] es truthy en JS — revisar length)
+  const pts = (s.puntos && s.puntos.length) ? s.puntos : (s.guias && s.guias.length) ? s.guias : [];
+  uiState.edit_srv_puntos = JSON.parse(JSON.stringify(pts.length ? pts : [{origen:'',destino:'',tipo:'descarga',guia:'',num:'',fecha_guia:'',fecha_descarga:'',kg:'',imagen_url:''}]));
   // Normalizar puntos al formato nuevo (guardar tanto guia como num)
   uiState.edit_srv_puntos = uiState.edit_srv_puntos.map(p=>({
     origen: p.origen||'', destino: p.destino||'', tipo: p.tipo||'descarga',
