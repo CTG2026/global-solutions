@@ -5,7 +5,7 @@
   <meta http-equiv="cache-control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="pragma" content="no-cache">
   <meta http-equiv="expires" content="1775758565">
-  <meta name="version" content="1775776609">
+  <meta name="version" content="1775777004">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <script>
 // Desregistrar cualquier Service Worker existente de forma inmediata
@@ -17,7 +17,7 @@ if ('serviceWorker' in navigator) {
 </script>
 <script>
 (function() {
-  var VERSION = '1775776609';
+  var VERSION = '1775777004';
   var stored = localStorage.getItem('gs_app_version');
   if (stored !== VERSION) {
     var session = localStorage.getItem('gs_session');
@@ -1252,9 +1252,7 @@ function renderCierreServicios() {
   const CF_MES = (appData.config && appData.config.costosFijosMes) || 5080000;
   const estadoOrden = s => s.cerrado ? 2 : s.precio ? 1 : 0;
   const todosServicios=(appData.servicios||[]).slice().sort((a,b)=>{
-    const eo = estadoOrden(a) - estadoOrden(b);
-    if (eo !== 0) return eo;
-    try{const fa=a.fecha.split('-').reverse().join('');const fb=b.fecha.split('-').reverse().join('');return fb.localeCompare(fa);}catch(e){return 0;}
+    try{const fa=(a.fecha||'').split('-').reverse().join('');const fb=(b.fecha||'').split('-').reverse().join('');return fa.localeCompare(fb);}catch(e){return 0;}
   });
   const servicios = todosServicios;
   const sinCerrar = servicios.filter(s=>!s.cerrado).length;
@@ -6500,7 +6498,7 @@ function renderFase(fase) {
           const serviciosOrdenados = servicios.slice().sort((a,b)=>{
             const fa=(a.fecha||'').split('-').reverse().join('');
             const fb=(b.fecha||'').split('-').reverse().join('');
-            return fb.localeCompare(fa);
+            return fa.localeCompare(fb);
           });
           // Solo mostrar servicios NO cerrados en módulo Operacional
           const serviciosPendientes = serviciosOrdenados.filter(s=>!s.cerrado);
