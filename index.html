@@ -4,8 +4,8 @@
 <meta charset="UTF-8">
   <meta http-equiv="cache-control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="pragma" content="no-cache">
-  <meta http-equiv="expires" content="1775704180">
-  <meta name="version" content="1775704180">
+  <meta http-equiv="expires" content="1775739539">
+  <meta name="version" content="1775739539">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <script>
 // Desregistrar cualquier Service Worker existente de forma inmediata
@@ -17,7 +17,7 @@ if ('serviceWorker' in navigator) {
 </script>
 <script>
 (function() {
-  var VERSION = '1775704180';
+  var VERSION = '1775739539';
   var stored = localStorage.getItem('gs_app_version');
   if (stored !== VERSION) {
     var session = localStorage.getItem('gs_session');
@@ -487,7 +487,6 @@ const DEFAULT_DATA = {
         { titulo: "Liquidaciones", proc: "Gestionar liquidaciones por servicio o por grupo. Seleccionar servicios, agrupar por cliente (puede tener múltiples RUT), generar y enviar liquidación.", subtareas: [], liquidacionTask: true, done: false },
         { titulo: "Facturación y Cobro", proc: "Registrar facturas emitidas, gestionar factoring y hacer seguimiento de cobro por cada liquidación.", subtareas: [], facturaTask: true, done: false },
         { titulo: "Costos", proc: "Resumen de costos del mes: petróleo, peajes, viáticos, comisiones, costos fijos y rendiciones. Margen bruto del período.", subtareas: [], costosTask: true, done: false },
-        { titulo: "Caja", proc: "Flujo de caja del mes: cobros recibidos, egresos, saldo estimado y pendientes de facturar.", subtareas: [], cajaTask: true, done: false },
         { titulo: "Rendición de Gastos", proc: "Registrar y gestionar rendiciones de gastos del equipo. Cada rendición agrupa uno o más gastos con su categoría, monto y equipo asociado.", subtareas: [], rendicionTask: true, done: false },
       ],
       pendientes: [
@@ -5340,10 +5339,6 @@ function loadData() {
       const _iFac=_finF.rutinarias.findIndex(r=>r.facturaTask);
       _finF.rutinarias.splice(_iFac+1,0,{titulo:'Costos',proc:'Resumen de costos del mes: petróleo, peajes, viáticos, comisiones, costos fijos y rendiciones.',subtareas:[],costosTask:true,done:false});
     }
-    if (!_finF.rutinarias.some(r=>r.cajaTask)) {
-      const _iCos=_finF.rutinarias.findIndex(r=>r.costosTask);
-      _finF.rutinarias.splice(_iCos+1,0,{titulo:'Caja',proc:'Flujo de caja del mes: cobros recibidos, egresos, saldo estimado y pendientes de facturar.',subtareas:[],cajaTask:true,done:false});
-    }
     // Rendición siempre al final
     if (!_finF.rutinarias.some(r=>r.rendicionTask)) {
       _finF.rutinarias.push({titulo:'Rendición de Gastos',proc:'Registrar y gestionar rendiciones de gastos del equipo.',subtareas:[],rendicionTask:true,done:false});
@@ -6035,11 +6030,6 @@ function renderFase(fase) {
       fase.rutinarias.splice(_iFacRF+1,0,{titulo:'Costos',proc:'Resumen de costos del mes: petróleo, peajes, viáticos, comisiones, costos fijos y rendiciones.',subtareas:[],costosTask:true,done:false});
       saveData();
     }
-    if (!fase.rutinarias.some(r=>r.cajaTask)) {
-      const _iCosRF=fase.rutinarias.findIndex(r=>r.costosTask);
-      fase.rutinarias.splice(_iCosRF+1,0,{titulo:'Caja',proc:'Flujo de caja del mes: cobros recibidos, egresos, saldo estimado y pendientes de facturar.',subtareas:[],cajaTask:true,done:false});
-      saveData();
-    }
     if (!fase.rutinarias.some(r=>r.rendicionTask)) {
       fase.rutinarias.push({titulo:'Rendición de Gastos',proc:'Registrar y gestionar rendiciones de gastos del equipo.',subtareas:[],rendicionTask:true,done:false});
       saveData();
@@ -6400,7 +6390,6 @@ function renderFase(fase) {
         ${tarea.rendicionTask ? `<div style="margin:-4px">${renderRendiciones()}</div>` : ''}
         ${tarea.facturaTask ? `<div style="margin:-4px">${renderFacturas()}</div>` : ''}
         ${tarea.costosTask ? `<div style="margin:-4px">${renderCostos()}</div>` : ''}
-        ${tarea.cajaTask ? `<div style="margin:-4px">${renderCaja()}</div>` : ''}
         ${tarea.respaldoTask ? `<div style="padding:8px 0">
           <button onclick="descargarRespaldo()" style="width:100%;padding:12px;background:#37474F;color:white;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer">💾 Descargar respaldo</button></div>` : ''}
         ${subsHTML}
@@ -7104,7 +7093,9 @@ function _deduplicarFases() {
   (appData.fases||[]).forEach(f => {
     if (!f.rutinarias) return;
     // Deduplicar por flag de sistema
-    const flags = ['facturaTask','costosTask','cajaTask','liquidacionTask','cierreServicioTask','rendicionTask','pipelineTask','rendimientoCombTask'];
+    // Eliminar cajaTask de datos existentes
+    f.rutinarias = f.rutinarias.filter(r => !r.cajaTask);
+    const flags = ['facturaTask','costosTask','liquidacionTask','cierreServicioTask','rendicionTask','pipelineTask','rendimientoCombTask'];
     flags.forEach(flag => {
       let cnt = 0;
       f.rutinarias = f.rutinarias.filter(r => r[flag] ? ++cnt <= 1 : true);
