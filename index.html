@@ -5,7 +5,7 @@
   <meta http-equiv="cache-control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="pragma" content="no-cache">
   <meta http-equiv="expires" content="1775758565">
-  <meta name="version" content="1775777651">
+  <meta name="version" content="1775778246">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <script>
 // Desregistrar cualquier Service Worker existente de forma inmediata
@@ -17,7 +17,7 @@ if ('serviceWorker' in navigator) {
 </script>
 <script>
 (function() {
-  var VERSION = '1775777651';
+  var VERSION = '1775778246';
   var stored = localStorage.getItem('gs_app_version');
   if (stored !== VERSION) {
     var session = localStorage.getItem('gs_session');
@@ -5752,6 +5752,59 @@ function updGuia(gi, campo, valor) {
   uiState.srv_guias[gi][campo] = valor;
 }
 
+function renderListadoRegistros(serviciosOrdenados) {
+  const modo = uiState.srv_lista_modo || 'todos';
+  const th = 'padding:5px 7px;font-size:9px;font-weight:700;color:#607D8B;background:#ECEFF1;border-bottom:2px solid #CFD8DC;text-align:left;white-space:nowrap';
+  const td = 'padding:5px 7px;border-bottom:1px solid #eee;font-size:10px;vertical-align:middle';
+  const badge = s => s.cerrado
+    ? '<span style="background:#E8F5E9;color:#2E7D32;border-radius:4px;padding:2px 5px;font-size:9px;font-weight:700">CERRADO</span>'
+    : s.estado==='borrador'
+      ? '<span style="background:#FFF3E0;color:#E65100;border-radius:4px;padding:2px 5px;font-size:9px;font-weight:700">BORRADOR</span>'
+      : '<span style="background:#FFF8E1;color:#F57F17;border-radius:4px;padding:2px 5px;font-size:9px;font-weight:700">PENDIENTE</span>';
+  const fmtP = v => v ? '$'+parseInt(v).toLocaleString('es-CL') : '—';
+  const thead = `<tr><th style="${th}">ID</th><th style="${th}">Fecha</th><th style="${th}">Cliente</th><th style="${th}">Conductor</th><th style="${th}">Patente</th><th style="${th}">N° Guía</th><th style="${th}">Origen → Destino</th><th style="${th}">Precio</th><th style="${th}">Estado</th></tr>`;
+  const fila = s => {
+    const pts = (s.puntos&&s.puntos.length)?s.puntos:(s.guias&&s.guias.length)?s.guias:[];
+    const gd = pts.map(g=>g.num||g.guia).filter(Boolean).join(', ')||'—';
+    const orig = pts[0]?.origen||s.origen||'—';
+    const dest = pts[pts.length-1]?.destino||'—';
+    return `<tr>
+      <td style="${td};font-weight:700;color:#455A64">${s.id}</td>
+      <td style="${td};white-space:nowrap">${s.fecha||'—'}</td>
+      <td style="${td};font-weight:600">${s.cliente||'—'}</td>
+      <td style="${td}">${s.conductor||'—'}</td>
+      <td style="${td}">${s.patente||'—'}</td>
+      <td style="${td};color:#1565C0;font-weight:600">${gd}</td>
+      <td style="${td}">${orig} → ${dest}</td>
+      <td style="${td}">${fmtP(s.precio)}</td>
+      <td style="${td}">${badge(s)}</td>
+    </tr>`;
+  };
+  const tabla = svcs => `<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse">${thead}${svcs.map(fila).join('')}</table></div>`;
+  let cuerpo = '';
+  if (modo === 'todos') {
+    cuerpo = tabla(serviciosOrdenados);
+  } else {
+    const porCliente = {};
+    serviciosOrdenados.forEach(s => { const k=s.cliente||'Sin cliente'; if(!porCliente[k])porCliente[k]=[]; porCliente[k].push(s); });
+    cuerpo = Object.entries(porCliente).map(([cl,svcs])=>`
+      <div style="margin-bottom:10px">
+        <div style="font-size:10px;font-weight:800;color:#455A64;background:#ECEFF1;padding:5px 8px;border-radius:5px;margin-bottom:4px">${cl} <span style="font-weight:400;color:#888">(${svcs.length})</span></div>
+        ${tabla(svcs)}
+      </div>`).join('');
+  }
+  return `<div style="margin-top:14px;border-top:2px solid #CFD8DC;padding-top:10px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+      <div style="font-size:11px;font-weight:800;color:#455A64;letter-spacing:1px">LISTADO DE REGISTROS</div>
+      <div style="display:flex;gap:4px">
+        <button onclick="uiState.srv_lista_modo='todos';render()" style="padding:4px 10px;border-radius:5px;font-size:10px;font-weight:700;cursor:pointer;border:1px solid #CFD8DC;background:${modo==='todos'?'#455A64':'white'};color:${modo==='todos'?'white':'#607D8B'}">Todos los registros</button>
+        <button onclick="uiState.srv_lista_modo='cliente';render()" style="padding:4px 10px;border-radius:5px;font-size:10px;font-weight:700;cursor:pointer;border:1px solid #CFD8DC;background:${modo==='cliente'?'#455A64':'white'};color:${modo==='cliente'?'white':'#607D8B'}">Por cliente</button>
+      </div>
+    </div>
+    ${cuerpo}
+  </div>`;
+}
+
 function buildGuiasRegistroHTML() {
   if (!uiState.srvForm) uiState.srvForm = {};
   const sf = uiState.srvForm;
@@ -6520,6 +6573,7 @@ function renderFase(fase) {
             +'<div style="margin-bottom:12px"><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">PEAJES ($)</div><input id="srv_peajes" type="number" value="'+sfPeajes+'" placeholder="ej: 8000" oninput="if(!uiState.srvForm)uiState.srvForm={};uiState.srvForm.peajes=this.value" style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit"></div>'
             +'<button onclick="addServicio()" style="width:100%;background:#455A64;color:white;border:none;border-radius:8px;padding:16px;font-size:15px;cursor:pointer;font-weight:700;min-height:54px;-webkit-tap-highlight-color:transparent;touch-action:manipulation">+ Registrar servicio</button>'
             +(serviciosPendientes.length?'<div style="margin-top:12px"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px"><div style="font-size:10px;font-weight:700;color:#607D8B;letter-spacing:1px">SERVICIOS PENDIENTES DE CERRAR ('+serviciosPendientes.length+')</div><span onclick="uiState.srv_ver_todos=!uiState.srv_ver_todos;render()" style="font-size:9px;color:#1565C0;cursor:pointer;text-decoration:underline">'+(verTodos?'Ver mes actual':'Ver todos')+'</span></div>'+lista+'</div>':'<div style="margin-top:6px">'+lista+'</div>')
+            +renderListadoRegistros(serviciosOrdenados)
             +'</div>';
         })(); return '<div style="margin:-4px">'+serviciosBlock+'</div>'; })() : ''}
         ${tarea.cierreServicioTask ? `<div style="margin:-4px">${renderCierreServicios()}</div>` : ''}
