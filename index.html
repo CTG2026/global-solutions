@@ -4,8 +4,8 @@
 <meta charset="UTF-8">
   <meta http-equiv="cache-control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="pragma" content="no-cache">
-  <meta http-equiv="expires" content="1775739539">
-  <meta name="version" content="1775739539">
+  <meta http-equiv="expires" content="1775740363">
+  <meta name="version" content="1775740363">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <script>
 // Desregistrar cualquier Service Worker existente de forma inmediata
@@ -17,7 +17,7 @@ if ('serviceWorker' in navigator) {
 </script>
 <script>
 (function() {
-  var VERSION = '1775739539';
+  var VERSION = '1775740363';
   var stored = localStorage.getItem('gs_app_version');
   if (stored !== VERSION) {
     var session = localStorage.getItem('gs_session');
@@ -3879,6 +3879,54 @@ function renderCostos() {
   return `<div style="padding:2px">${nav}${body}</div>`;
 }
 
+function renderCajaResumen() {
+  const hoy = new Date();
+  const mesPadded = String(hoy.getMonth()+1).padStart(2,'0');
+  const anioStr   = String(hoy.getFullYear());
+  const parseFecha = f => { if(!f) return null; const p=f.split('-'); return p[0].length===2?new Date(parseInt(p[2]),parseInt(p[1])-1,parseInt(p[0])):new Date(parseInt(p[0]),parseInt(p[1])-1,parseInt(p[2])); };
+  const esMes = s => { const d=parseFecha(s.fecha||''); return d&&(d.getMonth()+1)===parseInt(mesPadded)&&d.getFullYear()===parseInt(anioStr); };
+
+  // Servicios
+  const svcs        = (appData.servicios||[]).filter(esMes);
+  const svcsTotal   = svcs.reduce((a,s)=>a+(s.precio||0),0);
+  const svcsCobr    = svcs.filter(s=>s.cobrado).reduce((a,s)=>a+(s.precio||0),0);
+  const svcsPag     = svcs.filter(s=>s.liquidado).reduce((a,s)=>a+(s.precio||0),0);
+  const svcsPorCobr = svcsTotal - svcsCobr;
+
+  // Gastos a la fecha (costos + combustible)
+  const gastoManuales    = (appData.costos||[]).filter(c=>c.mes===mesPadded&&c.anio===anioStr).reduce((a,c)=>a+(c.total||0),0);
+  const gastoCombustible = (appData.copec||[]).filter(c=>c.mes===mesPadded&&c.anio===anioStr).reduce((a,c)=>a+(c.monto||0),0);
+  const gastosFecha      = gastoManuales + gastoCombustible;
+
+  // Caja efectiva y proyectada
+  const d = appData.dashboardData || {};
+  const cajaEfectiva      = d.caja || 0;
+  const gastosProyectados = d.gasto_meta || d.costos_fijos || 0;
+  const cajaProyectada    = cajaEfectiva + svcsPorCobr - gastosProyectados;
+
+  const fmt = v => (v<0?'−':'')+'$'+Math.abs(v).toLocaleString('es-CL');
+  const clr = v => v<0?'#C62828':'#0B2545';
+
+  const rows = [
+    { label:'Servicios mes',         val: svcsTotal,        color:'#0B2545' },
+    { label:'Servicios cobrados',    val: svcsCobr,         color:'#2E7D32' },
+    { label:'Servicios pagados',     val: svcsPag,          color:'#1565C0' },
+    { label:'Servicios por cobrar',  val: svcsPorCobr,      color:'#E65100' },
+    { label:'Gastos a la fecha',     val: gastosFecha,      color:'#C62828' },
+    { label:'Caja efectiva',         val: cajaEfectiva,     color: clr(cajaEfectiva)   },
+    { label:'Gastos proyectados',    val: gastosProyectados,color:'#C62828' },
+    { label:'Caja Proyectada',       val: cajaProyectada,   color: clr(cajaProyectada) },
+    { label:'Caja proyectada',       val: cajaProyectada,   color: clr(cajaProyectada) },
+  ];
+
+  return '<div style="padding:2px">'
+    + rows.map(r=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:9px 12px;background:white;border:1px solid #eee;border-radius:8px;margin-bottom:5px;cursor:pointer">
+      <span style="font-size:12px;font-weight:700;color:#546E7A">${r.label}</span>
+      <span style="font-size:14px;font-weight:900;color:${r.color}">${fmt(r.val)}</span>
+    </div>`).join('')
+    + '</div>';
+}
+
 function renderCaja() {
   const facturas = appData.facturas || [];
   const rendiciones = appData.rendiciones || [];
@@ -5360,6 +5408,9 @@ function loadData() {
       if(r.factoringTask){_factCount++;return _factCount<=1;}
       return true;
     });
+    // Sección CAJA siempre al final
+    _finF.rutinarias = _finF.rutinarias.filter(r=>!r.cajaResumenTask);
+    _finF.rutinarias.push({titulo:'CAJA',proc:'',subtareas:[],cajaResumenTask:true,done:false});
   }
   // Cotización PDF en Comercial
   const _comF = appData.fases.find(f=>f.id==='comercial');
@@ -6051,6 +6102,10 @@ function renderFase(fase) {
       if(r.factoringTask){_factRF++;return _factRF<=1;}
       return true;
     });
+    // Sección CAJA siempre al final
+    fase.rutinarias = fase.rutinarias.filter(r=>!r.cajaResumenTask);
+    fase.rutinarias.push({titulo:'CAJA',proc:'',subtareas:[],cajaResumenTask:true,done:false});
+    saveData();
   }
   // v36: Rendimiento Combustible en operacional
   if (fase.id==='operacional' && !fase.rutinarias.some(r=>r.rendimientoCombTask)) {
@@ -6390,6 +6445,7 @@ function renderFase(fase) {
         ${tarea.rendicionTask ? `<div style="margin:-4px">${renderRendiciones()}</div>` : ''}
         ${tarea.facturaTask ? `<div style="margin:-4px">${renderFacturas()}</div>` : ''}
         ${tarea.costosTask ? `<div style="margin:-4px">${renderCostos()}</div>` : ''}
+        ${tarea.cajaResumenTask ? `<div style="margin:-4px">${renderCajaResumen()}</div>` : ''}
         ${tarea.respaldoTask ? `<div style="padding:8px 0">
           <button onclick="descargarRespaldo()" style="width:100%;padding:12px;background:#37474F;color:white;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer">💾 Descargar respaldo</button></div>` : ''}
         ${subsHTML}
@@ -7095,7 +7151,7 @@ function _deduplicarFases() {
     // Deduplicar por flag de sistema
     // Eliminar cajaTask de datos existentes
     f.rutinarias = f.rutinarias.filter(r => !r.cajaTask);
-    const flags = ['facturaTask','costosTask','liquidacionTask','cierreServicioTask','rendicionTask','pipelineTask','rendimientoCombTask'];
+    const flags = ['facturaTask','costosTask','cajaResumenTask','liquidacionTask','cierreServicioTask','rendicionTask','pipelineTask','rendimientoCombTask'];
     flags.forEach(flag => {
       let cnt = 0;
       f.rutinarias = f.rutinarias.filter(r => r[flag] ? ++cnt <= 1 : true);
