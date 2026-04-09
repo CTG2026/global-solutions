@@ -5,7 +5,7 @@
   <meta http-equiv="cache-control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="pragma" content="no-cache">
   <meta http-equiv="expires" content="1775758565">
-  <meta name="version" content="1775778732">
+  <meta name="version" content="1775779183">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <script>
 // Desregistrar cualquier Service Worker existente de forma inmediata
@@ -17,7 +17,7 @@ if ('serviceWorker' in navigator) {
 </script>
 <script>
 (function() {
-  var VERSION = '1775778732';
+  var VERSION = '1775779183';
   var stored = localStorage.getItem('gs_app_version');
   if (stored !== VERSION) {
     var session = localStorage.getItem('gs_session');
@@ -5800,12 +5800,16 @@ function renderListadoRegistros(serviciosOrdenados) {
     cuerpo = svcsFiltered.length ? tabla(svcsFiltered) : '<div style="text-align:center;color:#aaa;font-size:11px;padding:12px">Sin registros en el período seleccionado</div>';
   } else {
     const porCliente = {};
-    svcsFiltered.forEach(s => { const k=s.cliente||'Sin cliente'; if(!porCliente[k])porCliente[k]=[]; porCliente[k].push(s); });
-    cuerpo = Object.keys(porCliente).length ? Object.entries(porCliente).map(([cl,svcs])=>`
-      <div style="margin-bottom:10px">
-        <div style="font-size:10px;font-weight:800;color:#455A64;background:#ECEFF1;padding:5px 8px;border-radius:5px;margin-bottom:4px">${cl} <span style="font-weight:400;color:#888">(${svcs.length})</span></div>
+    svcsFiltered.forEach(s => { const k=(s.cliente||'').trim()||'Sin cliente'; if(!porCliente[k])porCliente[k]=[]; porCliente[k].push(s); });
+    cuerpo = Object.keys(porCliente).length ? Object.entries(porCliente).sort(([a],[b])=>a.localeCompare(b,'es')).map(([cl,svcs])=>{
+      const tot=svcs.filter(s=>s.precio).reduce((a,s)=>a+(s.precio||0),0);
+      return `<div style="margin-bottom:12px">
+        <div style="display:flex;justify-content:space-between;align-items:center;background:#ECEFF1;padding:5px 8px;border-radius:5px;margin-bottom:4px">
+          <span style="font-size:10px;font-weight:800;color:#455A64">${cl} <span style="font-weight:400;color:#888">(${svcs.length} servicio${svcs.length!==1?'s':''})</span></span>
+          ${tot?`<span style="font-size:10px;font-weight:700;color:#2E7D32">${fmtP(tot)}</span>`:''}
+        </div>
         ${tabla(svcs)}
-      </div>`).join('') : '<div style="text-align:center;color:#aaa;font-size:11px;padding:12px">Sin registros en el período seleccionado</div>';
+      </div>`;}).join('') : '<div style="text-align:center;color:#aaa;font-size:11px;padding:12px">Sin registros en el período seleccionado</div>';
   }
   const inpDate = 'border:1px solid #CFD8DC;border-radius:5px;padding:4px 7px;font-size:11px;font-family:inherit;outline:none;background:white';
   return `<div style="margin-top:14px;border-top:2px solid #CFD8DC;padding-top:10px">
@@ -5869,7 +5873,7 @@ function pdfListadoRegistros() {
     body = `<h3>Todos los registros (${todos.length})</h3>${tablaHTML(todos)}`;
   } else {
     const porCliente = {};
-    todos.forEach(s => { const k=s.cliente||'Sin cliente'; if(!porCliente[k])porCliente[k]=[]; porCliente[k].push(s); });
+    todos.forEach(s => { const k=(s.cliente||'').trim()||'Sin cliente'; if(!porCliente[k])porCliente[k]=[]; porCliente[k].push(s); });
     body = Object.entries(porCliente).map(([cl,svcs])=>`<h3>${cl} (${svcs.length})</h3>${tablaHTML(svcs)}`).join('');
   }
   const total = todos.filter(s=>s.precio).reduce((a,s)=>a+(s.precio||0),0);
