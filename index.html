@@ -4,8 +4,8 @@
 <meta charset="UTF-8">
   <meta http-equiv="cache-control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="pragma" content="no-cache">
-  <meta http-equiv="expires" content="1775740363">
-  <meta name="version" content="1775740363">
+  <meta http-equiv="expires" content="1775757263">
+  <meta name="version" content="1775757263">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <script>
 // Desregistrar cualquier Service Worker existente de forma inmediata
@@ -17,7 +17,7 @@ if ('serviceWorker' in navigator) {
 </script>
 <script>
 (function() {
-  var VERSION = '1775740363';
+  var VERSION = '1775757263';
   var stored = localStorage.getItem('gs_app_version');
   if (stored !== VERSION) {
     var session = localStorage.getItem('gs_session');
@@ -1240,13 +1240,13 @@ function imprimirInformeRC() {
 // ── CIERRE DE SERVICIOS v36 ───────────────────────────────
 function renderCierreServicios() {
   const CF_MES = (appData.config && appData.config.costosFijosMes) || 5080000;
-  const estadoOrden = s => s.cerrado ? 0 : s.precio ? 1 : 2;
+  const estadoOrden = s => s.cerrado ? 2 : s.precio ? 1 : 0;
   const todosServicios=(appData.servicios||[]).slice().sort((a,b)=>{
     const eo = estadoOrden(a) - estadoOrden(b);
     if (eo !== 0) return eo;
     try{const fa=a.fecha.split('-').reverse().join('');const fb=b.fecha.split('-').reverse().join('');return fb.localeCompare(fa);}catch(e){return 0;}
   });
-  const servicios = todosServicios.slice(0,20);
+  const servicios = todosServicios;
   const sinCerrar = servicios.filter(s=>!s.cerrado).length;
   const cfPorServ = todosServicios.length > 0 ? Math.round(CF_MES / todosServicios.length) : 0;
   return `<div style="padding:2px">
