@@ -5,7 +5,7 @@
   <meta http-equiv="cache-control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="pragma" content="no-cache">
   <meta http-equiv="expires" content="1775758565">
-  <meta name="version" content="1775762537">
+  <meta name="version" content="1775763155">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <script>
 // Desregistrar cualquier Service Worker existente de forma inmediata
@@ -17,7 +17,7 @@ if ('serviceWorker' in navigator) {
 </script>
 <script>
 (function() {
-  var VERSION = '1775762537';
+  var VERSION = '1775763155';
   var stored = localStorage.getItem('gs_app_version');
   if (stored !== VERSION) {
     var session = localStorage.getItem('gs_session');
@@ -1318,6 +1318,10 @@ function renderCierreServicios() {
               <input id="cs_via_${s.id}" type="number" value="${_csVal(s,'viaticos','')}" placeholder="ej: 15000" oninput="updCS('${s.id}','viaticos',this.value)" style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit"></div>
             <div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">ADICIONAL ($)</div>
               <input id="cs_adic_${s.id}" type="number" value="${_csVal(s,'adicional','')}" placeholder="ej: 30000" oninput="updCS('${s.id}','adicional',this.value)" style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit"></div>
+            <div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">BASE CONDUCTOR ($)</div>
+              <input id="cs_base_cond_${s.id}" type="number" value="${_csVal(s,'baseConductor','')}" placeholder="ej: 80000" oninput="updCS('${s.id}','baseConductor',this.value)" style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit"></div>
+            <div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">GASTO FINANCIERO ($)</div>
+              <input id="cs_gf_${s.id}" type="number" value="${_csVal(s,'gastoFinanciero','')}" placeholder="ej: 20000" oninput="updCS('${s.id}','gastoFinanciero',this.value)" style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit"></div>
           </div>
           <!-- PETRÓLEO -->
           <div style="font-size:9px;font-weight:700;color:#E65100;margin:8px 0 5px;background:#FFF3E0;padding:4px 8px;border-radius:5px">⛽ COMBUSTIBLE</div>
@@ -1397,7 +1401,9 @@ function _leerCamposCierre(id, idx) {
     adicional:    parseInt(_v('cs_adic_'    +id,'adicional',0))||0,
     litros:       parseInt(_v('cs_litros_'  +id,'litros',   0))||0,
     petroleo:     parseInt(_v('cs_petroleo_'+id,'petroleo', 0))||0,
-    cfProrrateado:parseInt(_v('cs_cf_'      +id,'cfProrrateado',50800))||50800,
+    cfProrrateado:   parseInt(_v('cs_cf_'       +id,'cfProrrateado',  50800))||50800,
+    baseConductor:   parseInt(_v('cs_base_cond_'+id,'baseConductor',  0))||0,
+    gastoFinanciero: parseInt(_v('cs_gf_'       +id,'gastoFinanciero',0))||0,
   };
 }
 
@@ -1415,6 +1421,7 @@ async function guardarBorradorCierre(id) {
     precio: d.precio, km: d.km, tag: d.tag, oc: d.oc,
     peajes: d.peajes, viaticos: d.viaticos, adicional: d.adicional,
     litros: d.litros, petroleo: d.petroleo, cfProrrateado: d.cfProrrateado,
+    baseConductor: d.baseConductor, gastoFinanciero: d.gastoFinanciero,
     comisionConductor, cerrado: false, estado: 'borrador'
   });
   // Limpiar borrador ya que los datos quedaron en appData
@@ -1438,6 +1445,7 @@ async function guardarCierre(id) {
     precio: d.precio, km: d.km, tag: d.tag, oc: d.oc,
     peajes: d.peajes, viaticos: d.viaticos, adicional: d.adicional,
     litros: d.litros, petroleo: d.petroleo, cfProrrateado: d.cfProrrateado,
+    baseConductor: d.baseConductor, gastoFinanciero: d.gastoFinanciero,
     comisionConductor, cerrado: true, estado: 'cerrado'
   });
   appData.dashboard.ventas_mes=(appData.servicios||[]).filter(s=>s.cerrado&&s.precio).reduce((a,s)=>a+(s.precio||0),0);
@@ -3905,16 +3913,18 @@ function renderCajaResumen() {
   const svcsPag     = svcsCierre.filter(s=>s.liquidado).reduce((a,s)=>a+(s.precio||0),0);
   const svcsPorCobr = svcsTotal - svcsCobr;
 
-  // Gastos a la fecha: costos ingresados en cierre de servicios (borrador o cerrado) del mes
-  // Campos: petróleo + peajes + viáticos + adicional + comisión conductor
-  const gastosFecha = svcsCierre.reduce((a,s)=>
-    a + (s.petroleo||0) + (s.peajes||0) + (s.viaticos||0) + (s.adicional||0) + (s.comisionConductor||0), 0);
+  // Gastos a la fecha: solo peajes de servicios en cierre del mes
+  const gastosFecha = svcsCierre.reduce((a,s) => a + (s.peajes||0), 0);
+
+  // Gastos proyectados: base conductor + comisión conductor + gasto financiero + TAG + CF prorrateado
+  const gastosProyectados = svcsCierre.reduce((a,s) =>
+    a + (s.baseConductor||0) + (s.comisionConductor||0) + (s.gastoFinanciero||0)
+      + (parseInt(s.tag)||0) + (s.cfProrrateado||50800), 0);
 
   // Caja efectiva y proyectada
   const d = appData.dashboardData || {};
-  const cajaEfectiva      = d.caja || 0;
-  const gastosProyectados = d.gasto_meta || d.costos_fijos || 0;
-  const cajaProyectada    = cajaEfectiva + svcsPorCobr - gastosProyectados;
+  const cajaEfectiva   = d.caja || 0;
+  const cajaProyectada = cajaEfectiva + svcsPorCobr - gastosProyectados;
 
   const fmt = v => (v<0?'−':'')+'$'+Math.abs(v).toLocaleString('es-CL');
   const clr = v => v<0?'#C62828':'#0B2545';
