@@ -5,7 +5,7 @@
   <meta http-equiv="cache-control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="pragma" content="no-cache">
   <meta http-equiv="expires" content="1775758565">
-  <meta name="version" content="1775779183">
+  <meta name="version" content="1775779896">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <script>
 // Desregistrar cualquier Service Worker existente de forma inmediata
@@ -17,7 +17,7 @@ if ('serviceWorker' in navigator) {
 </script>
 <script>
 (function() {
-  var VERSION = '1775779183';
+  var VERSION = '1775779896';
   var stored = localStorage.getItem('gs_app_version');
   if (stored !== VERSION) {
     var session = localStorage.getItem('gs_session');
@@ -5776,6 +5776,7 @@ function renderListadoRegistros(serviciosOrdenados) {
       ? '<span style="background:#FFF3E0;color:#E65100;border-radius:4px;padding:2px 5px;font-size:9px;font-weight:700">BORRADOR</span>'
       : '<span style="background:#FFF8E1;color:#F57F17;border-radius:4px;padding:2px 5px;font-size:9px;font-weight:700">PENDIENTE</span>';
   const fmtP = v => v ? '$'+parseInt(v).toLocaleString('es-CL') : '—';
+  const normFecha = f => { if(!f) return '—'; const p=f.split('-'); return p[0].length===4 ? `${p[2]}-${p[1]}-${p[0]}` : f; };
   const thead = `<tr><th style="${th}">ID</th><th style="${th}">Fecha</th><th style="${th}">Cliente</th><th style="${th}">Conductor</th><th style="${th}">Patente</th><th style="${th}">N° Guía</th><th style="${th}">Origen → Destino</th><th style="${th}">Precio</th><th style="${th}">Estado</th></tr>`;
   const fila = s => {
     const pts = (s.puntos&&s.puntos.length)?s.puntos:(s.guias&&s.guias.length)?s.guias:[];
@@ -5784,7 +5785,7 @@ function renderListadoRegistros(serviciosOrdenados) {
     const dest = pts[pts.length-1]?.destino||'—';
     return `<tr>
       <td style="${td};font-weight:700;color:#455A64">${s.id}</td>
-      <td style="${td};white-space:nowrap">${s.fecha||'—'}</td>
+      <td style="${td};white-space:nowrap">${normFecha(s.fecha)}</td>
       <td style="${td};font-weight:600">${s.cliente||'—'}</td>
       <td style="${td}">${s.conductor||'—'}</td>
       <td style="${td}">${s.patente||'—'}</td>
@@ -5859,13 +5860,14 @@ function pdfListadoRegistros() {
   });
   const periodoTxt = desde||hasta ? `${desde||'inicio'} al ${hasta||'hoy'}` : 'Todos los períodos';
   const fmtP = v => v ? '$'+parseInt(v).toLocaleString('es-CL') : '—';
+  const normFecha = f => { if(!f) return '—'; const p=f.split('-'); return p[0].length===4 ? `${p[2]}-${p[1]}-${p[0]}` : f; };
   const badgeTxt = s => s.cerrado ? 'CERRADO' : s.estado==='borrador' ? 'BORRADOR' : 'PENDIENTE';
   const filaHTML = s => {
     const pts=(s.puntos&&s.puntos.length)?s.puntos:(s.guias&&s.guias.length)?s.guias:[];
     const gd=pts.map(g=>g.num||g.guia).filter(Boolean).join(', ')||'—';
     const orig=pts[0]?.origen||s.origen||'—';
     const dest=pts[pts.length-1]?.destino||'—';
-    return `<tr><td>${s.id}</td><td>${s.fecha||'—'}</td><td>${s.cliente||'—'}</td><td>${s.conductor||'—'}</td><td>${s.patente||'—'}</td><td>${gd}</td><td>${orig} → ${dest}</td><td>${fmtP(s.precio)}</td><td>${badgeTxt(s)}</td></tr>`;
+    return `<tr><td>${s.id}</td><td>${normFecha(s.fecha)}</td><td>${s.cliente||'—'}</td><td>${s.conductor||'—'}</td><td>${s.patente||'—'}</td><td>${gd}</td><td>${orig} → ${dest}</td><td>${fmtP(s.precio)}</td><td>${badgeTxt(s)}</td></tr>`;
   };
   const tablaHTML = svcs => `<table><thead><tr><th>ID</th><th>Fecha</th><th>Cliente</th><th>Conductor</th><th>Patente</th><th>N° Guía</th><th>Origen → Destino</th><th>Precio</th><th>Estado</th></tr></thead><tbody>${svcs.map(filaHTML).join('')}</tbody></table>`;
   let body = '';
