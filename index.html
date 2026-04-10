@@ -5,7 +5,7 @@
   <meta http-equiv="cache-control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="pragma" content="no-cache">
   <meta http-equiv="expires" content="1775758565">
-  <meta name="version" content="1775843808">
+  <meta name="version" content="1775844828">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <script>
 // Desregistrar cualquier Service Worker existente de forma inmediata
@@ -17,7 +17,7 @@ if ('serviceWorker' in navigator) {
 </script>
 <script>
 (function() {
-  var VERSION = '1775843808';
+  var VERSION = '1775844828';
   var stored = localStorage.getItem('gs_app_version');
   if (stored !== VERSION) {
     var session = localStorage.getItem('gs_session');
@@ -4536,7 +4536,9 @@ function renderLiquidacionesV2() {
             <!-- SERVICIOS ACTUALES EN LA LIQUIDACIÓN -->
             <div style="margin-bottom:8px">
               <div style="font-size:9px;font-weight:700;color:#888;margin-bottom:4px">SERVICIOS EN ESTA LIQUIDACIÓN</div>
-              ${svcsLiq.length?svcsLiq.map(s=>{const guiasE=(s.guias||s.puntos||[]).map(g=>g.num||g.guia).filter(Boolean).join(', ')||'—';return `<div style="display:flex;align-items:center;gap:6px;padding:5px 0;border-bottom:1px solid #f5f5f5"><div style="flex:1"><span style="font-size:11px;font-weight:700;color:#455A64">${s.id}</span><span style="font-size:10px;color:#777;margin-left:4px">${s.fecha||''}</span><span style="font-size:10px;color:#1565C0;font-weight:700;margin-left:4px">GD:${guiasE}</span></div><span style="font-size:11px;font-weight:700;color:#2E7D32">$${(s.precio||0).toLocaleString('es-CL')}</span><span onclick="quitarSrvDeLiq('${liq.id}','${s.id}')" style="font-size:18px;color:#E53935;cursor:pointer;padding:0 6px;font-weight:700;line-height:1" title="Quitar de liquidación">×</span></div>`;}).join(''):'<div style="font-size:10px;color:#aaa;text-align:center;padding:6px">Sin servicios</div>'}
+              ${svcsLiq.length?svcsLiq.map(s=>{const guiasE=(s.guias||s.puntos||[]).map(g=>g.num||g.guia).filter(Boolean).join(', ')||'—';const ptsE=(s.puntos&&s.puntos.length)?s.puntos:(s.guias&&s.guias.length)?s.guias:[];const isEd=!!uiState['liq_svc_edit_'+s.id];const iS='width:100%;border:1px solid #FFE082;border-radius:5px;padding:5px 7px;font-size:11px;outline:none;font-family:inherit;background:white;box-sizing:border-box';const lS='font-size:9px;font-weight:700;color:#888;margin-bottom:2px';return `<div style="border-bottom:1px solid #f0f0f0;padding:5px 0"><div style="display:flex;align-items:center;gap:6px"><div style="flex:1"><span style="font-size:11px;font-weight:700;color:#455A64">${s.id}</span><span style="font-size:10px;color:#777;margin-left:4px">${s.fecha||''}</span><span style="font-size:10px;color:#1565C0;font-weight:700;margin-left:4px">GD:${guiasE}</span></div><span style="font-size:11px;font-weight:700;color:#2E7D32">$${(s.precio||0).toLocaleString('es-CL')}</span><button onclick="uiState['liq_svc_edit_${s.id}']=!uiState['liq_svc_edit_${s.id}'];render()" style="background:${isEd?'#FFF8E1':'#f5f5f5'};color:${isEd?'#E65100':'#546E7A'};border:1px solid ${isEd?'#E65100':'#ccc'};border-radius:5px;padding:2px 7px;font-size:12px;cursor:pointer" title="Editar datos del servicio">✎</button><span onclick="quitarSrvDeLiq('${liq.id}','${s.id}')" style="font-size:18px;color:#E53935;cursor:pointer;padding:0 4px;font-weight:700;line-height:1" title="Quitar de liquidación">×</span></div>${isEd?`<div style="background:#FFF8E1;border:1px solid #FFE082;border-radius:7px;padding:10px;margin-top:6px"><div style="font-size:9px;font-weight:800;color:#E65100;letter-spacing:1px;margin-bottom:8px">EDITANDO ${s.id}</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px"><div><div style="${lS}">MONTO ($)</div><input id="lsvc_precio_${s.id}" type="number" value="${s.precio||0}" style="${iS}"></div><div><div style="${lS}">FECHA</div><input id="lsvc_fecha_${s.id}" type="text" value="${s.fecha||''}" placeholder="DD-MM-YYYY" style="${iS}"></div><div><div style="${lS}">CONDUCTOR</div><input id="lsvc_conductor_${s.id}" type="text" value="${s.conductor||''}" style="${iS}"></div><div><div style="${lS}">PATENTE</div><input id="lsvc_patente_${s.id}" type="text" value="${s.patente||''}" style="${iS}"></div></div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:4px">COSTOS</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px"><div><div style="${lS}">PETRÓLEO</div><input id="lsvc_petroleo_${s.id}" type="number" value="${s.petroleo||0}" style="${iS}"></div><div><div style="${lS}">PEAJES</div><input id="lsvc_peajes_${s.id}" type="number" value="${s.peajes||0}" style="${iS}"></div><div><div style="${lS}">VIÁTICOS</div><input id="lsvc_viaticos_${s.id}" type="number" value="${s.viaticos||0}" style="${iS}"></div><div><div style="${lS}">ADICIONAL</div><input id="lsvc_adicional_${s.id}" type="number" value="${s.adicional||0}" style="${iS}"></div></div>${ptsE.length?`<div style="font-size:9px;font-weight:700;color:#888;margin-bottom:4px">GUÍAS / PUNTOS</div>${ptsE.map((p,pi)=>`<div style="background:white;border-radius:5px;padding:6px 8px;margin-bottom:4px;border:1px solid #eee"><div style="font-size:9px;font-weight:700;color:#1565C0;margin-bottom:4px">Punto ${pi+1}</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:4px"><div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">N° GUÍA</div><input id="lsvc_guia_${pi}_num_${s.id}" type="text" value="${p.num||p.guia||''}" style="width:100%;border:1px solid #FFE082;border-radius:5px;padding:5px 7px;font-size:11px;outline:none;font-family:inherit;background:white;box-sizing:border-box"></div><div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">KG</div><input id="lsvc_guia_${pi}_kg_${s.id}" type="text" value="${p.kg||''}" style="width:100%;border:1px solid #FFE082;border-radius:5px;padding:5px 7px;font-size:11px;outline:none;font-family:inherit;background:white;box-sizing:border-box"></div><div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">ORIGEN</div><input id="lsvc_guia_${pi}_origen_${s.id}" type="text" value="${p.origen||''}" style="width:100%;border:1px solid #FFE082;border-radius:5px;padding:5px 7px;font-size:11px;outline:none;font-family:inherit;background:white;box-sizing:border-box"></div><div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">DESTINO</div><input id="lsvc_guia_${pi}_destino_${s.id}" type="text" value="${p.destino||''}" style="width:100%;border:1px solid #FFE082;border-radius:5px;padding:5px 7px;font-size:11px;outline:none;font-family:inherit;background:white;box-sizing:border-box"></div></div></div>`).join('')}`:''}
+<button onclick="guardarDatosSrvEnLiq('${liq.id}','${s.id}')" style="width:100%;padding:9px;background:#E65100;color:white;border:none;border-radius:7px;font-size:11px;font-weight:700;cursor:pointer;margin-top:4px">✓ Guardar cambios del servicio</button></div>`:''}
+</div>`;}).join(''):'<div style="font-size:10px;color:#aaa;text-align:center;padding:6px">Sin servicios</div>'}
             </div>
             <!-- AGREGAR SERVICIOS DISPONIBLES -->
             ${(()=>{const dispEdit=servicios.filter(s=>(s.cerrado||s.estado==='borrador')&&!liq.serviciosIds.includes(s.id)&&(!s.liquidacionId||s.liquidacionId===liq.id));const cl0=svcsLiq[0]?.cliente||'';const dispShow=cl0?dispEdit.filter(s=>(s.cliente||'')===cl0):dispEdit;if(!dispShow.length)return'<div style="font-size:10px;color:#aaa;text-align:center;padding:6px;margin-bottom:8px">Sin servicios disponibles para agregar</div>';return`<div style="margin-bottom:8px"><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:4px">AGREGAR SERVICIOS</div>${dispShow.map(s=>{const guiasA=(s.guias||s.puntos||[]).map(g=>g.num||g.guia).filter(Boolean).join(', ')||'—';const borrTagE=(!s.cerrado&&s.estado==='borrador')?'<span style="font-size:9px;background:#FFF9C4;color:#F9A825;padding:1px 4px;border-radius:3px;margin-left:3px">BORRDR</span>':'';return`<div style="display:flex;align-items:center;gap:6px;padding:5px 0;border-bottom:1px solid #f5f5f5"><div style="flex:1"><span style="font-size:11px;font-weight:700;color:#455A64">${s.id}</span>${borrTagE}<span style="font-size:10px;color:#777;margin-left:4px">${s.fecha||''}</span><span style="font-size:10px;color:#1565C0;font-weight:700;margin-left:4px">GD:${guiasA}</span></div><span style="font-size:11px;font-weight:700;color:#546E7A">$${(s.precio||0).toLocaleString('es-CL')}</span><button onclick="agregarSrvALiq('${liq.id}','${s.id}')" style="background:#E8F5E9;color:#2E7D32;border:1px solid #A5D6A7;border-radius:5px;padding:3px 8px;font-size:10px;cursor:pointer;font-weight:700;white-space:nowrap">+ Agregar</button></div>`;}).join('')}</div>`;})()}
@@ -4626,6 +4628,40 @@ function agregarSrvALiq(liqId, svcId) {
   if(svc){svc.liquidacionId=liqId;upsertServicioSupabase(svc);}
   saveData();pushLiquidacionesSupabase();render();
   showToastGeneral('✅ Servicio agregado a la liquidación','#2E7D32');
+}
+async function guardarDatosSrvEnLiq(liqId, svcId) {
+  const liq=(appData.liquidaciones||[]).find(l=>l.id===liqId);
+  const idx=(appData.servicios||[]).findIndex(s=>s.id===svcId);
+  if(!liq||idx===-1) return;
+  const svc=appData.servicios[idx];
+  const gv=campo=>{const el=document.getElementById('lsvc_'+campo+'_'+svcId);return el?el.value:undefined;};
+  const gi=campo=>{const el=document.getElementById('lsvc_'+campo+'_'+svcId);return el?(parseInt(el.value)||0):undefined;};
+  const precio=gi('precio'); if(precio!==undefined) svc.precio=precio;
+  const fecha=gv('fecha'); if(fecha!==undefined&&fecha!=='') svc.fecha=fecha;
+  const conductor=gv('conductor'); if(conductor!==undefined) svc.conductor=conductor;
+  const patente=gv('patente'); if(patente!==undefined) svc.patente=patente;
+  const petroleo=gi('petroleo'); if(petroleo!==undefined) svc.petroleo=petroleo;
+  const peajes=gi('peajes'); if(peajes!==undefined) svc.peajes=peajes;
+  const viaticos=gi('viaticos'); if(viaticos!==undefined) svc.viaticos=viaticos;
+  const adicional=gi('adicional'); if(adicional!==undefined) svc.adicional=adicional;
+  // Guías / puntos
+  const puntos=(svc.puntos&&svc.puntos.length)?svc.puntos:(svc.guias&&svc.guias.length)?svc.guias:[];
+  if(puntos.length){
+    const nuevasPts=puntos.map((p,pi)=>{
+      const gp=(campo)=>{const el=document.getElementById('lsvc_guia_'+pi+'_'+campo+'_'+svcId);return el?el.value:(p[campo]||'');};
+      return {...p,num:gp('num'),guia:gp('num'),origen:gp('origen'),destino:gp('destino'),kg:gp('kg')};
+    });
+    if(svc.puntos&&svc.puntos.length) svc.puntos=nuevasPts;
+    else svc.guias=nuevasPts;
+  }
+  // Recalcular total de la liquidación
+  liq.total=(liq.serviciosIds||[]).reduce((a,id)=>{const sv=(appData.servicios||[]).find(s=>s.id===id);return a+(sv?sv.precio||0:0);},0);
+  uiState['liq_svc_edit_'+svcId]=false;
+  saveData();
+  await upsertServicioSupabase(svc);
+  pushLiquidacionesSupabase();
+  showToastGeneral('✅ Servicio actualizado','#2E7D32');
+  render();
 }
 function eliminarLiquidacion(liqId) {
   const liq = (appData.liquidaciones||[]).find(l=>l.id===liqId);
