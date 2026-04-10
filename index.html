@@ -5,7 +5,7 @@
   <meta http-equiv="cache-control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="pragma" content="no-cache">
   <meta http-equiv="expires" content="1775758565">
-  <meta name="version" content="1775832784">
+  <meta name="version" content="1775841285">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <script>
 // Desregistrar cualquier Service Worker existente de forma inmediata
@@ -17,7 +17,7 @@ if ('serviceWorker' in navigator) {
 </script>
 <script>
 (function() {
-  var VERSION = '1775832784';
+  var VERSION = '1775841285';
   var stored = localStorage.getItem('gs_app_version');
   if (stored !== VERSION) {
     var session = localStorage.getItem('gs_session');
@@ -1468,6 +1468,9 @@ function renderCierreServicios() {
             <button onclick="guardarCierre('${s.id}')" style="padding:10px;background:#546E7A;color:white;border:none;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer">✓ Cerrar servicio</button>
           </div>
           <button onclick="uiState['cs_${s.id}']=false;render()" style="width:100%;padding:7px;background:transparent;color:#aaa;border:1px solid #eee;border-radius:7px;font-size:11px;cursor:pointer;margin-top:4px">Cancelar</button>
+          <div style="border-top:1px solid #FFCDD2;margin-top:10px;padding-top:8px">
+            <button onclick="eliminarServicioCierre('${s.id}')" style="width:100%;padding:8px;background:#FFEBEE;color:#C62828;border:1px solid #FFCDD2;border-radius:7px;font-size:11px;font-weight:700;cursor:pointer">🗑️ Eliminar este servicio</button>
+          </div>
         </div>`:''}
       </div>`;
     }).join('')}
@@ -6866,6 +6869,12 @@ async function delServicio(si) {
     try { await supa.from('servicios').delete().eq('id', id); } catch(e) {}
   }
 }
+function eliminarServicioCierre(id) {
+  const idx = (appData.servicios||[]).findIndex(s=>s.id===id);
+  if (idx === -1) return;
+  delServicio(idx);
+}
+
 function addSub(faseId, ti) {
   const input = document.getElementById(`sub_input_${faseId}_${ti}`);
   const val = input.value.trim(); if (!val) return;
