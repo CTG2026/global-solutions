@@ -5,7 +5,7 @@
   <meta http-equiv="cache-control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="pragma" content="no-cache">
   <meta http-equiv="expires" content="1775758565">
-  <meta name="version" content="1775827149">
+  <meta name="version" content="1775828078">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <script>
 // Desregistrar cualquier Service Worker existente de forma inmediata
@@ -17,7 +17,7 @@ if ('serviceWorker' in navigator) {
 </script>
 <script>
 (function() {
-  var VERSION = '1775827149';
+  var VERSION = '1775828078';
   var stored = localStorage.getItem('gs_app_version');
   if (stored !== VERSION) {
     var session = localStorage.getItem('gs_session');
@@ -1243,6 +1243,38 @@ function updCS(id, campo, val) {
   if (!uiState.cs_draft[id]) uiState.cs_draft[id] = {};
   uiState.cs_draft[id][campo] = val;
 }
+
+function updCSGuia(svcId, pi, campo, valor) {
+  if (!uiState.cs_draft) uiState.cs_draft = {};
+  if (!uiState.cs_draft[svcId]) uiState.cs_draft[svcId] = {};
+  const svc = (appData.servicios||[]).find(s=>s.id===svcId);
+  const pts = svc ? ((svc.puntos&&svc.puntos.length)?svc.puntos:(svc.guias&&svc.guias.length)?svc.guias:[]) : [];
+  if (!uiState.cs_draft[svcId].guias) uiState.cs_draft[svcId].guias = pts.map(p=>({...p}));
+  if (uiState.cs_draft[svcId].guias[pi]) {
+    uiState.cs_draft[svcId].guias[pi][campo] = valor;
+    if (campo==='num') uiState.cs_draft[svcId].guias[pi].guia = valor;
+  }
+}
+
+async function guardarEdicionGuias(svcId) {
+  const idx = (appData.servicios||[]).findIndex(s=>s.id===svcId);
+  if (idx===-1) return;
+  const svc = appData.servicios[idx];
+  const puntos = (svc.puntos&&svc.puntos.length)?svc.puntos:(svc.guias&&svc.guias.length)?svc.guias:[];
+  if (!puntos.length) { showToastGeneral('Sin guías para editar','#888'); return; }
+  const nuevas = puntos.map((p, pi) => {
+    const g = campo => { const el=document.getElementById('cs_guia_'+pi+'_'+campo+'_'+svcId); return el?el.value:(p[campo]||''); };
+    return { ...p, num:g('num'), guia:g('num'), origen:g('origen'), destino:g('destino'), kg:g('kg') };
+  });
+  const usaPuntos = !!(svc.puntos&&svc.puntos.length);
+  if (usaPuntos) appData.servicios[idx].puntos = nuevas;
+  else           appData.servicios[idx].guias  = nuevas;
+  if (uiState.cs_draft&&uiState.cs_draft[svcId]) delete uiState.cs_draft[svcId].guias;
+  saveData();
+  await upsertServicioSupabase(appData.servicios[idx]);
+  showToastGeneral('✅ Guías actualizadas','#2E7D32');
+  render();
+}
 function _csVal(s, campo, fallback) {
   const d = uiState.cs_draft && uiState.cs_draft[s.id];
   if (d && d[campo] !== undefined && d[campo] !== null) return d[campo];
@@ -1282,6 +1314,48 @@ function renderCierreServicios() {
         ${isOpen?`<div style="padding:10px 12px;background:#FAFAFA;border-top:1px solid #eee">
           ${srvDetalle(s)}
           <div style="height:1px;background:#eee;margin:10px 0"></div>
+          ${(()=>{
+            const pts=(s.puntos&&s.puntos.length)?s.puntos:(s.guias&&s.guias.length)?s.guias:[];
+            if(!pts.length) return '';
+            const sinDest=pts.filter(p=>!p.destino).length;
+            return `<div style="margin-bottom:12px;background:#EFF8FF;border:1px solid #BBDEFB;border-radius:8px;padding:10px">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+                <div style="font-size:10px;font-weight:800;color:#1565C0">✏️ EDITAR PUNTOS / GUÍAS</div>
+                ${sinDest?`<span style="background:#FFEBEE;color:#C62828;border-radius:4px;padding:2px 7px;font-size:9px;font-weight:700">⚠️ ${sinDest} sin destino</span>`:''}
+              </div>
+              ${pts.map((p,pi)=>`
+              <div style="background:white;border:1px solid ${!p.destino?'#FFCDD2':'#BBDEFB'};border-radius:6px;padding:8px;margin-bottom:6px">
+                <div style="font-size:9px;font-weight:700;color:#1565C0;margin-bottom:5px">PUNTO ${pi+1}</div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:5px">
+                  <div>
+                    <div style="font-size:9px;color:#888;margin-bottom:2px">N° GUÍA</div>
+                    <input id="cs_guia_${pi}_num_${s.id}" value="${p.num||p.guia||''}" placeholder="N° guía"
+                      oninput="updCSGuia('${s.id}',${pi},'num',this.value)"
+                      style="width:100%;border:1px solid #dde;border-radius:5px;padding:5px 7px;font-size:11px;outline:none;font-family:inherit;box-sizing:border-box">
+                  </div>
+                  <div>
+                    <div style="font-size:9px;color:${!p.destino?'#C62828':'#888'};margin-bottom:2px;font-weight:${!p.destino?'700':'400'}">DESTINO${!p.destino?' ⚠️ VACÍO':''}</div>
+                    <input id="cs_guia_${pi}_destino_${s.id}" value="${p.destino||''}" placeholder="Destino del punto"
+                      oninput="updCSGuia('${s.id}',${pi},'destino',this.value)"
+                      style="width:100%;border:1px solid ${!p.destino?'#FFCDD2':'#dde'};background:${!p.destino?'#FFF8F8':'white'};border-radius:5px;padding:5px 7px;font-size:11px;outline:none;font-family:inherit;box-sizing:border-box">
+                  </div>
+                  <div style="grid-column:1/-1">
+                    <div style="font-size:9px;color:#888;margin-bottom:2px">ORIGEN</div>
+                    <input id="cs_guia_${pi}_origen_${s.id}" value="${p.origen||''}" placeholder="Origen"
+                      oninput="updCSGuia('${s.id}',${pi},'origen',this.value)"
+                      style="width:100%;border:1px solid #dde;border-radius:5px;padding:5px 7px;font-size:11px;outline:none;font-family:inherit;box-sizing:border-box">
+                  </div>
+                  <div>
+                    <div style="font-size:9px;color:#888;margin-bottom:2px">KG NETOS</div>
+                    <input id="cs_guia_${pi}_kg_${s.id}" value="${p.kg||''}" placeholder="0"
+                      oninput="updCSGuia('${s.id}',${pi},'kg',this.value)"
+                      style="width:100%;border:1px solid #dde;border-radius:5px;padding:5px 7px;font-size:11px;outline:none;font-family:inherit;box-sizing:border-box">
+                  </div>
+                </div>
+              </div>`).join('')}
+              <button onclick="guardarEdicionGuias('${s.id}')" style="width:100%;padding:9px;background:#1565C0;color:white;border:none;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer">💾 Guardar cambios de guías</button>
+            </div>`;
+          })()}
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px">
             <div style="grid-column:1/-1">
               <div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">PRECIO NETO ($)</div>
