@@ -5,7 +5,7 @@
   <meta http-equiv="cache-control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="pragma" content="no-cache">
   <meta http-equiv="expires" content="1775758565">
-  <meta name="version" content="1775793626">
+  <meta name="version" content="1775793907">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <script>
 // Desregistrar cualquier Service Worker existente de forma inmediata
@@ -17,7 +17,7 @@ if ('serviceWorker' in navigator) {
 </script>
 <script>
 (function() {
-  var VERSION = '1775793626';
+  var VERSION = '1775793907';
   var stored = localStorage.getItem('gs_app_version');
   if (stored !== VERSION) {
     var session = localStorage.getItem('gs_session');
@@ -3309,11 +3309,12 @@ function _costoTabCopec(mes, anio, flota) {
     </div>
     ${desde||hasta?`<button onclick="uiState.copec_desde='';uiState.copec_hasta='';render()" style="padding:4px 8px;border-radius:5px;font-size:10px;cursor:pointer;border:1px solid #FFCDD2;background:#FFEBEE;color:#C62828;font-weight:700">✕ Limpiar</button>`:''}
   </div>
-  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:wrap;gap:6px">
     <div style="font-size:9px;font-weight:700;color:#888">${copecMes.length} registro${copecMes.length!==1?'s':''} — TOTAL: $${totalCopec.toLocaleString('es-CL')}</div>
-    <div style="display:flex;gap:4px">
+    <div style="display:flex;gap:4px;flex-wrap:wrap">
       <button onclick="uiState.copec_vista='fecha';render()" style="padding:4px 10px;border-radius:5px;font-size:10px;font-weight:700;cursor:pointer;border:1px solid #FFE082;background:${vistaMode==='fecha'?'#E65100':'white'};color:${vistaMode==='fecha'?'white':'#888'}">Por fecha</button>
       <button onclick="uiState.copec_vista='patente';render()" style="padding:4px 10px;border-radius:5px;font-size:10px;font-weight:700;cursor:pointer;border:1px solid #FFE082;background:${vistaMode==='patente'?'#E65100':'white'};color:${vistaMode==='patente'?'white':'#888'}">Por patente</button>
+      <button onclick="pdfCombustible()" style="padding:4px 10px;border-radius:5px;font-size:10px;font-weight:700;cursor:pointer;border:1px solid #B0BEC5;background:#ECEFF1;color:#37474F">🖨️ PDF</button>
     </div>
   </div>
   ${vistaMode==='patente' ? vistaPorPatente() : vistaPorFecha()}
@@ -5997,6 +5998,76 @@ function pdfListadoRegistros() {
     <p style="color:#888;font-size:10px">Período: ${periodoTxt} &nbsp;|&nbsp; Vista: ${modo==='todos'?'Todos los registros':'Por cliente'} &nbsp;|&nbsp; Total registros: ${todos.length}</p>
     ${body}
     <div class="total">TOTAL FACTURADO: ${fmtP(total)}</div>
+    <script>setTimeout(function(){window.print();},500);<\/script>
+  </body></html>`);
+  w.document.close();
+}
+
+function pdfCombustible() {
+  const desde = uiState.copec_desde || '';
+  const hasta  = uiState.copec_hasta || '';
+  const vistaMode = uiState.copec_vista || 'fecha';
+  const parseFDD = f => { if(!f)return null; const p=f.split('-'); return p[0].length===4?new Date(f):new Date(p[2],p[1]-1,p[0]); };
+  const hoy = new Date();
+  const mes  = String(hoy.getMonth()+1).padStart(2,'0');
+  const anio = String(hoy.getFullYear());
+  const copecMes = (appData.copec||[]).filter(c => {
+    if (desde || hasta) {
+      const fd = parseFDD(c.fecha); if(!fd) return false;
+      if (desde && fd < parseFDD(desde)) return false;
+      if (hasta && fd > parseFDD(hasta)) return false;
+      return true;
+    }
+    return c.mes===mes && c.anio===anio;
+  });
+  const totalCopec = copecMes.reduce((a,c)=>a+(c.monto||0),0);
+  const totalLitros = copecMes.reduce((a,c)=>a+(parseFloat(c.litros)||0),0);
+  const periodoTxt = desde||hasta
+    ? `${desde ? parseFDD(desde).toLocaleDateString('es-CL') : 'inicio'} al ${hasta ? parseFDD(hasta).toLocaleDateString('es-CL') : 'hoy'}`
+    : `${['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'][parseInt(mes)-1]} ${anio}`;
+
+  let body = '';
+  if (vistaMode === 'patente') {
+    const porPat = {};
+    copecMes.forEach(c => {
+      const k = c.patente || 'Sin patente';
+      if (!porPat[k]) porPat[k] = { monto:0, litros:0, regs:[] };
+      porPat[k].monto  += c.monto||0;
+      porPat[k].litros += parseFloat(c.litros)||0;
+      porPat[k].regs.push(c);
+    });
+    body = Object.entries(porPat).sort(([,a],[,b])=>b.monto-a.monto).map(([pat,data])=>`
+      <h3>${pat} — $${data.monto.toLocaleString('es-CL')} &nbsp;|&nbsp; ${data.litros.toFixed(0)}L &nbsp;|&nbsp; ${data.regs.length} carga${data.regs.length!==1?'s':''}</h3>
+      <table><thead><tr><th>Fecha</th><th>Litros</th><th>Monto</th><th>ID Transacción</th></tr></thead>
+      <tbody>${data.regs.slice().sort((a,b)=>(a.fecha||'').localeCompare(b.fecha||'')).map(c=>`
+        <tr><td>${c.fecha||'—'}</td><td>${c.litros||'—'}</td><td>$${(c.monto||0).toLocaleString('es-CL')}</td><td>${c.id_manual||'—'}</td></tr>`).join('')}
+      </tbody></table>`).join('');
+  } else {
+    const filas = copecMes.slice().sort((a,b)=>(a.fecha||'').localeCompare(b.fecha||'')).map(c=>
+      `<tr><td>${c.fecha||'—'}</td><td>${c.patente||'—'}</td><td>${c.litros||'—'}</td><td>$${(c.monto||0).toLocaleString('es-CL')}</td><td>${c.id_manual||'—'}</td></tr>`
+    ).join('');
+    body = `<table><thead><tr><th>Fecha</th><th>Patente</th><th>Litros</th><th>Monto</th><th>ID Transacción</th></tr></thead><tbody>${filas}</tbody></table>`;
+  }
+
+  const css = `body{font-family:Arial,sans-serif;font-size:10px;margin:20px;color:#222}
+    h1{font-size:16px;color:#E65100;margin-bottom:4px}h2{font-size:12px;color:#555;font-weight:400;margin:0 0 12px}
+    h3{font-size:11px;color:#E65100;margin:14px 0 4px;border-bottom:2px solid #FFE082;padding-bottom:4px;font-weight:800}
+    table{width:100%;border-collapse:collapse;margin-bottom:12px}
+    th{background:#FFF8E1;color:#E65100;font-size:9px;padding:5px 8px;text-align:left;border-bottom:2px solid #FFE082}
+    td{padding:4px 8px;border-bottom:1px solid #FFF9C4;font-size:9px}
+    tr:nth-child(even)td{background:#FFFDE7}
+    .totales{font-weight:700;font-size:11px;margin-top:14px;border-top:2px solid #E65100;padding-top:8px;display:flex;justify-content:space-between}
+    .no-print{margin-bottom:14px}@media print{.no-print{display:none}}`;
+  const w = window.open('','_blank');
+  w.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Informe Combustible</title><style>${css}</style></head><body>
+    <div class="no-print"><button onclick="window.print()" style="background:#E65100;color:white;border:none;border-radius:6px;padding:8px 20px;font-size:12px;font-weight:700;cursor:pointer">🖨️ Imprimir / Guardar PDF</button></div>
+    <h1>⛽ Informe de Combustible</h1>
+    <h2>Global Solutions SpA &nbsp;·&nbsp; Período: ${periodoTxt} &nbsp;·&nbsp; Vista: ${vistaMode==='patente'?'Por patente':'Por fecha'}</h2>
+    ${body}
+    <div class="totales">
+      <span>Total registros: ${copecMes.length} &nbsp;|&nbsp; Total litros: ${totalLitros.toFixed(0)}L</span>
+      <span>TOTAL: $${totalCopec.toLocaleString('es-CL')}</span>
+    </div>
     <script>setTimeout(function(){window.print();},500);<\/script>
   </body></html>`);
   w.document.close();
