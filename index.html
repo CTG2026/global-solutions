@@ -5,7 +5,7 @@
   <meta http-equiv="cache-control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="pragma" content="no-cache">
   <meta http-equiv="expires" content="1775758565">
-  <meta name="version" content="1775841285">
+  <meta name="version" content="1775843808">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <script>
 // Desregistrar cualquier Service Worker existente de forma inmediata
@@ -17,7 +17,7 @@ if ('serviceWorker' in navigator) {
 </script>
 <script>
 (function() {
-  var VERSION = '1775841285';
+  var VERSION = '1775843808';
   var stored = localStorage.getItem('gs_app_version');
   if (stored !== VERSION) {
     var session = localStorage.getItem('gs_session');
@@ -4258,7 +4258,7 @@ function renderLiquidacionesV2() {
   if(!appData.liquidaciones) appData.liquidaciones=[];
   const servicios=appData.servicios||[];
   const disponibles=servicios.filter(s=>{
-    if(!s.cerrado) return false;
+    if(!s.cerrado && s.estado!=='borrador') return false;
     if(!s.liquidacionId) return true;
     return !(appData.liquidaciones||[]).some(l=>l.id===s.liquidacionId);
   });
@@ -4297,9 +4297,10 @@ function renderLiquidacionesV2() {
       ${isOpen?`<div style="padding:6px 10px">
         ${svcs.map(s=>{
           const guias=(s.guias||s.puntos||[]).map(g=>g.num||g.guia).filter(Boolean).join(', ')||'—';
+          const borrBadge=(!s.cerrado&&s.estado==='borrador')?`<span style="font-size:9px;font-weight:700;padding:1px 5px;border-radius:4px;background:#FFF9C4;color:#F9A825;margin-left:4px">BORRADOR</span>`:'';
           return `<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid #f5f5f5">
             <input type="checkbox" ${seleccionados.includes(s.id)?'checked':''} onchange="toggleSrvLiq('${s.id}',this.checked)" style="cursor:pointer">
-            <div style="flex:1"><span style="font-size:11px;font-weight:700;color:#455A64">${s.id}</span>
+            <div style="flex:1"><span style="font-size:11px;font-weight:700;color:#455A64">${s.id}</span>${borrBadge}
               <span style="font-size:10px;color:#777;margin-left:4px">${s.fecha}</span><span style="font-size:10px;color:#1565C0;font-weight:700;margin-left:6px">GD: ${guias}</span></div>
             <span style="font-size:11px;font-weight:700;color:#546E7A">$${(s.precio||0).toLocaleString('es-CL')}</span>
           </div>`;
@@ -4399,13 +4400,20 @@ function renderLiquidacionesV2() {
         </div>
       </div>`;
     })():''}
+    <div style="margin-bottom:8px">
+      <div style="font-size:9px;font-weight:700;color:#888;margin-bottom:4px">TIPO DE LIQUIDACIÓN</div>
+      <div style="display:flex;gap:6px">
+        <button onclick="uiState.liq_tipo_nueva='oficial';render()" style="flex:1;padding:8px;background:${(uiState.liq_tipo_nueva||'oficial')==='oficial'?'#546E7A':'white'};color:${(uiState.liq_tipo_nueva||'oficial')==='oficial'?'white':'#546E7A'};border:1px solid #546E7A;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer">✅ Oficial</button>
+        <button onclick="uiState.liq_tipo_nueva='borrador';render()" style="flex:1;padding:8px;background:${uiState.liq_tipo_nueva==='borrador'?'#FFF9C4':'white'};color:${uiState.liq_tipo_nueva==='borrador'?'#F9A825':'#888'};border:1px solid ${uiState.liq_tipo_nueva==='borrador'?'#F9A825':'#dde'};border-radius:6px;font-size:11px;font-weight:700;cursor:pointer">📝 Borrador</button>
+      </div>
+    </div>
     <button onclick="crearLiquidacionV2()" style="width:100%;padding:10px;background:#546E7A;color:white;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer">💾 Crear ${nextNum}</button>
-    <button onclick="uiState.liq_sel=[];uiState.liq_preview=false;uiState.liq_ui_fecha='';uiState.liq_ui_email=undefined;render()" style="width:100%;padding:7px;background:transparent;color:#aaa;border:1px solid #eee;border-radius:7px;font-size:11px;cursor:pointer;margin-top:4px">Limpiar selección</button>
+    <button onclick="uiState.liq_sel=[];uiState.liq_preview=false;uiState.liq_ui_fecha='';uiState.liq_ui_email=undefined;uiState.liq_tipo_nueva=undefined;render()" style="width:100%;padding:7px;background:transparent;color:#aaa;border:1px solid #eee;border-radius:7px;font-size:11px;cursor:pointer;margin-top:4px">Limpiar selección</button>
   `:'';
 
-  const ESTADO_COLOR={creada:{bg:'#FFF9C4',text:'#F9A825',label:'⏳ Creada'},enviada:{bg:'#E3F2FD',text:'#1565C0',label:'📤 Enviada'},facturada:{bg:'#F3E5F5',text:'#6A1B9A',label:'🧾 Facturada'},pagada:{bg:'#E8F5E9',text:'#2E7D32',label:'✅ Pagada'}};
-  // Ordenar: pendiente pago primero, luego facturadas, luego pagadas
-  const ordenEstadoLiq = l => l.estado==='creada'?0:l.estado==='enviada'?1:l.estado==='facturada'?2:3;
+  const ESTADO_COLOR={borrador:{bg:'#F5F5F5',text:'#757575',label:'📝 Borrador'},creada:{bg:'#FFF9C4',text:'#F9A825',label:'⏳ Creada'},enviada:{bg:'#E3F2FD',text:'#1565C0',label:'📤 Enviada'},facturada:{bg:'#F3E5F5',text:'#6A1B9A',label:'🧾 Facturada'},pagada:{bg:'#E8F5E9',text:'#2E7D32',label:'✅ Pagada'}};
+  // Ordenar: borrador primero, luego creada, enviada, facturada, pagada
+  const ordenEstadoLiq = l => l.estado==='borrador'?0:l.estado==='creada'?1:l.estado==='enviada'?2:l.estado==='facturada'?3:4;
   const liqOrdenadas = appData.liquidaciones.slice().sort((a,b)=>ordenEstadoLiq(a)-ordenEstadoLiq(b));
   const histHTML=liqOrdenadas.length?`
     <div style="font-size:9px;font-weight:700;color:#888;letter-spacing:0.5px;margin:10px 0 6px">LIQUIDACIONES (${liqOrdenadas.length})</div>
@@ -4496,6 +4504,7 @@ function renderLiquidacionesV2() {
           </div>
           <!-- BOTONES -->
           <div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:6px">
+            ${liq.estado==='borrador'?`<button onclick="cambiarEstadoLiq('${liq.id}','creada')" style="flex:1;padding:8px;background:#FFF9C4;color:#F9A825;border:1px solid #F9A825;border-radius:7px;font-size:10px;font-weight:700;cursor:pointer">✅ Confirmar oficial</button>`:''}
             ${liq.estado==='creada'?`<button onclick="cambiarEstadoLiq('${liq.id}','enviada')" style="flex:1;padding:8px;background:#E3F2FD;color:#1565C0;border:1px solid #1565C0;border-radius:7px;font-size:10px;font-weight:700;cursor:pointer">📤 Marcar enviada</button>`:''}
             ${liq.estado==='enviada'?`<button onclick="cambiarEstadoLiq('${liq.id}','facturada')" style="flex:1;padding:8px;background:#F3E5F5;color:#6A1B9A;border:1px solid #6A1B9A;border-radius:7px;font-size:10px;font-weight:700;cursor:pointer">🧾 Marcar facturada</button>`:''}
             ${liq.estado==='facturada'?`<button onclick="cambiarEstadoLiq('${liq.id}','pagada')" style="flex:1;padding:8px;background:#E8F5E9;color:#2E7D32;border:1px solid #2E7D32;border-radius:7px;font-size:10px;font-weight:700;cursor:pointer">✅ Marcar pagada</button>`:''}
@@ -4524,9 +4533,16 @@ function renderLiquidacionesV2() {
                 <button onclick="agregarRutEditLiq('${liq.id}')" style="background:#607D8B;color:white;border:none;border-radius:6px;padding:6px 10px;font-size:11px;cursor:pointer">+ RUT</button>
               </div>
             </div>
+            <!-- SERVICIOS ACTUALES EN LA LIQUIDACIÓN -->
+            <div style="margin-bottom:8px">
+              <div style="font-size:9px;font-weight:700;color:#888;margin-bottom:4px">SERVICIOS EN ESTA LIQUIDACIÓN</div>
+              ${svcsLiq.length?svcsLiq.map(s=>{const guiasE=(s.guias||s.puntos||[]).map(g=>g.num||g.guia).filter(Boolean).join(', ')||'—';return `<div style="display:flex;align-items:center;gap:6px;padding:5px 0;border-bottom:1px solid #f5f5f5"><div style="flex:1"><span style="font-size:11px;font-weight:700;color:#455A64">${s.id}</span><span style="font-size:10px;color:#777;margin-left:4px">${s.fecha||''}</span><span style="font-size:10px;color:#1565C0;font-weight:700;margin-left:4px">GD:${guiasE}</span></div><span style="font-size:11px;font-weight:700;color:#2E7D32">$${(s.precio||0).toLocaleString('es-CL')}</span><span onclick="quitarSrvDeLiq('${liq.id}','${s.id}')" style="font-size:18px;color:#E53935;cursor:pointer;padding:0 6px;font-weight:700;line-height:1" title="Quitar de liquidación">×</span></div>`;}).join(''):'<div style="font-size:10px;color:#aaa;text-align:center;padding:6px">Sin servicios</div>'}
+            </div>
+            <!-- AGREGAR SERVICIOS DISPONIBLES -->
+            ${(()=>{const dispEdit=servicios.filter(s=>(s.cerrado||s.estado==='borrador')&&!liq.serviciosIds.includes(s.id)&&(!s.liquidacionId||s.liquidacionId===liq.id));const cl0=svcsLiq[0]?.cliente||'';const dispShow=cl0?dispEdit.filter(s=>(s.cliente||'')===cl0):dispEdit;if(!dispShow.length)return'<div style="font-size:10px;color:#aaa;text-align:center;padding:6px;margin-bottom:8px">Sin servicios disponibles para agregar</div>';return`<div style="margin-bottom:8px"><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:4px">AGREGAR SERVICIOS</div>${dispShow.map(s=>{const guiasA=(s.guias||s.puntos||[]).map(g=>g.num||g.guia).filter(Boolean).join(', ')||'—';const borrTagE=(!s.cerrado&&s.estado==='borrador')?'<span style="font-size:9px;background:#FFF9C4;color:#F9A825;padding:1px 4px;border-radius:3px;margin-left:3px">BORRDR</span>':'';return`<div style="display:flex;align-items:center;gap:6px;padding:5px 0;border-bottom:1px solid #f5f5f5"><div style="flex:1"><span style="font-size:11px;font-weight:700;color:#455A64">${s.id}</span>${borrTagE}<span style="font-size:10px;color:#777;margin-left:4px">${s.fecha||''}</span><span style="font-size:10px;color:#1565C0;font-weight:700;margin-left:4px">GD:${guiasA}</span></div><span style="font-size:11px;font-weight:700;color:#546E7A">$${(s.precio||0).toLocaleString('es-CL')}</span><button onclick="agregarSrvALiq('${liq.id}','${s.id}')" style="background:#E8F5E9;color:#2E7D32;border:1px solid #A5D6A7;border-radius:5px;padding:3px 8px;font-size:10px;cursor:pointer;font-weight:700;white-space:nowrap">+ Agregar</button></div>`;}).join('')}</div>`;})()}
             <div style="display:flex;gap:6px">
-              <button onclick="guardarEdicionLiq('${liq.id}')" style="flex:1;padding:9px;background:#E65100;color:white;border:none;border-radius:7px;font-size:11px;font-weight:700;cursor:pointer">✓ Guardar cambios</button>
-              <button onclick="uiState.liq_editId=null;render()" style="padding:9px 14px;background:#eee;color:#555;border:none;border-radius:7px;font-size:11px;cursor:pointer">Cancelar</button>
+              <button onclick="guardarEdicionLiq('${liq.id}')" style="flex:1;padding:9px;background:#E65100;color:white;border:none;border-radius:7px;font-size:11px;font-weight:700;cursor:pointer">✓ Guardar fecha/email/RUTs</button>
+              <button onclick="uiState.liq_editId=null;render()" style="padding:9px 14px;background:#eee;color:#555;border:none;border-radius:7px;font-size:11px;cursor:pointer">Cerrar</button>
             </div>
           </div>`:''}
         </div>`:''}
@@ -4545,10 +4561,10 @@ function renderLiquidacionesV2() {
 }
 
 function toggleSrvLiq(id,checked){if(!uiState.liq_sel)uiState.liq_sel=[];if(checked){if(!uiState.liq_sel.includes(id))uiState.liq_sel.push(id);}else{uiState.liq_sel=uiState.liq_sel.filter(x=>x!==id);}render();}
-function toggleTodosClienteLiq(cl,checked){if(!uiState.liq_sel)uiState.liq_sel=[];const svcs=(appData.servicios||[]).filter(s=>s.cliente===cl&&s.cerrado&&!s.liquidacionId);svcs.forEach(s=>{if(checked){if(!uiState.liq_sel.includes(s.id))uiState.liq_sel.push(s.id);}else{uiState.liq_sel=uiState.liq_sel.filter(x=>x!==s.id);}});render();}
+function toggleTodosClienteLiq(cl,checked){if(!uiState.liq_sel)uiState.liq_sel=[];const svcs=(appData.servicios||[]).filter(s=>s.cliente===cl&&(s.cerrado||s.estado==='borrador')&&!s.liquidacionId);svcs.forEach(s=>{if(checked){if(!uiState.liq_sel.includes(s.id))uiState.liq_sel.push(s.id);}else{uiState.liq_sel=uiState.liq_sel.filter(x=>x!==s.id);}});render();}
 function toggleRutLiq(rut,checked){if(!uiState.liq_ruts_sel)uiState.liq_ruts_sel=[];if(checked){if(!uiState.liq_ruts_sel.includes(rut))uiState.liq_ruts_sel.push(rut);}else{uiState.liq_ruts_sel=uiState.liq_ruts_sel.filter(r=>r!==rut);}render();}
 function agregarRutLiq(){const input=document.getElementById('liq_rut_nuevo');const rut=input?.value.trim();if(!rut)return;const cl=uiState.liq_cliente_sel||'';if(cl){if(!appData.clientesRut)appData.clientesRut={};if(!appData.clientesRut[cl])appData.clientesRut[cl]=[];if(!appData.clientesRut[cl].includes(rut)){appData.clientesRut[cl].push(rut);saveData();}}if(!uiState.liq_ruts_sel)uiState.liq_ruts_sel=[];if(!uiState.liq_ruts_sel.includes(rut))uiState.liq_ruts_sel.push(rut);input.value='';render();}
-function crearLiquidacionV2(){const sel=uiState.liq_sel||[];if(!sel.length)return alert('Selecciona al menos un servicio');const fecha=document.getElementById('liq_fecha_v2')?.value||new Date().toISOString().split('T')[0];const email=document.getElementById('liq_email_v2')?.value||'';const p=fecha.split('-');const fechaStr=`${p[2]}-${p[1]}-${p[0]}`;const ruts=uiState.liq_ruts_sel||[];const servicios=appData.servicios||[];const total=sel.reduce((a,id)=>{const s=servicios.find(sv=>sv.id===id);return a+(s?s.precio||0:0);},0);const id='LIQ-'+String(appData.liquidaciones.length+1).padStart(3,'0');appData.liquidaciones.push({id,fecha:fechaStr,email,serviciosIds:[...sel],total,estado:'creada',nFactura:'',ruts});sel.forEach(sid=>{const s=servicios.find(sv=>sv.id===sid);if(s){s.liquidacionId=id;upsertServicioSupabase(s);}});uiState.liq_sel=[];uiState.liq_ruts_sel=[];uiState.liq_preview=false;uiState.liq_ui_fecha='';uiState.liq_ui_email=undefined;saveData();pushLiquidacionesSupabase();render();alert('✅ '+id+' creada — Total: $'+total.toLocaleString('es-CL'));}
+function crearLiquidacionV2(){const sel=uiState.liq_sel||[];if(!sel.length)return alert('Selecciona al menos un servicio');const tipo=uiState.liq_tipo_nueva||'oficial';const estadoInicial=tipo==='borrador'?'borrador':'creada';const fecha=document.getElementById('liq_fecha_v2')?.value||new Date().toISOString().split('T')[0];const email=document.getElementById('liq_email_v2')?.value||'';const p=fecha.split('-');const fechaStr=`${p[2]}-${p[1]}-${p[0]}`;const ruts=uiState.liq_ruts_sel||[];const servicios=appData.servicios||[];const total=sel.reduce((a,id)=>{const s=servicios.find(sv=>sv.id===id);return a+(s?s.precio||0:0);},0);const id='LIQ-'+String(appData.liquidaciones.length+1).padStart(3,'0');appData.liquidaciones.push({id,fecha:fechaStr,email,serviciosIds:[...sel],total,estado:estadoInicial,nFactura:'',ruts});sel.forEach(sid=>{const s=servicios.find(sv=>sv.id===sid);if(s){s.liquidacionId=id;upsertServicioSupabase(s);}});uiState.liq_sel=[];uiState.liq_ruts_sel=[];uiState.liq_preview=false;uiState.liq_ui_fecha='';uiState.liq_ui_email=undefined;uiState.liq_tipo_nueva=undefined;saveData();pushLiquidacionesSupabase();render();alert('✅ '+id+' creada — Total: $'+total.toLocaleString('es-CL'));}
 function cambiarEstadoLiq(liqId,estado){const liq=(appData.liquidaciones||[]).find(l=>l.id===liqId);if(!liq)return;liq.estado=estado;saveData();pushLiquidacionesSupabase();render();}
 function guardarObsLiq(liqId) {
   const liq = (appData.liquidaciones||[]).find(l=>l.id===liqId);
@@ -4588,6 +4604,28 @@ function eliminarRutEditLiq(liqId, ri) {
   if (!liq || !liq.ruts) return;
   liq.ruts.splice(ri, 1);
   render();
+}
+function quitarSrvDeLiq(liqId, svcId) {
+  if(!confirm('¿Quitar el servicio '+svcId+' de esta liquidación?')) return;
+  const liq=(appData.liquidaciones||[]).find(l=>l.id===liqId);
+  if(!liq) return;
+  liq.serviciosIds=liq.serviciosIds.filter(id=>id!==svcId);
+  liq.total=(appData.servicios||[]).filter(s=>liq.serviciosIds.includes(s.id)).reduce((a,s)=>a+(s.precio||0),0);
+  const svc=(appData.servicios||[]).find(s=>s.id===svcId);
+  if(svc&&svc.liquidacionId===liqId){delete svc.liquidacionId;upsertServicioSupabase(svc);}
+  saveData();pushLiquidacionesSupabase();render();
+  showToastGeneral('✅ Servicio quitado de la liquidación','#607D8B');
+}
+function agregarSrvALiq(liqId, svcId) {
+  const liq=(appData.liquidaciones||[]).find(l=>l.id===liqId);
+  if(!liq) return;
+  if(liq.serviciosIds.includes(svcId)) return;
+  liq.serviciosIds.push(svcId);
+  liq.total=(appData.servicios||[]).filter(s=>liq.serviciosIds.includes(s.id)).reduce((a,s)=>a+(s.precio||0),0);
+  const svc=(appData.servicios||[]).find(s=>s.id===svcId);
+  if(svc){svc.liquidacionId=liqId;upsertServicioSupabase(svc);}
+  saveData();pushLiquidacionesSupabase();render();
+  showToastGeneral('✅ Servicio agregado a la liquidación','#2E7D32');
 }
 function eliminarLiquidacion(liqId) {
   const liq = (appData.liquidaciones||[]).find(l=>l.id===liqId);
