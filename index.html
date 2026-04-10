@@ -5,7 +5,7 @@
   <meta http-equiv="cache-control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="pragma" content="no-cache">
   <meta http-equiv="expires" content="1775758565">
-  <meta name="version" content="1775792630">
+  <meta name="version" content="1775793256">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <script>
 // Desregistrar cualquier Service Worker existente de forma inmediata
@@ -17,7 +17,7 @@ if ('serviceWorker' in navigator) {
 </script>
 <script>
 (function() {
-  var VERSION = '1775792630';
+  var VERSION = '1775793256';
   var stored = localStorage.getItem('gs_app_version');
   if (stored !== VERSION) {
     var session = localStorage.getItem('gs_session');
@@ -3174,10 +3174,86 @@ function imprimirLiquidacionRem(empId, remMes, remAnio) {
 function _costoTabCopec(mes, anio, flota) {
   const f = uiState.copecForm || {};
   const apiKey = appData.config && appData.config.anthropicApiKey;
-  const copecMes = (appData.copec||[]).filter(c=>c.mes===mes&&c.anio===anio);
+
+  // Filtro de período
+  const desde  = uiState.copec_desde || '';
+  const hasta  = uiState.copec_hasta || '';
+  const parseFDD = f => { if(!f)return null; const p=f.split('-'); return p[0].length===4?new Date(f):new Date(p[2],p[1]-1,p[0]); };
+  const todoCopec = appData.copec || [];
+  const copecFiltrado = todoCopec.filter(c => {
+    if (desde || hasta) {
+      const fd = parseFDD(c.fecha); if(!fd) return false;
+      if (desde && fd < parseFDD(desde)) return false;
+      if (hasta && fd > parseFDD(hasta)) return false;
+      return true;
+    }
+    return c.mes===mes && c.anio===anio;
+  });
+  const copecMes = copecFiltrado;
   const totalCopec = copecMes.reduce((a,c)=>a+c.monto,0);
+  const vistaMode = uiState.copec_vista || 'fecha';
+
   const inpStyle = 'width:100%;padding:7px;border:1px solid #dde;border-radius:6px;font-size:12px;box-sizing:border-box';
+  const inpDate  = 'border:1px solid #CFD8DC;border-radius:5px;padding:4px 7px;font-size:11px;font-family:inherit;outline:none;background:white';
   const eqOpts = `<option value="">— Seleccionar —</option><optgroup label="Camiones">${flota.camiones.map(p=>`<option value="${p}" ${f.patente===p?'selected':''}>${p}</option>`).join('')}</optgroup><optgroup label="Camionetas">${flota.camionetas.map(p=>`<option value="${p}" ${f.patente===p?'selected':''}>${p}</option>`).join('')}</optgroup>`;
+
+  // Vista por patente
+  const vistaPorPatente = () => {
+    const porPat = {};
+    copecMes.forEach(c => {
+      const k = c.patente || 'Sin patente';
+      if (!porPat[k]) porPat[k] = { monto:0, litros:0, regs:[] };
+      porPat[k].monto  += c.monto||0;
+      porPat[k].litros += parseFloat(c.litros)||0;
+      porPat[k].regs.push(c);
+    });
+    if (!Object.keys(porPat).length) return '<div style="text-align:center;color:#aaa;font-size:11px;padding:12px">Sin registros en el período</div>';
+    return Object.entries(porPat).sort(([,a],[,b])=>b.monto-a.monto).map(([pat,data])=>{
+      const isOpen = !!uiState['copec_pat_'+pat];
+      return `<div style="border:1px solid #FFE082;border-radius:8px;margin-bottom:6px;overflow:hidden">
+        <div onclick="uiState['copec_pat_${pat}']=!uiState['copec_pat_${pat}'];render()" style="display:flex;justify-content:space-between;align-items:center;padding:9px 12px;background:#FFF8E1;cursor:pointer">
+          <div>
+            <div style="font-size:12px;font-weight:800;color:#E65100">${pat}</div>
+            <div style="font-size:10px;color:#888">${data.regs.length} carga${data.regs.length!==1?'s':''} · ${data.litros.toFixed(0)}L</div>
+          </div>
+          <div style="text-align:right">
+            <div style="font-size:14px;font-weight:900;color:#E65100">$${data.monto.toLocaleString('es-CL')}</div>
+            <div style="font-size:9px;color:#aaa">${isOpen?'▲ ocultar':'▼ ver detalle'}</div>
+          </div>
+        </div>
+        ${isOpen ? data.regs.slice().reverse().map(c=>`
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:7px 12px;border-top:1px solid #FFE082;background:white">
+          <div>
+            <div style="font-size:10px;color:#555">${c.fecha}${c.litros?' · '+c.litros+'L':''}</div>
+            <div style="font-size:9px;color:#aaa">${c.id_manual?'ID: '+c.id_manual:''}</div>
+          </div>
+          <div style="display:flex;align-items:center;gap:6px">
+            <span style="font-size:12px;font-weight:700;color:#E65100">$${c.monto.toLocaleString('es-CL')}</span>
+            <button onclick="eliminarCopec('${c.id}')" style="font-size:10px;padding:3px 7px;background:#FFEBEE;color:#C62828;border:1px solid #FFCDD2;border-radius:5px;cursor:pointer">🗑️</button>
+          </div>
+        </div>`).join('') : ''}
+      </div>`;
+    }).join('');
+  };
+
+  // Vista por fecha (original)
+  const vistaPorFecha = () => copecMes.length
+    ? copecMes.slice().reverse().map(c=>`
+  <div style="background:white;border:1px solid #FFE082;border-radius:8px;padding:8px 10px;margin-bottom:5px;display:flex;justify-content:space-between;align-items:center">
+    <div>
+      <div style="font-size:11px;font-weight:700;color:#E65100">${c.patente}</div>
+      <div style="font-size:10px;color:#888">${c.fecha}${c.litros?' · '+c.litros+'L':''}</div>
+      <div style="font-size:10px;color:#aaa">${c.id_manual?'ID: '+c.id_manual+' ':''}
+        <span onclick="editarCopecId('${c.id}')" style="color:#1565C0;cursor:pointer;text-decoration:underline">${c.id_manual?'editar':'+ ID transacción'}</span>
+      </div>
+    </div>
+    <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">
+      <div style="font-size:13px;font-weight:900;color:#E65100">$${c.monto.toLocaleString('es-CL')}</div>
+      <button onclick="eliminarCopec('${c.id}')" style="font-size:10px;padding:3px 8px;background:#FFEBEE;color:#C62828;border:1px solid #FFCDD2;border-radius:5px;cursor:pointer">🗑️</button>
+    </div>
+  </div>`).join('')
+    : '<div style="text-align:center;color:#aaa;font-size:11px;padding:12px">Sin registros en el período</div>';
+
   return `
   <div style="background:#FFF8E1;border:1px solid #FFE082;border-radius:10px;padding:10px;margin-bottom:10px">
     ${!apiKey?`<div style="font-size:10px;color:#E65100;font-weight:700;margin-bottom:8px">⚠️ Lectura automática requiere API key — agrégala en Configuración</div>`:''}
@@ -3219,24 +3295,29 @@ function _costoTabCopec(mes, anio, flota) {
     </div>
     <button onclick="agregarCopec()" style="width:100%;padding:10px;background:#E65100;color:white;border:none;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer">✓ Registrar combustible</button>
   </div>
-  ${copecMes.length?`
-  <div style="font-size:9px;font-weight:700;color:#888;margin-bottom:6px">COMBUSTIBLE DEL MES — $${totalCopec.toLocaleString('es-CL')}</div>
-  ${copecMes.slice().reverse().map(c=>`
-  <div style="background:white;border:1px solid #FFE082;border-radius:8px;padding:8px 10px;margin-bottom:5px;display:flex;justify-content:space-between;align-items:center">
-    <div>
-      <div style="font-size:11px;font-weight:700;color:#E65100">${c.patente}</div>
-      <div style="font-size:10px;color:#888">${c.fecha}${c.litros?' · '+c.litros+'L':''}</div>
-      <div style="font-size:10px;color:#aaa">${c.id_manual?'ID: '+c.id_manual+' ':''}
-        <span onclick="editarCopecId('${c.id}')" style="color:#1565C0;cursor:pointer;text-decoration:underline">${c.id_manual?'editar':'+ ID transacción'}</span>
-      </div>
+
+  <!-- FILTROS Y VISTA -->
+  <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap;background:#FFF3E0;border-radius:8px;padding:8px 10px">
+    <div style="font-size:10px;font-weight:700;color:#E65100">PERÍODO:</div>
+    <div style="display:flex;align-items:center;gap:5px">
+      <span style="font-size:10px;color:#888">Desde</span>
+      <input type="date" value="${desde}" onchange="uiState.copec_desde=this.value;render()" style="${inpDate}">
     </div>
-    <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">
-      <div style="font-size:13px;font-weight:900;color:#E65100">$${c.monto.toLocaleString('es-CL')}</div>
-      <button onclick="eliminarCopec('${c.id}')" style="font-size:10px;padding:3px 8px;background:#FFEBEE;color:#C62828;border:1px solid #FFCDD2;border-radius:5px;cursor:pointer">🗑️</button>
+    <div style="display:flex;align-items:center;gap:5px">
+      <span style="font-size:10px;color:#888">Hasta</span>
+      <input type="date" value="${hasta}" onchange="uiState.copec_hasta=this.value;render()" style="${inpDate}">
     </div>
-  </div>`).join('')}`
-  :'<div style="text-align:center;color:#aaa;font-size:11px;padding:12px">Sin registros de combustible este mes</div>'}`;
-}
+    ${desde||hasta?`<button onclick="uiState.copec_desde='';uiState.copec_hasta='';render()" style="padding:4px 8px;border-radius:5px;font-size:10px;cursor:pointer;border:1px solid #FFCDD2;background:#FFEBEE;color:#C62828;font-weight:700">✕ Limpiar</button>`:''}
+  </div>
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+    <div style="font-size:9px;font-weight:700;color:#888">${copecMes.length} registro${copecMes.length!==1?'s':''} — TOTAL: $${totalCopec.toLocaleString('es-CL')}</div>
+    <div style="display:flex;gap:4px">
+      <button onclick="uiState.copec_vista='fecha';render()" style="padding:4px 10px;border-radius:5px;font-size:10px;font-weight:700;cursor:pointer;border:1px solid #FFE082;background:${vistaMode==='fecha'?'#E65100':'white'};color:${vistaMode==='fecha'?'white':'#888'}">Por fecha</button>
+      <button onclick="uiState.copec_vista='patente';render()" style="padding:4px 10px;border-radius:5px;font-size:10px;font-weight:700;cursor:pointer;border:1px solid #FFE082;background:${vistaMode==='patente'?'#E65100':'white'};color:${vistaMode==='patente'?'white':'#888'}">Por patente</button>
+    </div>
+  </div>
+  ${vistaMode==='patente' ? vistaPorPatente() : vistaPorFecha()}
+  `;
 
 // ─── CARTOLA SUPABASE ─────────────────────────────────────────────────────────
 // SQL (ejecutar en Supabase si la tabla no existe):
