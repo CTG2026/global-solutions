@@ -5,7 +5,7 @@
   <meta http-equiv="cache-control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="pragma" content="no-cache">
   <meta http-equiv="expires" content="1775758565">
-  <meta name="version" content="1775828078">
+  <meta name="version" content="1775831573">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <script>
 // Desregistrar cualquier Service Worker existente de forma inmediata
@@ -17,7 +17,7 @@ if ('serviceWorker' in navigator) {
 </script>
 <script>
 (function() {
-  var VERSION = '1775828078';
+  var VERSION = '1775831573';
   var stored = localStorage.getItem('gs_app_version');
   if (stored !== VERSION) {
     var session = localStorage.getItem('gs_session');
@@ -1286,15 +1286,25 @@ function renderCierreServicios() {
   const todosServicios=(appData.servicios||[]).slice().sort((a,b)=>{
     const eo = estadoOrden(a) - estadoOrden(b);
     if (eo !== 0) return eo;
-    try{const fa=(a.fecha||'').split('-').reverse().join('');const fb=(b.fecha||'').split('-').reverse().join('');return fa.localeCompare(fb);}catch(e){return 0;}
+    try{const fa=(a.fecha||'').split('-').reverse().join('');const fb=(b.fecha||'').split('-').reverse().join('');return fb.localeCompare(fa);}catch(e){return 0;}
   });
-  const servicios = todosServicios;
+  const clientesCierre = [...new Set(todosServicios.map(s=>(s.cliente||'').trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'es'));
+  const filtroCliente  = uiState.cs_filtro_cliente || '';
+  const servicios = filtroCliente ? todosServicios.filter(s=>(s.cliente||'').trim()===filtroCliente) : todosServicios;
   const sinCerrar = servicios.filter(s=>!s.cerrado).length;
   const cfPorServ = todosServicios.length > 0 ? Math.round(CF_MES / todosServicios.length) : 0;
   return `<div style="padding:2px">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-      <div style="font-size:9px;font-weight:700;color:#546E7A;letter-spacing:0.5px">${sinCerrar} PENDIENTES · ${servicios.length - sinCerrar} CERRADOS</div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:wrap;gap:6px">
+      <div style="font-size:9px;font-weight:700;color:#546E7A;letter-spacing:0.5px">${sinCerrar} PENDIENTES · ${servicios.length - sinCerrar} CERRADOS${filtroCliente?' (filtrado)':''}</div>
       <div style="font-size:9px;color:#888">CF/servicio: $${cfPorServ.toLocaleString('es-CL')}</div>
+    </div>
+    <div style="display:flex;align-items:center;gap:6px;margin-bottom:10px;flex-wrap:wrap">
+      <div style="font-size:9px;font-weight:700;color:#546E7A">CLIENTE:</div>
+      <select onchange="uiState.cs_filtro_cliente=this.value;render()" style="border:1px solid #CFD8DC;border-radius:6px;padding:4px 8px;font-size:11px;font-family:inherit;outline:none;background:white;flex:1;min-width:140px">
+        <option value="">— Todos —</option>
+        ${clientesCierre.map(c=>`<option value="${c}" ${filtroCliente===c?'selected':''}>${c}</option>`).join('')}
+      </select>
+      ${filtroCliente?`<button onclick="uiState.cs_filtro_cliente='';render()" style="padding:4px 8px;border-radius:5px;font-size:10px;cursor:pointer;border:1px solid #FFCDD2;background:#FFEBEE;color:#C62828;font-weight:700">✕ Limpiar</button>`:''}
     </div>
     ${servicios.map(s=>{
       const isOpen=!!uiState['cs_'+s.id];
@@ -7406,10 +7416,12 @@ function renderFase(fase) {
           const serviciosOrdenados = servicios.slice().sort((a,b)=>{
             const fa=(a.fecha||'').split('-').reverse().join('');
             const fb=(b.fecha||'').split('-').reverse().join('');
-            return fa.localeCompare(fb);
+            return fb.localeCompare(fa); // más reciente primero
           });
+          const clientesOper = [...new Set(serviciosOrdenados.map(s=>(s.cliente||'').trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'es'));
+          const filtroClienteOper = uiState.srv_filtro_cliente || '';
           // Solo mostrar servicios NO cerrados en módulo Operacional
-          const serviciosPendientes = serviciosOrdenados.filter(s=>!s.cerrado);
+          const serviciosPendientes = serviciosOrdenados.filter(s=>!s.cerrado && (!filtroClienteOper||(s.cliente||'').trim()===filtroClienteOper));
           const serviciosMes = serviciosPendientes.filter(s=>s.mes===hoyMes&&s.anio===hoyAnio);
           const ultimos5 = verTodos ? serviciosPendientes : serviciosMes;
           const lista=ultimos5.length?ultimos5.map((s)=>{const idxReal=servicios.indexOf(s);const isExpanded=!!uiState['srv_exp_'+s.id];const expandKey='srv_exp_'+s.id;const isEditing=uiState.editando_srv_id===s.id;return '<div style="border-radius:8px;margin-bottom:4px;border:1px solid '+(isEditing?'#7E57C2':isExpanded?'#C7D2FE':'#e8eaec')+'">'+(isEditing?renderEditarServicio(s.id):('<div onclick="uiState[\'' +expandKey+ '\']=!uiState[\'' +expandKey+ '\'];render()" style="cursor:pointer;background:'+(isExpanded?'#EEF2FF':'white')+';border-radius:8px">'+srvVista(s)+'</div>'+(isExpanded?`<div style="padding:8px 12px;border-top:1px solid #eee;background:#f8f9fa">${srvDetalle(s)}<div style="display:flex;gap:6px;margin-top:8px"><button onclick="event.stopPropagation();editarServicio('${s.id}')" style="flex:1;background:#455A64;color:white;border:none;border-radius:6px;padding:8px;font-size:11px;font-weight:700;cursor:pointer">✎ Editar servicio</button><button onclick="event.stopPropagation();delServicio(${idxReal})" style="background:#FFEBEE;color:#C62828;border:1px solid #FFCDD2;border-radius:6px;padding:8px 12px;font-size:11px;cursor:pointer;font-weight:700">× Eliminar</button></div></div>`:'')))+'</div>';}).join(''):'<div style="font-size:11px;color:#bbb;padding:6px 0;text-align:center">Sin servicios registrados aún</div>';
@@ -7425,7 +7437,15 @@ function renderFase(fase) {
             +buildGuiasRegistroHTML()
             +'<div style="margin-bottom:12px"><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">PEAJES ($)</div><input id="srv_peajes" type="number" value="'+sfPeajes+'" placeholder="ej: 8000" oninput="if(!uiState.srvForm)uiState.srvForm={};uiState.srvForm.peajes=this.value" style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit"></div>'
             +'<button onclick="addServicio()" style="width:100%;background:#455A64;color:white;border:none;border-radius:8px;padding:16px;font-size:15px;cursor:pointer;font-weight:700;min-height:54px;-webkit-tap-highlight-color:transparent;touch-action:manipulation">+ Registrar servicio</button>'
-            +(serviciosPendientes.length?'<div style="margin-top:12px"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px"><div style="font-size:10px;font-weight:700;color:#607D8B;letter-spacing:1px">SERVICIOS PENDIENTES DE CERRAR ('+serviciosPendientes.length+')</div><span onclick="uiState.srv_ver_todos=!uiState.srv_ver_todos;render()" style="font-size:9px;color:#1565C0;cursor:pointer;text-decoration:underline">'+(verTodos?'Ver mes actual':'Ver todos')+'</span></div>'+lista+'</div>':'<div style="margin-top:6px">'+lista+'</div>')
+            +'<div style="display:flex;align-items:center;gap:6px;margin-top:12px;margin-bottom:8px;flex-wrap:wrap">'
+            +'<div style="font-size:9px;font-weight:700;color:#607D8B">CLIENTE:</div>'
+            +'<select onchange="uiState.srv_filtro_cliente=this.value;render()" style="border:1px solid #CFD8DC;border-radius:6px;padding:4px 8px;font-size:11px;font-family:inherit;outline:none;background:white;flex:1;min-width:140px">'
+            +'<option value="">— Todos —</option>'
+            +clientesOper.map(c=>'<option value="'+c+'" '+(filtroClienteOper===c?'selected':'')+'>'+c+'</option>').join('')
+            +'</select>'
+            +(filtroClienteOper?'<button onclick="uiState.srv_filtro_cliente=\'\';render()" style="padding:4px 8px;border-radius:5px;font-size:10px;cursor:pointer;border:1px solid #FFCDD2;background:#FFEBEE;color:#C62828;font-weight:700">✕ Limpiar</button>':'')
+            +'</div>'
+            +(serviciosPendientes.length?'<div style="margin-top:4px"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px"><div style="font-size:10px;font-weight:700;color:#607D8B;letter-spacing:1px">SERVICIOS PENDIENTES DE CERRAR ('+serviciosPendientes.length+')</div><span onclick="uiState.srv_ver_todos=!uiState.srv_ver_todos;render()" style="font-size:9px;color:#1565C0;cursor:pointer;text-decoration:underline">'+(verTodos?'Ver mes actual':'Ver todos')+'</span></div>'+lista+'</div>':'<div style="margin-top:6px">'+lista+'</div>')
             +renderListadoRegistros(serviciosOrdenados)
             +'</div>';
         })(); return '<div style="margin:-4px">'+serviciosBlock+'</div>'; })() : ''}
