@@ -5,7 +5,7 @@
   <meta http-equiv="cache-control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="pragma" content="no-cache">
   <meta http-equiv="expires" content="1775758565">
-  <meta name="version" content="1775779896">
+  <meta name="version" content="1775792630">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <script>
 // Desregistrar cualquier Service Worker existente de forma inmediata
@@ -17,7 +17,7 @@ if ('serviceWorker' in navigator) {
 </script>
 <script>
 (function() {
-  var VERSION = '1775779896';
+  var VERSION = '1775792630';
   var stored = localStorage.getItem('gs_app_version');
   if (stored !== VERSION) {
     var session = localStorage.getItem('gs_session');
@@ -3894,8 +3894,29 @@ function renderCostos() {
   const mes = String(hoy.getMonth()+1).padStart(2,'0');
   const anio = String(hoy.getFullYear());
   const flota = getFlota();
-  const tabs = [['manual','🔧 Mantención'],['copec','⛽ Combustible'],['cartola','🏦 Cartola'],['historial','📋 Historial'],['remuneraciones','👥 Remuneraciones']];
-  const nav = `<div style="display:flex;gap:4px;margin-bottom:10px;overflow-x:auto">${tabs.map(([id,lbl])=>`<button onclick="uiState.costoTab='${id}';render()" style="padding:7px 12px;border-radius:7px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;flex-shrink:0;${tab===id?'background:#1565C0;color:white;border:none':'background:#F5F5F5;color:#555;border:1px solid #dde'}">${lbl}</button>`).join('')}</div>`;
+
+  // Totales del mes para cada tab
+  const tMantencion   = (appData.costos||[]).filter(c=>c.mes===mes&&c.anio===anio).reduce((a,c)=>a+(c.total||0),0);
+  const tCombustible  = (appData.copec||[]).filter(c=>c.mes===mes&&c.anio===anio).reduce((a,c)=>a+(c.monto||0),0);
+  const tCartola      = (appData.cartola||[]).filter(c=>c.mes===mes&&c.anio===anio).reduce((a,c)=>a+(c.egreso||0),0);
+  const tHistorial    = tMantencion + tCombustible;
+  const tRemuneraciones = (appData.remuneraciones||[]).reduce((a,emp)=>{
+    const liq=(emp.liquidaciones||[]).find(l=>l.mes===mes&&l.anio===anio);
+    return a+(liq?liq.liquidoAPagar||0:0);
+  },0);
+  const fmt = v => v ? '$'+v.toLocaleString('es-CL') : '—';
+
+  const tabs = [
+    ['manual',        '🔧 Mantención',      tMantencion],
+    ['copec',         '⛽ Combustible',      tCombustible],
+    ['cartola',       '🏦 Cartola',          tCartola],
+    ['historial',     '📋 Historial',        tHistorial],
+    ['remuneraciones','👥 Remuneraciones',   tRemuneraciones],
+  ];
+  const nav = `<div style="display:flex;gap:4px;margin-bottom:10px;overflow-x:auto">${tabs.map(([id,lbl,tot])=>`<button onclick="uiState.costoTab='${id}';render()" style="padding:6px 12px;border-radius:7px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;flex-shrink:0;text-align:center;${tab===id?'background:#1565C0;color:white;border:none':'background:#F5F5F5;color:#555;border:1px solid #dde'}">
+    <div>${lbl}</div>
+    <div style="font-size:10px;font-weight:900;margin-top:2px;color:${tab===id?'rgba(255,255,255,0.9)':'#C62828'}">${fmt(tot)}</div>
+  </button>`).join('')}</div>`;
   let body = '';
   if (tab==='manual') body = _costoTabManual(mes, anio, flota);
   else if (tab==='copec') body = _costoTabCopec(mes, anio, flota);
