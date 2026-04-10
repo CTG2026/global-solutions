@@ -5,7 +5,7 @@
   <meta http-equiv="cache-control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="pragma" content="no-cache">
   <meta http-equiv="expires" content="1775758565">
-  <meta name="version" content="1775823173">
+  <meta name="version" content="1775823854">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <script>
 // Desregistrar cualquier Service Worker existente de forma inmediata
@@ -17,7 +17,7 @@ if ('serviceWorker' in navigator) {
 </script>
 <script>
 (function() {
-  var VERSION = '1775823173';
+  var VERSION = '1775823854';
   var stored = localStorage.getItem('gs_app_version');
   if (stored !== VERSION) {
     var session = localStorage.getItem('gs_session');
@@ -5943,7 +5943,6 @@ function renderListadoRegistros(serviciosOrdenados) {
     </div>
     <div style="font-size:10px;color:#888;margin-bottom:6px">${svcsFiltered.length} registro${svcsFiltered.length!==1?'s':''} ${desde||hasta?'en el período':'en total'}</div>
     ${cuerpo}
-    ${renderRendimientoKm()}
   </div>`;
 }
 
@@ -7119,6 +7118,7 @@ function renderFase(fase) {
             +'<button onclick="addServicio()" style="width:100%;background:#455A64;color:white;border:none;border-radius:8px;padding:16px;font-size:15px;cursor:pointer;font-weight:700;min-height:54px;-webkit-tap-highlight-color:transparent;touch-action:manipulation">+ Registrar servicio</button>'
             +(serviciosPendientes.length?'<div style="margin-top:12px"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px"><div style="font-size:10px;font-weight:700;color:#607D8B;letter-spacing:1px">SERVICIOS PENDIENTES DE CERRAR ('+serviciosPendientes.length+')</div><span onclick="uiState.srv_ver_todos=!uiState.srv_ver_todos;render()" style="font-size:9px;color:#1565C0;cursor:pointer;text-decoration:underline">'+(verTodos?'Ver mes actual':'Ver todos')+'</span></div>'+lista+'</div>':'<div style="margin-top:6px">'+lista+'</div>')
             +renderListadoRegistros(serviciosOrdenados)
+            +renderRendimientoKm()
             +'</div>';
         })(); return '<div style="margin:-4px">'+serviciosBlock+'</div>'; })() : ''}
         ${tarea.cierreServicioTask ? `<div style="margin:-4px">${renderCierreServicios()}</div>` : ''}
