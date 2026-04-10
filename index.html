@@ -5,7 +5,7 @@
   <meta http-equiv="cache-control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="pragma" content="no-cache">
   <meta http-equiv="expires" content="1775758565">
-  <meta name="version" content="1775831573">
+  <meta name="version" content="1775832784">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <script>
 // Desregistrar cualquier Service Worker existente de forma inmediata
@@ -17,7 +17,7 @@ if ('serviceWorker' in navigator) {
 </script>
 <script>
 (function() {
-  var VERSION = '1775831573';
+  var VERSION = '1775832784';
   var stored = localStorage.getItem('gs_app_version');
   if (stored !== VERSION) {
     var session = localStorage.getItem('gs_session');
@@ -1283,10 +1283,11 @@ function _csVal(s, campo, fallback) {
 function renderCierreServicios() {
   const CF_MES = (appData.config && appData.config.costosFijosMes) || 5080000;
   const estadoOrden = s => s.cerrado ? 2 : s.precio ? 1 : 0;
+  const _fKeyC = f => { if(!f) return ''; const p=f.split('-'); return p[0].length===4?f:p[2]+'-'+p[1]+'-'+p[0]; };
   const todosServicios=(appData.servicios||[]).slice().sort((a,b)=>{
     const eo = estadoOrden(a) - estadoOrden(b);
     if (eo !== 0) return eo;
-    try{const fa=(a.fecha||'').split('-').reverse().join('');const fb=(b.fecha||'').split('-').reverse().join('');return fb.localeCompare(fa);}catch(e){return 0;}
+    return _fKeyC(b.fecha||'').localeCompare(_fKeyC(a.fecha||'')); // más reciente primero
   });
   const clientesCierre = [...new Set(todosServicios.map(s=>(s.cliente||'').trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'es'));
   const filtroCliente  = uiState.cs_filtro_cliente || '';
@@ -7412,12 +7413,10 @@ function renderFase(fase) {
           const hoyMes=(()=>{const h=new Date();return String(h.getMonth()+1).padStart(2,'0');})();
           const hoyAnio=new Date().getFullYear().toString();
           const verTodos=!!uiState.srv_ver_todos;
-          // Ordenar todos los servicios por fecha del servicio (dd-mm-yyyy) descendente
-          const serviciosOrdenados = servicios.slice().sort((a,b)=>{
-            const fa=(a.fecha||'').split('-').reverse().join('');
-            const fb=(b.fecha||'').split('-').reverse().join('');
-            return fb.localeCompare(fa); // más reciente primero
-          });
+          // Normaliza DD-MM-YYYY o YYYY-MM-DD a YYYY-MM-DD para comparación correcta
+          const _fKey = f => { if(!f) return ''; const p=f.split('-'); return p[0].length===4?f:p[2]+'-'+p[1]+'-'+p[0]; };
+          // Ordenar por fecha descendente (más reciente primero)
+          const serviciosOrdenados = servicios.slice().sort((a,b)=>_fKey(b.fecha||'').localeCompare(_fKey(a.fecha||'')));
           const clientesOper = [...new Set(serviciosOrdenados.map(s=>(s.cliente||'').trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'es'));
           const filtroClienteOper = uiState.srv_filtro_cliente || '';
           // Solo mostrar servicios NO cerrados en módulo Operacional
