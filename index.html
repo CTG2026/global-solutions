@@ -5,7 +5,7 @@
   <meta http-equiv="cache-control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="pragma" content="no-cache">
   <meta http-equiv="expires" content="1775758565">
-  <meta name="version" content="1775824560">
+  <meta name="version" content="1775827149">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <script>
 // Desregistrar cualquier Service Worker existente de forma inmediata
@@ -17,7 +17,7 @@ if ('serviceWorker' in navigator) {
 </script>
 <script>
 (function() {
-  var VERSION = '1775824560';
+  var VERSION = '1775827149';
   var stored = localStorage.getItem('gs_app_version');
   if (stored !== VERSION) {
     var session = localStorage.getItem('gs_session');
@@ -2130,7 +2130,7 @@ async function pushCostosSupabase() {
   try {
     await supa.from('config_panel').upsert({
       id: 'costos',
-      data: { costos: appData.costos||[], copec: appData.copec||[], cartola: appData.cartola||[], kmFlota: appData.kmFlota||[] },
+      data: { costos: appData.costos||[], copec: appData.copec||[], cartola: appData.cartola||[], kmFlota: appData.kmFlota||[], historialRendimiento: appData.historialRendimiento||[] },
       updated_at: new Date().toISOString()
     }, { onConflict: 'id' });
   } catch(e) { console.warn('Error sync costos Supabase:', e); }
@@ -2145,6 +2145,7 @@ async function syncCostosDesdeSupabase() {
       if (Array.isArray(data.data.copec)) appData.copec = data.data.copec;
       if (Array.isArray(data.data.cartola)) appData.cartola = data.data.cartola;
       if (Array.isArray(data.data.kmFlota)) appData.kmFlota = data.data.kmFlota;
+      if (Array.isArray(data.data.historialRendimiento)) appData.historialRendimiento = data.data.historialRendimiento;
       saveData();
     }
   } catch(e) { console.warn('Error sync costos desde Supabase:', e); }
@@ -5949,6 +5950,18 @@ function renderListadoRegistros(serviciosOrdenados) {
 
 // ─── RENDIMIENTO COMBUSTIBLE POR KM ──────────────────────────────────────────
 function _genIdKmFlota() { return 'KMF-' + Date.now().toString(36).toUpperCase(); }
+function _genIdHistorial() { return 'HR-'  + Date.now().toString(36).toUpperCase(); }
+const MESES_NOM = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+
+// Ordena patentes: camiones primero (orden flota), luego camionetas
+function _ordenarPorFlota(pats, flota) {
+  const order = p => {
+    const ci = flota.camiones.indexOf(p);    if (ci !== -1) return ci;
+    const ki = flota.camionetas.indexOf(p);  if (ki !== -1) return flota.camiones.length + ki;
+    return 999;
+  };
+  return [...pats].sort((a, b) => order(a) - order(b));
+}
 
 function agregarKmFlota() {
   const f = uiState.kmFlotaForm || {};
@@ -5971,6 +5984,39 @@ function eliminarKmFlota(id) {
   showToastGeneral('🗑️ Registro eliminado','#E65100'); render();
 }
 
+function guardarInformeRendimiento() {
+  const flota = getFlota();
+  const { kmPorPat, copecPorPat, todasRaw } = _getRendimientoData();
+  const todasPat = _ordenarPorFlota(todasRaw, flota);
+  if (!todasPat.length) { alert('⚠️ No hay datos en el período para guardar.'); return; }
+  const desde = uiState.km_desde || '';
+  const hasta  = uiState.km_hasta || '';
+  const hoy = new Date();
+  const mes  = String(hoy.getMonth()+1).padStart(2,'0');
+  const anio = String(hoy.getFullYear());
+  const periodoLabel = desde||hasta ? `${desde||'inicio'} → ${hasta||'hoy'}` : `${MESES_NOM[parseInt(mes)-1]} ${anio}`;
+  const registros = todasPat.map(pat => {
+    const kd = kmPorPat[pat]    || { km:0 };
+    const cd = copecPorPat[pat] || { litros:0, monto:0 };
+    const rendimiento = kd.km && cd.litros ? parseFloat((kd.km/cd.litros).toFixed(2)) : null;
+    const costoPorKm  = kd.km && cd.monto  ? Math.round(cd.monto/kd.km)               : null;
+    const tipo = flota.camiones.includes(pat)?'camion':flota.camionetas.includes(pat)?'camioneta':'otro';
+    return { patente:pat, km:kd.km||0, litros:parseFloat((cd.litros||0).toFixed(1)), monto:cd.monto||0, rendimiento, costoPorKm, tipo };
+  });
+  const fechaHoy = `${String(hoy.getDate()).padStart(2,'0')}-${mes}-${anio}`;
+  if (!appData.historialRendimiento) appData.historialRendimiento = [];
+  appData.historialRendimiento.push({ id:_genIdHistorial(), periodo:periodoLabel, desde, hasta, mes, anio, fechaGuardado:fechaHoy, registros });
+  saveData(); pushCostosSupabase();
+  showToastGeneral('✅ Informe guardado en historial','#2E7D32'); render();
+}
+
+function eliminarInformeRendimiento(id) {
+  if (!confirm('¿Eliminar este informe del historial?')) return;
+  appData.historialRendimiento = (appData.historialRendimiento||[]).filter(x=>x.id!==id);
+  saveData(); pushCostosSupabase();
+  showToastGeneral('🗑️ Informe eliminado','#E65100'); render();
+}
+
 function _getRendimientoData() {
   const desde = uiState.km_desde || '';
   const hasta  = uiState.km_hasta || '';
@@ -5980,24 +6026,24 @@ function _getRendimientoData() {
   const anio = String(hoy.getFullYear());
   const inRango = (mes_, anio_) => {
     if (!desde && !hasta) return mes_===mes && anio_===anio;
-    const d = new Date(parseInt(anio_), parseInt(mes_)-1, 1);
+    const d    = new Date(parseInt(anio_), parseInt(mes_)-1, 1);
     const dFin = new Date(parseInt(anio_), parseInt(mes_)-1, 28);
     if (desde && dFin < parseFDD(desde)) return false;
-    if (hasta && d > parseFDD(hasta)) return false;
+    if (hasta && d    > parseFDD(hasta))  return false;
     return true;
   };
-  const kmFiltrado  = (appData.kmFlota||[]).filter(k=>inRango(k.mes,k.anio));
+  const kmFiltrado    = (appData.kmFlota||[]).filter(k => inRango(k.mes, k.anio));
   const copecFiltrado = (appData.copec||[]).filter(c => {
     if (!desde && !hasta) return c.mes===mes && c.anio===anio;
-    const fd = parseFDD(c.fecha); if(!fd) return false;
+    const fd = parseFDD(c.fecha); if (!fd) return false;
     if (desde && fd < parseFDD(desde)) return false;
-    if (hasta && fd > parseFDD(hasta)) return false;
+    if (hasta && fd > parseFDD(hasta))  return false;
     return true;
   });
   const kmPorPat = {};
   kmFiltrado.forEach(k => {
     if (!kmPorPat[k.patente]) kmPorPat[k.patente] = { km:0, regs:[] };
-    kmPorPat[k.patente].km   += k.km||0;
+    kmPorPat[k.patente].km += k.km||0;
     kmPorPat[k.patente].regs.push(k);
   });
   const copecPorPat = {};
@@ -6007,8 +6053,8 @@ function _getRendimientoData() {
     copecPorPat[c.patente].monto  += c.monto||0;
     copecPorPat[c.patente].regs.push(c);
   });
-  const todasPat = [...new Set([...Object.keys(kmPorPat), ...Object.keys(copecPorPat)])].sort();
-  return { kmPorPat, copecPorPat, todasPat };
+  const todasRaw = [...new Set([...Object.keys(kmPorPat), ...Object.keys(copecPorPat)])];
+  return { kmPorPat, copecPorPat, todasRaw };
 }
 
 function renderRendimientoKm() {
@@ -6019,40 +6065,52 @@ function renderRendimientoKm() {
   const flota   = getFlota();
   const inpDate = 'border:1px solid #CFD8DC;border-radius:5px;padding:4px 7px;font-size:11px;font-family:inherit;outline:none;background:white';
   const inpStyle= 'width:100%;padding:7px;border:1px solid #dde;border-radius:6px;font-size:12px;box-sizing:border-box';
+  const hoy = new Date();
+  const mes  = String(hoy.getMonth()+1).padStart(2,'0');
+  const anio = String(hoy.getFullYear());
+  const periodoActual = desde||hasta ? `${desde||'inicio'} → ${hasta||'hoy'}` : `${MESES_NOM[parseInt(mes)-1]} ${anio}`;
+
   const hdr = `<div onclick="uiState.rendimiento_open=${!isOpen};render()" style="display:flex;justify-content:space-between;align-items:center;cursor:pointer;padding:9px 12px;background:#E8F5E9;border-radius:${isOpen?'8px 8px 0 0':'8px'};border:1px solid #C8E6C9">
     <div style="font-size:11px;font-weight:800;color:#2E7D32;letter-spacing:1px">⛽ RENDIMIENTO COMBUSTIBLE POR KM</div>
     <div style="font-size:10px;color:#4CAF50">${isOpen?'▲ ocultar':'▼ ver'}</div>
   </div>`;
   if (!isOpen) return `<div style="margin-top:12px">${hdr}</div>`;
 
-  const { kmPorPat, copecPorPat, todasPat } = _getRendimientoData();
+  const { kmPorPat, copecPorPat, todasRaw } = _getRendimientoData();
+  const todasPat = _ordenarPorFlota(todasRaw, flota);
   const th = 'padding:6px 10px;font-size:9px;font-weight:700;color:#2E7D32;background:#E8F5E9;text-align:center;white-space:nowrap';
   const td = 'padding:6px 10px;text-align:center;font-size:11px;border-bottom:1px solid #F1F8E9';
 
-  const filas = todasPat.length ? todasPat.map(pat => {
-    const kd = kmPorPat[pat]    || { km:0, regs:[] };
+  const filaRend = pat => {
+    const kd = kmPorPat[pat]    || { km:0 };
     const cd = copecPorPat[pat] || { litros:0, monto:0 };
-    const rend   = kd.km && cd.litros ? (kd.km / cd.litros).toFixed(2) : null;
-    const costKm = kd.km && cd.monto  ? Math.round(cd.monto / kd.km)  : null;
+    const rend   = kd.km && cd.litros ? (kd.km/cd.litros).toFixed(2) : null;
+    const costKm = kd.km && cd.monto  ? Math.round(cd.monto/kd.km)   : null;
     const rendColor = rend ? (parseFloat(rend)>=3?'#2E7D32':'#E65100') : '#aaa';
+    const tipoBadge = flota.camiones.includes(pat)
+      ? '<span style="font-size:8px;background:#E3F2FD;color:#1565C0;border-radius:3px;padding:1px 4px;margin-left:4px">C</span>'
+      : '<span style="font-size:8px;background:#F3E5F5;color:#6A1B9A;border-radius:3px;padding:1px 4px;margin-left:4px">V</span>';
     return `<tr>
-      <td style="${td};font-weight:800;color:#2E7D32;text-align:left">${pat}</td>
+      <td style="${td};font-weight:800;color:#2E7D32;text-align:left">${pat}${tipoBadge}</td>
       <td style="${td}">${kd.km ? kd.km.toLocaleString('es-CL')+' km' : '<span style="color:#aaa">—</span>'}</td>
       <td style="${td}">${cd.litros ? cd.litros.toFixed(1)+'L' : '<span style="color:#aaa">—</span>'}</td>
       <td style="${td};font-weight:900;font-size:13px;color:${rendColor}">${rend ? rend+' km/L' : '<span style="color:#aaa">—</span>'}</td>
       <td style="${td}">${costKm ? '$'+costKm.toLocaleString('es-CL')+'/km' : '<span style="color:#aaa">—</span>'}</td>
       <td style="${td}">${cd.monto ? '$'+cd.monto.toLocaleString('es-CL') : '<span style="color:#aaa">—</span>'}</td>
     </tr>`;
-  }).join('') : `<tr><td colspan="6" style="padding:14px;text-align:center;color:#aaa;font-size:11px">Sin datos — agrega km por patente o amplía el período</td></tr>`;
+  };
+  const filas = todasPat.length
+    ? todasPat.map(filaRend).join('')
+    : `<tr><td colspan="6" style="padding:14px;text-align:center;color:#aaa;font-size:11px">Sin datos — agrega km por patente o amplía el período</td></tr>`;
 
   const patOpts = `<option value="">— Patente —</option><optgroup label="Camiones">${flota.camiones.map(p=>`<option value="${p}" ${kfForm.patente===p?'selected':''}>${p}</option>`).join('')}</optgroup><optgroup label="Camionetas">${flota.camionetas.map(p=>`<option value="${p}" ${kfForm.patente===p?'selected':''}>${p}</option>`).join('')}</optgroup>`;
-
   const kmGuardados = (appData.kmFlota||[]).slice().reverse();
 
   return `<div style="margin-top:12px">
     ${hdr}
     <div style="border:1px solid #C8E6C9;border-top:none;border-radius:0 0 8px 8px;padding:12px;background:#FAFFF9">
-      <!-- Filtro período + PDF -->
+
+      <!-- Filtro período -->
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap;background:#F1F8E9;border-radius:8px;padding:8px 10px">
         <div style="font-size:10px;font-weight:700;color:#33691E">PERÍODO:</div>
         <div style="display:flex;align-items:center;gap:5px">
@@ -6064,14 +6122,14 @@ function renderRendimientoKm() {
           <input type="date" value="${hasta}" onchange="uiState.km_hasta=this.value;render()" style="${inpDate}">
         </div>
         ${desde||hasta?`<button onclick="uiState.km_desde='';uiState.km_hasta='';render()" style="padding:4px 8px;border-radius:5px;font-size:10px;cursor:pointer;border:1px solid #FFCDD2;background:#FFEBEE;color:#C62828;font-weight:700">✕ Limpiar</button>`:''}
-        <div style="margin-left:auto;display:flex;gap:5px">
+        <div style="margin-left:auto;display:flex;gap:5px;flex-wrap:wrap">
           <button onclick="pdfRendimientoKm('todos')" style="padding:5px 10px;border-radius:5px;font-size:10px;font-weight:700;cursor:pointer;border:none;background:#2E7D32;color:white">🖨️ PDF Total</button>
           <button onclick="pdfRendimientoKm('patente')" style="padding:5px 10px;border-radius:5px;font-size:10px;font-weight:700;cursor:pointer;border:none;background:#1B5E20;color:white">🖨️ PDF por Patente</button>
         </div>
       </div>
 
       <!-- Tabla resumen -->
-      <div style="overflow-x:auto;margin-bottom:12px">
+      <div style="overflow-x:auto;margin-bottom:10px">
         <table style="width:100%;border-collapse:collapse;background:white;border-radius:8px;overflow:hidden;border:1px solid #C8E6C9">
           <thead><tr>
             <th style="${th};text-align:left">PATENTE</th>
@@ -6083,6 +6141,15 @@ function renderRendimientoKm() {
           </tr></thead>
           <tbody>${filas}</tbody>
         </table>
+      </div>
+
+      <!-- Botón guardar informe -->
+      <div style="background:#E8F5E9;border:1px solid #A5D6A7;border-radius:8px;padding:10px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+        <div>
+          <div style="font-size:11px;font-weight:800;color:#1B5E20">✓ GUARDAR INFORME DEL PERÍODO</div>
+          <div style="font-size:9px;color:#555;margin-top:2px">Período: <strong>${periodoActual}</strong> · Guarda un snapshot definitivo en el historial</div>
+        </div>
+        <button onclick="guardarInformeRendimiento()" style="padding:8px 16px;background:#2E7D32;color:white;border:none;border-radius:7px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap">💾 Guardar en historial</button>
       </div>
 
       <!-- Formulario agregar km -->
@@ -6103,25 +6170,190 @@ function renderRendimientoKm() {
           </div>
           <button onclick="agregarKmFlota()" style="padding:7px 14px;background:#33691E;color:white;border:none;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;height:36px">+ Agregar</button>
         </div>
-        <div style="font-size:9px;color:#888;margin-top:5px">Los KM se asocian al mes en curso. El rendimiento se calcula contra los litros cargados (Copec) del mismo período.</div>
+        <div style="font-size:9px;color:#888;margin-top:5px">Los KM quedan asociados al mes en curso y se cruzan con los litros Copec del mismo período.</div>
       </div>
 
       <!-- Registros km guardados -->
       ${kmGuardados.length ? `
-      <div style="font-size:9px;font-weight:700;color:#555;margin-bottom:5px;text-transform:uppercase;letter-spacing:0.5px">Registros guardados</div>
+      <div style="font-size:9px;font-weight:700;color:#555;margin-bottom:5px;text-transform:uppercase;letter-spacing:0.5px">KM ingresados (${kmGuardados.length})</div>
       <div style="display:flex;flex-direction:column;gap:4px">
         ${kmGuardados.map(k=>`
         <div style="display:flex;justify-content:space-between;align-items:center;background:white;border:1px solid #DCEDC8;border-radius:6px;padding:6px 10px">
           <div>
             <span style="font-size:11px;font-weight:700;color:#2E7D32">${k.patente}</span>
             <span style="font-size:11px;font-weight:700;color:#333;margin-left:10px">${k.km.toLocaleString('es-CL')} km</span>
-            <span style="font-size:9px;color:#aaa;margin-left:8px">${['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'][parseInt(k.mes)-1]} ${k.anio}${k.label?' · '+k.label:''}</span>
+            <span style="font-size:9px;color:#aaa;margin-left:8px">${MESES_NOM[parseInt(k.mes)-1]} ${k.anio}${k.label?' · '+k.label:''}</span>
           </div>
           <button onclick="eliminarKmFlota('${k.id}')" style="font-size:10px;padding:3px 7px;background:#FFEBEE;color:#C62828;border:1px solid #FFCDD2;border-radius:5px;cursor:pointer">🗑️</button>
         </div>`).join('')}
       </div>` : '<div style="text-align:center;color:#bbb;font-size:10px;padding:8px">Sin registros de km aún</div>'}
     </div>
+  </div>
+  ${renderHistorialRendimiento()}`;
+}
+
+function renderHistorialRendimiento() {
+  const hist = (appData.historialRendimiento||[]).slice().reverse();
+  const isOpen = !!uiState.historial_rend_open;
+  const inpDate = 'border:1px solid #CFD8DC;border-radius:5px;padding:4px 7px;font-size:11px;font-family:inherit;outline:none;background:white';
+  const desde = uiState.hrend_desde || '';
+  const hasta  = uiState.hrend_hasta || '';
+  const parseFDD = f => { if(!f)return null; const p=f.split('-'); return p[0].length===4?new Date(f):new Date(p[2],p[1]-1,p[0]); };
+
+  const histFiltrado = hist.filter(h => {
+    if (!desde && !hasta) return true;
+    const fd = parseFDD(h.fechaGuardado); if(!fd) return true;
+    if (desde && fd < parseFDD(desde)) return false;
+    if (hasta && fd > parseFDD(hasta))  return false;
+    return true;
+  });
+
+  const hdr = `<div onclick="uiState.historial_rend_open=${!isOpen};render()" style="display:flex;justify-content:space-between;align-items:center;cursor:pointer;padding:9px 12px;background:#EDE7F6;border-radius:${isOpen?'8px 8px 0 0':'8px'};border:1px solid #CE93D8;margin-top:8px">
+    <div style="font-size:11px;font-weight:800;color:#4A148C;letter-spacing:1px">📋 HISTORIAL DE RENDIMIENTO ${hist.length?'('+hist.length+')':''}</div>
+    <div style="font-size:10px;color:#7B1FA2">${isOpen?'▲ ocultar':'▼ ver'}</div>
   </div>`;
+  if (!isOpen) return hdr;
+
+  const th = 'padding:5px 8px;font-size:9px;font-weight:700;color:#4A148C;background:#EDE7F6;text-align:center;white-space:nowrap';
+  const td = 'padding:5px 8px;font-size:10px;text-align:center;border-bottom:1px solid #F3E5F5';
+
+  const informeHTML = h => {
+    const isDetalle = !!uiState['hrend_det_'+h.id];
+    const flota = getFlota();
+    const regsOrdenados = _ordenarPorFlota(h.registros.map(r=>r.patente), flota).map(p=>h.registros.find(r=>r.patente===p)).filter(Boolean);
+    const filas = regsOrdenados.map(r => {
+      const rendColor = r.rendimiento ? (r.rendimiento>=3?'#2E7D32':'#E65100') : '#aaa';
+      const tipoBadge = r.tipo==='camion'
+        ? '<span style="font-size:7px;background:#E3F2FD;color:#1565C0;border-radius:3px;padding:1px 3px;margin-left:3px">C</span>'
+        : '<span style="font-size:7px;background:#F3E5F5;color:#6A1B9A;border-radius:3px;padding:1px 3px;margin-left:3px">V</span>';
+      return `<tr>
+        <td style="${td};text-align:left;font-weight:700;color:#4A148C">${r.patente}${tipoBadge}</td>
+        <td style="${td}">${r.km ? r.km.toLocaleString('es-CL')+' km':'—'}</td>
+        <td style="${td}">${r.litros ? r.litros+'L':'—'}</td>
+        <td style="${td};font-weight:900;color:${rendColor}">${r.rendimiento ? r.rendimiento+' km/L':'—'}</td>
+        <td style="${td}">${r.costoPorKm ? '$'+r.costoPorKm.toLocaleString('es-CL')+'/km':'—'}</td>
+        <td style="${td}">${r.monto ? '$'+r.monto.toLocaleString('es-CL'):'—'}</td>
+      </tr>`;
+    }).join('');
+    return `<div style="border:1px solid #CE93D8;border-radius:8px;margin-bottom:6px;overflow:hidden">
+      <div onclick="uiState['hrend_det_${h.id}']=!uiState['hrend_det_${h.id}'];render()" style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:#F3E5F5;cursor:pointer">
+        <div>
+          <div style="font-size:11px;font-weight:800;color:#4A148C">${h.periodo}</div>
+          <div style="font-size:9px;color:#888">${h.registros.length} equipo${h.registros.length!==1?'s':''} · Guardado: ${h.fechaGuardado}</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px">
+          <span style="font-size:9px;color:#aaa">${isDetalle?'▲':'▼'}</span>
+          <button onclick="event.stopPropagation();eliminarInformeRendimiento('${h.id}')" style="font-size:10px;padding:3px 7px;background:#FFEBEE;color:#C62828;border:1px solid #FFCDD2;border-radius:5px;cursor:pointer">🗑️</button>
+        </div>
+      </div>
+      ${isDetalle ? `<div style="overflow-x:auto">
+        <table style="width:100%;border-collapse:collapse">
+          <thead><tr>
+            <th style="${th};text-align:left">PATENTE</th>
+            <th style="${th}">KM</th><th style="${th}">LITROS</th>
+            <th style="${th}">RENDIMIENTO</th><th style="${th}">COSTO/KM</th><th style="${th}">GASTO</th>
+          </tr></thead>
+          <tbody>${filas}</tbody>
+        </table>
+      </div>` : ''}
+    </div>`;
+  };
+
+  return `${hdr}
+  <div style="border:1px solid #CE93D8;border-top:none;border-radius:0 0 8px 8px;padding:12px;background:#FAF5FF">
+    <!-- Filtro + PDF histórico -->
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap;background:#F3E5F5;border-radius:8px;padding:8px 10px">
+      <div style="font-size:10px;font-weight:700;color:#4A148C">FILTRAR POR FECHA GUARDADO:</div>
+      <div style="display:flex;align-items:center;gap:5px">
+        <span style="font-size:10px;color:#888">Desde</span>
+        <input type="date" value="${desde}" onchange="uiState.hrend_desde=this.value;render()" style="${inpDate}">
+      </div>
+      <div style="display:flex;align-items:center;gap:5px">
+        <span style="font-size:10px;color:#888">Hasta</span>
+        <input type="date" value="${hasta}" onchange="uiState.hrend_hasta=this.value;render()" style="${inpDate}">
+      </div>
+      ${desde||hasta?`<button onclick="uiState.hrend_desde='';uiState.hrend_hasta='';render()" style="padding:4px 8px;border-radius:5px;font-size:10px;cursor:pointer;border:1px solid #FFCDD2;background:#FFEBEE;color:#C62828;font-weight:700">✕ Limpiar</button>`:''}
+      <div style="margin-left:auto">
+        <button onclick="pdfHistorialRendimiento()" style="padding:5px 12px;border-radius:5px;font-size:10px;font-weight:700;cursor:pointer;border:none;background:#4A148C;color:white">🖨️ PDF Histórico</button>
+      </div>
+    </div>
+    <div style="font-size:9px;color:#888;margin-bottom:8px">${histFiltrado.length} informe${histFiltrado.length!==1?'s':''} guardado${histFiltrado.length!==1?'s':''}</div>
+    ${histFiltrado.length ? histFiltrado.map(informeHTML).join('') : '<div style="text-align:center;color:#bbb;font-size:10px;padding:16px">Sin informes guardados aún — usa "💾 Guardar en historial" arriba</div>'}
+  </div>`;
+}
+
+function pdfHistorialRendimiento() {
+  const hist = (appData.historialRendimiento||[]).slice().reverse();
+  const desde = uiState.hrend_desde || '';
+  const hasta  = uiState.hrend_hasta || '';
+  const parseFDD = f => { if(!f)return null; const p=f.split('-'); return p[0].length===4?new Date(f):new Date(p[2],p[1]-1,p[0]); };
+  const histFiltrado = hist.filter(h => {
+    if (!desde && !hasta) return true;
+    const fd = parseFDD(h.fechaGuardado); if(!fd) return true;
+    if (desde && fd < parseFDD(desde)) return false;
+    if (hasta && fd > parseFDD(hasta))  return false;
+    return true;
+  });
+  if (!histFiltrado.length) { alert('No hay informes en el período seleccionado.'); return; }
+
+  // Recopilar todas las patentes del historial
+  const flota = getFlota();
+  const todasPat = _ordenarPorFlota([...new Set(histFiltrado.flatMap(h=>h.registros.map(r=>r.patente)))], flota);
+
+  // Por patente: evolución temporal
+  const porPatente = {};
+  todasPat.forEach(p => { porPatente[p] = []; });
+  histFiltrado.forEach(h => {
+    h.registros.forEach(r => { if (porPatente[r.patente]) porPatente[r.patente].push({ periodo:h.periodo, fechaGuardado:h.fechaGuardado, ...r }); });
+  });
+
+  const css = `body{font-family:Arial,sans-serif;font-size:10px;margin:20px;color:#222}
+    h1{font-size:16px;color:#4A148C;margin-bottom:4px}h2{font-size:11px;color:#555;font-weight:400;margin:0 0 14px}
+    h3{font-size:12px;color:#4A148C;font-weight:800;margin:16px 0 4px;border-bottom:2px solid #CE93D8;padding-bottom:4px}
+    table{width:100%;border-collapse:collapse;margin-bottom:14px}
+    th{background:#EDE7F6;color:#4A148C;font-size:9px;padding:5px 8px;text-align:center;border-bottom:2px solid #CE93D8}
+    th.left{text-align:left}td{padding:4px 8px;border-bottom:1px solid #F3E5F5;text-align:center;font-size:9px}
+    td.left{text-align:left;font-weight:700}
+    .alto{color:#2E7D32;font-weight:900}.bajo{color:#E65100;font-weight:900}
+    .no-print{margin-bottom:14px}@media print{.no-print{display:none}}`;
+
+  const periodoTxt = desde||hasta ? `${desde||'inicio'} al ${hasta||'hoy'}` : 'Todo el historial';
+  const tablaEvolucion = pat => {
+    const regs = porPatente[pat];
+    if (!regs.length) return '';
+    const filas = regs.map(r => {
+      const cls = r.rendimiento ? (r.rendimiento>=3?'alto':'bajo') : '';
+      return `<tr>
+        <td class="left">${r.periodo}</td>
+        <td>${r.fechaGuardado}</td>
+        <td>${r.km ? r.km.toLocaleString('es-CL')+' km':'—'}</td>
+        <td>${r.litros ? r.litros+'L':'—'}</td>
+        <td class="${cls}">${r.rendimiento ? r.rendimiento+' km/L':'—'}</td>
+        <td>${r.costoPorKm ? '$'+r.costoPorKm.toLocaleString('es-CL')+'/km':'—'}</td>
+        <td>${r.monto ? '$'+r.monto.toLocaleString('es-CL'):'—'}</td>
+      </tr>`;
+    }).join('');
+    const rendProm = regs.filter(r=>r.rendimiento).reduce((a,r,_,arr)=>a+(r.rendimiento/arr.length),0);
+    return `<h3>${pat} ${regs[0]?.tipo==='camion'?'(Camión)':'(Camioneta)'}</h3>
+    <table>
+      <thead><tr>
+        <th class="left">PERÍODO</th><th>FECHA GUARDADO</th><th>KM</th><th>LITROS</th>
+        <th>RENDIMIENTO</th><th>COSTO/KM</th><th>GASTO</th>
+      </tr></thead>
+      <tbody>${filas}</tbody>
+    </table>
+    ${rendProm ? `<p style="font-size:9px;color:#555;margin:0 0 8px">Promedio rendimiento: <strong class="${rendProm>=3?'alto':'bajo'}">${rendProm.toFixed(2)} km/L</strong> en ${regs.filter(r=>r.rendimiento).length} período${regs.filter(r=>r.rendimiento).length!==1?'s':''}</p>` : ''}`;
+  };
+
+  const w = window.open('','_blank');
+  w.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Historial Rendimiento</title><style>${css}</style></head><body>
+    <div class="no-print"><button onclick="window.print()" style="background:#4A148C;color:white;border:none;border-radius:6px;padding:8px 20px;font-size:12px;font-weight:700;cursor:pointer">🖨️ Imprimir / Guardar PDF</button></div>
+    <h1>📋 Historial de Rendimiento Combustible</h1>
+    <h2>Global Solutions SpA &nbsp;·&nbsp; ${periodoTxt} &nbsp;·&nbsp; ${histFiltrado.length} informes guardados</h2>
+    ${todasPat.map(tablaEvolucion).join('')}
+    <script>setTimeout(function(){window.print();},500);<\/script>
+  </body></html>`);
+  w.document.close();
 }
 
 function pdfRendimientoKm(modo) {
@@ -6135,7 +6367,9 @@ function pdfRendimientoKm(modo) {
     ? `${desde||'inicio'} al ${hasta||'hoy'}`
     : `${mesesNom[parseInt(mes)-1]} ${anio}`;
 
-  const { kmPorPat, copecPorPat, todasPat } = _getRendimientoData();
+  const flota = getFlota();
+  const { kmPorPat, copecPorPat, todasRaw } = _getRendimientoData();
+  const todasPat = _ordenarPorFlota(todasRaw, flota);
 
   const css = `body{font-family:Arial,sans-serif;font-size:10px;margin:20px;color:#222}
     h1{font-size:16px;color:#2E7D32;margin-bottom:4px}h2{font-size:11px;color:#555;font-weight:400;margin:0 0 14px}
