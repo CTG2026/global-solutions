@@ -5,7 +5,7 @@
   <meta http-equiv="cache-control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="pragma" content="no-cache">
   <meta http-equiv="expires" content="1775758565">
-  <meta name="version" content="1775949047">
+  <meta name="version" content="1775949628">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <script>
 // Desregistrar cualquier Service Worker existente de forma inmediata
@@ -17,7 +17,7 @@ if ('serviceWorker' in navigator) {
 </script>
 <script>
 (function() {
-  var VERSION = '1775949047';
+  var VERSION = '1775949628';
   var stored = localStorage.getItem('gs_app_version');
   if (stored !== VERSION) {
     var session = localStorage.getItem('gs_session');
@@ -1375,6 +1375,8 @@ function renderCierreServicios() {
                 oninput="updCS('${s.id}','precio',this.value);(function(v){const h=document.getElementById('cs_comision_hint_${s.id}');const sug=Math.round((parseInt(v)||0)*0.1);if(h)h.textContent='Sugerida 10%: $'+sug.toLocaleString('es-CL');})(this.value)"
                 style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:14px;font-weight:700;outline:none;font-family:inherit">
             </div>
+            <!-- CANTIDAD DE PUNTOS + MONTO TOTAL PUNTOS -->
+            ${(()=>{const _pts=(s.puntos&&s.puntos.length)?s.puntos:(s.guias&&s.guias.length)?s.guias:[];const _np=_pts.length;return`<div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">CANTIDAD DE PUNTOS</div><div style="background:#F4F6F8;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:14px;font-weight:700;color:#455A64">${_np} punto${_np!==1?'s':''}</div></div><div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">MONTO TOTAL PUNTOS ($)</div><input id="cs_monto_puntos_${s.id}" type="number" value="${_csVal(s,'montoPuntos','')}" placeholder="ej: 50000" oninput="updCS('${s.id}','montoPuntos',this.value)" style="width:100%;border:1px solid #1565C0;border-radius:6px;padding:7px 9px;font-size:12px;font-weight:700;outline:none;font-family:inherit"></div>`;})()}
             <div>
               <div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">COMISIÓN CONDUCTOR ($)</div>
               <input id="cs_comision_input_${s.id}" type="number" value="${_csVal(s,'comisionConductor','')}" placeholder="ej: 35000"
