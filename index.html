@@ -5,7 +5,7 @@
   <meta http-equiv="cache-control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="pragma" content="no-cache">
   <meta http-equiv="expires" content="1775758565">
-  <meta name="version" content="1775844828">
+  <meta name="version" content="1775944823">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <script>
 // Desregistrar cualquier Service Worker existente de forma inmediata
@@ -17,7 +17,7 @@ if ('serviceWorker' in navigator) {
 </script>
 <script>
 (function() {
-  var VERSION = '1775844828';
+  var VERSION = '1775944823';
   var stored = localStorage.getItem('gs_app_version');
   if (stored !== VERSION) {
     var session = localStorage.getItem('gs_session');
@@ -5480,6 +5480,12 @@ async function guardarEdicionServicio() {
   if (!conductor) { alert('⚠️ Debes seleccionar un conductor.'); return; }
   if (!patente) { alert('⚠️ Debes seleccionar una patente.'); return; }
   if (!cliente) { alert('⚠️ Debes seleccionar un cliente.'); return; }
+  // Verificar guías duplicadas excluyendo el servicio actual
+  const _editPuntos=(uiState.edit_srv_puntos||[]);
+  if(_editPuntos.length){
+    const _guiasOtros=(appData.servicios||[]).flatMap(sv=>{if(sv.id===id)return[];return((sv.puntos&&sv.puntos.length)?sv.puntos:(sv.guias&&sv.guias.length)?sv.guias:[]).map(g=>({num:(g.num||g.guia||'').trim().toLowerCase(),svcId:sv.id}));}).filter(x=>x.num);
+    for(let i=0;i<_editPuntos.length;i++){const nv=(_editPuntos[i].num||_editPuntos[i].guia||'').trim().toLowerCase();if(!nv)continue;const dup=_guiasOtros.find(x=>x.num===nv);if(dup){alert(`⚠️ N° guía "${_editPuntos[i].num||_editPuntos[i].guia}" ya está registrada en el servicio ${dup.svcId}.\nCorrige el número antes de guardar.`);return;}}
+  }
   const puntos = (uiState.edit_srv_puntos||[]);
   const origen = document.getElementById('edit_srv_origen')?.value.trim() || s.origen || 'Casablanca';
   const estadia = document.getElementById('edit_srv_estadia')?.value || s.estadia || 'no';
@@ -6019,6 +6025,34 @@ function toggleConductorTercero() {
 function updGuia(gi, campo, valor) {
   if (!uiState.srv_guias) uiState.srv_guias = [{ num:'', destino:'', fecha_guia:'', fecha_descarga:'', kg:'', imagen_url:'' }];
   uiState.srv_guias[gi][campo] = valor;
+  if (campo==='num') checkGuiaDuplicada(gi, valor);
+}
+
+function checkGuiaDuplicada(gi, valor) {
+  const num=(valor||'').trim().toLowerCase();
+  const input=document.getElementById('srv_guia_num_'+gi);
+  const warnId='guia_dup_warn_'+gi;
+  let warn=document.getElementById(warnId);
+  if(!num){
+    if(warn) warn.remove();
+    if(input) input.style.border='1px solid #dde';
+    return;
+  }
+  const dup=(appData.servicios||[]).find(sv=>
+    ((sv.puntos&&sv.puntos.length)?sv.puntos:(sv.guias&&sv.guias.length)?sv.guias:[])
+    .some(g=>(g.num||g.guia||'').trim().toLowerCase()===num)
+  );
+  if(input) input.style.border=dup?'2px solid #C62828':'2px solid #2E7D32';
+  if(!warn&&input?.parentNode){
+    warn=document.createElement('div');
+    warn.id=warnId;
+    warn.style.cssText='font-size:10px;margin-top:3px;font-weight:700';
+    input.parentNode.appendChild(warn);
+  }
+  if(warn){
+    if(dup){warn.style.color='#C62828';warn.textContent='⚠️ Ya registrada en '+dup.id;}
+    else{warn.style.color='#2E7D32';warn.textContent='✓ Número disponible';}
+  }
 }
 
 function renderListadoRegistros(serviciosOrdenados) {
@@ -6877,6 +6911,9 @@ async function addServicio() {
     if (!g.fecha_guia) { markRed(`srv_guia_fg_${i}`); alert(`⚠️ La guía N°${i+1} necesita fecha.`); return; }
   }
   if (isNaN(peajes)) { alert('⚠️ Ingresa los peajes.\nSi no hubo, escribe 0.'); return; }
+  // Verificar guías duplicadas contra todos los servicios existentes
+  const _todasGuias=(appData.servicios||[]).flatMap(sv=>((sv.puntos&&sv.puntos.length)?sv.puntos:(sv.guias&&sv.guias.length)?sv.guias:[]).map(g=>({num:(g.num||g.guia||'').trim().toLowerCase(),svcId:sv.id}))).filter(x=>x.num);
+  for(let i=0;i<guiasRaw.length;i++){const nv=(guiasRaw[i].num||'').trim().toLowerCase();if(!nv)continue;const dup=_todasGuias.find(x=>x.num===nv);if(dup){markRed(`srv_guia_num_${i}`);alert(`⚠️ N° guía "${guiasRaw[i].num}" ya está registrada en el servicio ${dup.svcId}.\nNo se puede ingresar guías duplicadas.`);return;}}
   if (!appData.servicios) appData.servicios = [];
   const hoy = new Date();
   const fechaFinal = fecha || `${String(hoy.getDate()).padStart(2,'0')}-${String(hoy.getMonth()+1).padStart(2,'0')}-${hoy.getFullYear()}`;
