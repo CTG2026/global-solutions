@@ -5,7 +5,7 @@
   <meta http-equiv="cache-control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="pragma" content="no-cache">
   <meta http-equiv="expires" content="1775758565">
-  <meta name="version" content="1775949628">
+  <meta name="version" content="1775950785">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <script>
 // Desregistrar cualquier Service Worker existente de forma inmediata
@@ -17,7 +17,7 @@ if ('serviceWorker' in navigator) {
 </script>
 <script>
 (function() {
-  var VERSION = '1775949628';
+  var VERSION = '1775950785';
   var stored = localStorage.getItem('gs_app_version');
   if (stored !== VERSION) {
     var session = localStorage.getItem('gs_session');
@@ -378,8 +378,17 @@ function generarIdServicio(servicios, fechaStr) {
   if (!d || isNaN(d.getTime())) d = new Date();
   const mesStr = MESES_ABREV[d.getMonth()];
   const anioStr = String(d.getFullYear()).slice(2);
-  const num = String((servicios||[]).length + 1).padStart(2,'0');
-  return num + anioStr + mesStr;
+  // Usar el máximo numérico existente para no retroceder aunque se eliminen servicios
+  const maxNum = (servicios||[]).reduce((max, s) => {
+    const m = (s.id||'').match(/^(\d+)/);
+    return m ? Math.max(max, parseInt(m[1])) : max;
+  }, 0);
+  let n = Math.max(maxNum + 1, (servicios||[]).length + 1);
+  let id = String(n).padStart(2,'0') + anioStr + mesStr;
+  // Verificar unicidad absoluta — incrementar si ya existe
+  const ids = new Set((servicios||[]).map(s=>s.id));
+  while (ids.has(id)) { n++; id = String(n).padStart(2,'0') + anioStr + mesStr; }
+  return id;
 }
 
 const DEFAULT_DATA = {
