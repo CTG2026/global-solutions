@@ -5,7 +5,7 @@
   <meta http-equiv="cache-control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="pragma" content="no-cache">
   <meta http-equiv="expires" content="1775758565">
-  <meta name="version" content="1775955297">
+  <meta name="version" content="1775956219">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <script>
 // Desregistrar cualquier Service Worker existente de forma inmediata
@@ -17,7 +17,7 @@ if ('serviceWorker' in navigator) {
 </script>
 <script>
 (function() {
-  var VERSION = '1775955297';
+  var VERSION = '1775956219';
   var stored = localStorage.getItem('gs_app_version');
   if (stored !== VERSION) {
     var session = localStorage.getItem('gs_session');
@@ -4312,7 +4312,7 @@ function renderLiquidacionesV2() {
           const borrBadge=(!s.cerrado&&s.estado==='borrador')?`<span style="font-size:9px;font-weight:700;padding:1px 5px;border-radius:4px;background:#FFF9C4;color:#F9A825;margin-left:4px">BORRADOR</span>`:'';
           return `<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid #f5f5f5">
             <input type="checkbox" ${seleccionados.includes(s.id)?'checked':''} onchange="toggleSrvLiq('${s.id}',this.checked)" style="cursor:pointer">
-            <div style="flex:1"><span style="font-size:11px;font-weight:700;color:#455A64">${s.id}</span>${borrBadge}
+            <div style="flex:1"><span style="font-size:11px;font-weight:700;color:#455A64">${s.cliente||'—'}</span>${borrBadge}
               <span style="font-size:10px;color:#777;margin-left:4px">${s.fecha}</span><span style="font-size:10px;color:#1565C0;font-weight:700;margin-left:6px">GD: ${guias}</span></div>
             <span style="font-size:11px;font-weight:700;color:#546E7A">$${(s.precio||0).toLocaleString('es-CL')}</span>
           </div>`;
@@ -4361,7 +4361,6 @@ function renderLiquidacionesV2() {
         const origen=puntos[0]?.origen||s.origen||'—';
         const destino=puntos[puntos.length-1]?.destino||'—';
         return `<tr style="background:${i%2===0?'#f9fafb':'white'}">
-          <td style="padding:5px 7px;border-bottom:1px solid #eee;font-size:9px;font-weight:700;color:#1F4E79">${s.id}</td>
           <td style="padding:5px 7px;border-bottom:1px solid #eee;font-size:9px;color:#1565C0">${guias}</td>
           <td style="padding:5px 7px;border-bottom:1px solid #eee;font-size:9px">${s.fecha||'—'}</td>
           <td style="padding:5px 7px;border-bottom:1px solid #eee;font-size:9px">${origen}</td>
@@ -4392,7 +4391,6 @@ function renderLiquidacionesV2() {
           <div style="overflow-x:auto;margin-bottom:8px">
             <table style="width:100%;border-collapse:collapse">
               <thead><tr style="background:#0B2545;color:white">
-                <th style="padding:5px 7px;text-align:left;font-size:8px">ID</th>
                 <th style="padding:5px 7px;text-align:left;font-size:8px">N° GUÍA</th>
                 <th style="padding:5px 7px;text-align:left;font-size:8px">FECHA</th>
                 <th style="padding:5px 7px;text-align:left;font-size:8px">ORIGEN</th>
@@ -4465,11 +4463,10 @@ function renderLiquidacionesV2() {
               const resultado=(s.precio||0)-comision-(s.petroleo||0)-(s.peajes||0)-(s.viaticos||0)-(s.adicional||0)-(s.cfProrrateado||50800);
               return `<div style="background:white;border:1px solid #CFD8DC;border-radius:8px;padding:10px;margin-bottom:6px">
                 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-                  <span style="font-size:12px;font-weight:900;color:#455A64">${s.id}</span>
+                  <span style="font-size:12px;font-weight:900;color:#0B2545">${s.cliente||'—'}</span>
                   <span style="font-size:12px;font-weight:700;color:#2E7D32">$${(s.precio||0).toLocaleString('es-CL')}</span>
                 </div>
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:3px;font-size:10px;margin-bottom:6px">
-                  <div style="color:#888">Cliente</div><div style="font-weight:600">${s.cliente||'—'}</div>
                   <div style="color:#888">N° Guía</div><div style="color:#1565C0;font-weight:700">${guias}</div>
                   <div style="color:#888">Fecha guía</div><div>${fechaGuia}</div>
                   <div style="color:#888">Fecha descarga</div><div>${fechaDesc}</div>
@@ -4548,12 +4545,12 @@ function renderLiquidacionesV2() {
             <!-- SERVICIOS ACTUALES EN LA LIQUIDACIÓN -->
             <div style="margin-bottom:8px">
               <div style="font-size:9px;font-weight:700;color:#888;margin-bottom:4px">SERVICIOS EN ESTA LIQUIDACIÓN</div>
-              ${svcsLiq.length?svcsLiq.map(s=>{const guiasE=(s.guias||s.puntos||[]).map(g=>g.num||g.guia).filter(Boolean).join(', ')||'—';const ptsE=(s.puntos&&s.puntos.length)?s.puntos:(s.guias&&s.guias.length)?s.guias:[];const isEd=!!uiState['liq_svc_edit_'+s.id];const iS='width:100%;border:1px solid #FFE082;border-radius:5px;padding:5px 7px;font-size:11px;outline:none;font-family:inherit;background:white;box-sizing:border-box';const lS='font-size:9px;font-weight:700;color:#888;margin-bottom:2px';return `<div style="border-bottom:1px solid #f0f0f0;padding:5px 0"><div style="display:flex;align-items:center;gap:6px"><div style="flex:1"><span style="font-size:11px;font-weight:700;color:#455A64">${s.id}</span><span style="font-size:10px;color:#777;margin-left:4px">${s.fecha||''}</span><span style="font-size:10px;color:#1565C0;font-weight:700;margin-left:4px">GD:${guiasE}</span></div><span style="font-size:11px;font-weight:700;color:#2E7D32">$${(s.precio||0).toLocaleString('es-CL')}</span><button onclick="uiState['liq_svc_edit_${s.id}']=!uiState['liq_svc_edit_${s.id}'];render()" style="background:${isEd?'#FFF8E1':'#f5f5f5'};color:${isEd?'#E65100':'#546E7A'};border:1px solid ${isEd?'#E65100':'#ccc'};border-radius:5px;padding:2px 7px;font-size:12px;cursor:pointer" title="Editar datos del servicio">✎</button><span onclick="quitarSrvDeLiq('${liq.id}','${s.id}')" style="font-size:18px;color:#E53935;cursor:pointer;padding:0 4px;font-weight:700;line-height:1" title="Quitar de liquidación">×</span></div>${isEd?`<div style="background:#FFF8E1;border:1px solid #FFE082;border-radius:7px;padding:10px;margin-top:6px"><div style="font-size:9px;font-weight:800;color:#E65100;letter-spacing:1px;margin-bottom:8px">EDITANDO ${s.id}</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px"><div><div style="${lS}">MONTO ($)</div><input id="lsvc_precio_${s.id}" type="number" value="${s.precio||0}" style="${iS}"></div><div><div style="${lS}">FECHA</div><input id="lsvc_fecha_${s.id}" type="text" value="${s.fecha||''}" placeholder="DD-MM-YYYY" style="${iS}"></div><div><div style="${lS}">CONDUCTOR</div><input id="lsvc_conductor_${s.id}" type="text" value="${s.conductor||''}" style="${iS}"></div><div><div style="${lS}">PATENTE</div><input id="lsvc_patente_${s.id}" type="text" value="${s.patente||''}" style="${iS}"></div></div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:4px">COSTOS</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px"><div><div style="${lS}">PETRÓLEO</div><input id="lsvc_petroleo_${s.id}" type="number" value="${s.petroleo||0}" style="${iS}"></div><div><div style="${lS}">PEAJES</div><input id="lsvc_peajes_${s.id}" type="number" value="${s.peajes||0}" style="${iS}"></div><div><div style="${lS}">VIÁTICOS</div><input id="lsvc_viaticos_${s.id}" type="number" value="${s.viaticos||0}" style="${iS}"></div><div><div style="${lS}">ADICIONAL</div><input id="lsvc_adicional_${s.id}" type="number" value="${s.adicional||0}" style="${iS}"></div></div>${ptsE.length?`<div style="font-size:9px;font-weight:700;color:#888;margin-bottom:4px">GUÍAS / PUNTOS</div>${ptsE.map((p,pi)=>`<div style="background:white;border-radius:5px;padding:6px 8px;margin-bottom:4px;border:1px solid #eee"><div style="font-size:9px;font-weight:700;color:#1565C0;margin-bottom:4px">Punto ${pi+1}</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:4px"><div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">N° GUÍA</div><input id="lsvc_guia_${pi}_num_${s.id}" type="text" value="${p.num||p.guia||''}" style="width:100%;border:1px solid #FFE082;border-radius:5px;padding:5px 7px;font-size:11px;outline:none;font-family:inherit;background:white;box-sizing:border-box"></div><div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">KG</div><input id="lsvc_guia_${pi}_kg_${s.id}" type="text" value="${p.kg||''}" style="width:100%;border:1px solid #FFE082;border-radius:5px;padding:5px 7px;font-size:11px;outline:none;font-family:inherit;background:white;box-sizing:border-box"></div><div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">ORIGEN</div><input id="lsvc_guia_${pi}_origen_${s.id}" type="text" value="${p.origen||''}" style="width:100%;border:1px solid #FFE082;border-radius:5px;padding:5px 7px;font-size:11px;outline:none;font-family:inherit;background:white;box-sizing:border-box"></div><div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">DESTINO</div><input id="lsvc_guia_${pi}_destino_${s.id}" type="text" value="${p.destino||''}" style="width:100%;border:1px solid #FFE082;border-radius:5px;padding:5px 7px;font-size:11px;outline:none;font-family:inherit;background:white;box-sizing:border-box"></div></div></div>`).join('')}`:''}
+              ${svcsLiq.length?svcsLiq.map(s=>{const guiasE=(s.guias||s.puntos||[]).map(g=>g.num||g.guia).filter(Boolean).join(', ')||'—';const ptsE=(s.puntos&&s.puntos.length)?s.puntos:(s.guias&&s.guias.length)?s.guias:[];const isEd=!!uiState['liq_svc_edit_'+s.id];const iS='width:100%;border:1px solid #FFE082;border-radius:5px;padding:5px 7px;font-size:11px;outline:none;font-family:inherit;background:white;box-sizing:border-box';const lS='font-size:9px;font-weight:700;color:#888;margin-bottom:2px';return `<div style="border-bottom:1px solid #f0f0f0;padding:5px 0"><div style="display:flex;align-items:center;gap:6px"><div style="flex:1"><span style="font-size:11px;font-weight:700;color:#455A64">${s.cliente||'—'}</span><span style="font-size:10px;color:#777;margin-left:4px">${s.fecha||''}</span><span style="font-size:10px;color:#1565C0;font-weight:700;margin-left:4px">GD:${guiasE}</span></div><span style="font-size:11px;font-weight:700;color:#2E7D32">$${(s.precio||0).toLocaleString('es-CL')}</span><button onclick="uiState['liq_svc_edit_${s.id}']=!uiState['liq_svc_edit_${s.id}'];render()" style="background:${isEd?'#FFF8E1':'#f5f5f5'};color:${isEd?'#E65100':'#546E7A'};border:1px solid ${isEd?'#E65100':'#ccc'};border-radius:5px;padding:2px 7px;font-size:12px;cursor:pointer" title="Editar datos del servicio">✎</button><span onclick="quitarSrvDeLiq('${liq.id}','${s.id}')" style="font-size:18px;color:#E53935;cursor:pointer;padding:0 4px;font-weight:700;line-height:1" title="Quitar de liquidación">×</span></div>${isEd?`<div style="background:#FFF8E1;border:1px solid #FFE082;border-radius:7px;padding:10px;margin-top:6px"><div style="font-size:9px;font-weight:800;color:#E65100;letter-spacing:1px;margin-bottom:8px">EDITANDO SERVICIO</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px"><div><div style="${lS}">MONTO ($)</div><input id="lsvc_precio_${s.id}" type="number" value="${s.precio||0}" style="${iS}"></div><div><div style="${lS}">FECHA</div><input id="lsvc_fecha_${s.id}" type="text" value="${s.fecha||''}" placeholder="DD-MM-YYYY" style="${iS}"></div><div><div style="${lS}">CONDUCTOR</div><input id="lsvc_conductor_${s.id}" type="text" value="${s.conductor||''}" style="${iS}"></div><div><div style="${lS}">PATENTE</div><input id="lsvc_patente_${s.id}" type="text" value="${s.patente||''}" style="${iS}"></div></div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:4px">COSTOS</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px"><div><div style="${lS}">PETRÓLEO</div><input id="lsvc_petroleo_${s.id}" type="number" value="${s.petroleo||0}" style="${iS}"></div><div><div style="${lS}">PEAJES</div><input id="lsvc_peajes_${s.id}" type="number" value="${s.peajes||0}" style="${iS}"></div><div><div style="${lS}">VIÁTICOS</div><input id="lsvc_viaticos_${s.id}" type="number" value="${s.viaticos||0}" style="${iS}"></div><div><div style="${lS}">ADICIONAL</div><input id="lsvc_adicional_${s.id}" type="number" value="${s.adicional||0}" style="${iS}"></div></div>${ptsE.length?`<div style="font-size:9px;font-weight:700;color:#888;margin-bottom:4px">GUÍAS / PUNTOS</div>${ptsE.map((p,pi)=>`<div style="background:white;border-radius:5px;padding:6px 8px;margin-bottom:4px;border:1px solid #eee"><div style="font-size:9px;font-weight:700;color:#1565C0;margin-bottom:4px">Punto ${pi+1}</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:4px"><div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">N° GUÍA</div><input id="lsvc_guia_${pi}_num_${s.id}" type="text" value="${p.num||p.guia||''}" style="width:100%;border:1px solid #FFE082;border-radius:5px;padding:5px 7px;font-size:11px;outline:none;font-family:inherit;background:white;box-sizing:border-box"></div><div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">KG</div><input id="lsvc_guia_${pi}_kg_${s.id}" type="text" value="${p.kg||''}" style="width:100%;border:1px solid #FFE082;border-radius:5px;padding:5px 7px;font-size:11px;outline:none;font-family:inherit;background:white;box-sizing:border-box"></div><div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">ORIGEN</div><input id="lsvc_guia_${pi}_origen_${s.id}" type="text" value="${p.origen||''}" style="width:100%;border:1px solid #FFE082;border-radius:5px;padding:5px 7px;font-size:11px;outline:none;font-family:inherit;background:white;box-sizing:border-box"></div><div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">DESTINO</div><input id="lsvc_guia_${pi}_destino_${s.id}" type="text" value="${p.destino||''}" style="width:100%;border:1px solid #FFE082;border-radius:5px;padding:5px 7px;font-size:11px;outline:none;font-family:inherit;background:white;box-sizing:border-box"></div></div></div>`).join('')}`:''}
 <button onclick="guardarDatosSrvEnLiq('${liq.id}','${s.id}')" style="width:100%;padding:9px;background:#E65100;color:white;border:none;border-radius:7px;font-size:11px;font-weight:700;cursor:pointer;margin-top:4px">✓ Guardar cambios del servicio</button></div>`:''}
 </div>`;}).join(''):'<div style="font-size:10px;color:#aaa;text-align:center;padding:6px">Sin servicios</div>'}
             </div>
             <!-- AGREGAR SERVICIOS DISPONIBLES -->
-            ${(()=>{const dispEdit=servicios.filter(s=>(s.cerrado||s.estado==='borrador')&&!liq.serviciosIds.includes(s.id)&&(!s.liquidacionId||s.liquidacionId===liq.id));const cl0=svcsLiq[0]?.cliente||'';const dispShow=cl0?dispEdit.filter(s=>(s.cliente||'')===cl0):dispEdit;if(!dispShow.length)return'<div style="font-size:10px;color:#aaa;text-align:center;padding:6px;margin-bottom:8px">Sin servicios disponibles para agregar</div>';return`<div style="margin-bottom:8px"><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:4px">AGREGAR SERVICIOS</div>${dispShow.map(s=>{const guiasA=(s.guias||s.puntos||[]).map(g=>g.num||g.guia).filter(Boolean).join(', ')||'—';const borrTagE=(!s.cerrado&&s.estado==='borrador')?'<span style="font-size:9px;background:#FFF9C4;color:#F9A825;padding:1px 4px;border-radius:3px;margin-left:3px">BORRDR</span>':'';return`<div style="display:flex;align-items:center;gap:6px;padding:5px 0;border-bottom:1px solid #f5f5f5"><div style="flex:1"><span style="font-size:11px;font-weight:700;color:#455A64">${s.id}</span>${borrTagE}<span style="font-size:10px;color:#777;margin-left:4px">${s.fecha||''}</span><span style="font-size:10px;color:#1565C0;font-weight:700;margin-left:4px">GD:${guiasA}</span></div><span style="font-size:11px;font-weight:700;color:#546E7A">$${(s.precio||0).toLocaleString('es-CL')}</span><button onclick="agregarSrvALiq('${liq.id}','${s.id}')" style="background:#E8F5E9;color:#2E7D32;border:1px solid #A5D6A7;border-radius:5px;padding:3px 8px;font-size:10px;cursor:pointer;font-weight:700;white-space:nowrap">+ Agregar</button></div>`;}).join('')}</div>`;})()}
+            ${(()=>{const dispEdit=servicios.filter(s=>(s.cerrado||s.estado==='borrador')&&!liq.serviciosIds.includes(s.id)&&(!s.liquidacionId||s.liquidacionId===liq.id));const cl0=svcsLiq[0]?.cliente||'';const dispShow=cl0?dispEdit.filter(s=>(s.cliente||'')===cl0):dispEdit;if(!dispShow.length)return'<div style="font-size:10px;color:#aaa;text-align:center;padding:6px;margin-bottom:8px">Sin servicios disponibles para agregar</div>';return`<div style="margin-bottom:8px"><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:4px">AGREGAR SERVICIOS</div>${dispShow.map(s=>{const guiasA=(s.guias||s.puntos||[]).map(g=>g.num||g.guia).filter(Boolean).join(', ')||'—';const borrTagE=(!s.cerrado&&s.estado==='borrador')?'<span style="font-size:9px;background:#FFF9C4;color:#F9A825;padding:1px 4px;border-radius:3px;margin-left:3px">BORRDR</span>':'';return`<div style="display:flex;align-items:center;gap:6px;padding:5px 0;border-bottom:1px solid #f5f5f5"><div style="flex:1"><span style="font-size:11px;font-weight:700;color:#455A64">${s.cliente||'—'}</span>${borrTagE}<span style="font-size:10px;color:#777;margin-left:4px">${s.fecha||''}</span><span style="font-size:10px;color:#1565C0;font-weight:700;margin-left:4px">GD:${guiasA}</span></div><span style="font-size:11px;font-weight:700;color:#546E7A">$${(s.precio||0).toLocaleString('es-CL')}</span><button onclick="agregarSrvALiq('${liq.id}','${s.id}')" style="background:#E8F5E9;color:#2E7D32;border:1px solid #A5D6A7;border-radius:5px;padding:3px 8px;font-size:10px;cursor:pointer;font-weight:700;white-space:nowrap">+ Agregar</button></div>`;}).join('')}</div>`;})()}
             <div style="display:flex;gap:6px">
               <button onclick="guardarEdicionLiq('${liq.id}')" style="flex:1;padding:9px;background:#E65100;color:white;border:none;border-radius:7px;font-size:11px;font-weight:700;cursor:pointer">✓ Guardar fecha/email/RUTs</button>
               <button onclick="uiState.liq_editId=null;render()" style="padding:9px 14px;background:#eee;color:#555;border:none;border-radius:7px;font-size:11px;cursor:pointer">Cerrar</button>
@@ -4711,7 +4708,6 @@ function descargarLiqV2(liqId) {
     const puntosDetalle = puntos.length>1 ? puntos.map((p,pi)=>`P${pi+1}: ${p.origen||'—'}→${p.destino||'—'}${p.num||p.guia?' (GD:'+( p.num||p.guia)+')':''}`).join(' | ') : '';
     const adicional = s.adicional||0;
     return `<tr style="background:${i%2===0?'#f9fafb':'white'}">
-      <td style="padding:8px 10px;border-bottom:1px solid #eee;font-size:11px;font-weight:700;color:#1F4E79">${s.id}</td>
       <td style="padding:8px 10px;border-bottom:1px solid #eee;font-size:11px;font-weight:600">${s.cliente||'—'}</td>
       <td style="padding:8px 10px;border-bottom:1px solid #eee;font-size:11px;color:#1565C0">${guias}</td>
       <td style="padding:8px 10px;border-bottom:1px solid #eee;font-size:10px">${fechaGuia}</td>
@@ -4765,7 +4761,6 @@ function descargarLiqV2(liqId) {
     <table style="margin-bottom:20px">
       <thead>
         <tr style="background:#0B2545;color:white">
-          <th style="padding:8px;text-align:left">ID</th>
           <th style="padding:8px;text-align:left">CLIENTE</th>
           <th style="padding:8px;text-align:left">N° GUÍA</th>
           <th style="padding:8px;text-align:left">FECHA GUÍA</th>
@@ -6686,9 +6681,9 @@ function pdfListadoRegistros() {
     const gd=pts.map(g=>g.num||g.guia).filter(Boolean).join(', ')||'—';
     const orig=pts[0]?.origen||s.origen||'—';
     const dest=pts[pts.length-1]?.destino||'—';
-    return `<tr><td>${s.id}</td><td>${normFecha(s.fecha)}</td><td>${s.cliente||'—'}</td><td>${s.conductor||'—'}</td><td>${s.patente||'—'}</td><td>${gd}</td><td>${orig} → ${dest}</td><td>${fmtP(s.precio)}</td><td>${badgeTxt(s)}</td></tr>`;
+    return `<tr><td>${normFecha(s.fecha)}</td><td>${s.cliente||'—'}</td><td>${s.conductor||'—'}</td><td>${s.patente||'—'}</td><td>${gd}</td><td>${orig} → ${dest}</td><td>${fmtP(s.precio)}</td><td>${badgeTxt(s)}</td></tr>`;
   };
-  const tablaHTML = svcs => `<table><thead><tr><th>ID</th><th>Fecha</th><th>Cliente</th><th>Conductor</th><th>Patente</th><th>N° Guía</th><th>Origen → Destino</th><th>Precio</th><th>Estado</th></tr></thead><tbody>${svcs.map(filaHTML).join('')}</tbody></table>`;
+  const tablaHTML = svcs => `<table><thead><tr><th>Fecha</th><th>Cliente</th><th>Conductor</th><th>Patente</th><th>N° Guía</th><th>Origen → Destino</th><th>Precio</th><th>Estado</th></tr></thead><tbody>${svcs.map(filaHTML).join('')}</tbody></table>`;
   let body = '';
   if (modo === 'todos') {
     body = `<h3>Todos los registros (${todos.length})</h3>${tablaHTML(todos)}`;
@@ -7317,7 +7312,7 @@ function renderFase(fase) {
           : `<span style="background:#F9A825;color:white;padding:2px 8px;border-radius:10px;font-size:9px;font-weight:700">PENDIENTE</span>`;
         const detalle = estaAbriendo ? `
           <div style="margin-top:8px;padding:10px;background:white;border-radius:8px;border:1px solid #dde">
-            <div style="font-size:9px;font-weight:700;color:#607D8B;margin-bottom:10px">PROCESO LIQUIDACIÓN — ${s.id}</div>
+            <div style="font-size:9px;font-weight:700;color:#607D8B;margin-bottom:10px">PROCESO LIQUIDACIÓN — ${s.cliente||'—'}</div>
 
             <div style="font-size:9px;font-weight:700;color:#1565C0;margin-bottom:6px;background:#E3F2FD;padding:4px 8px;border-radius:5px">🚛 SALIDA — Combustible</div>
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:10px">
@@ -7357,12 +7352,12 @@ function renderFase(fase) {
           <div onclick="uiState.liquidando_id=(uiState.liquidando_id==='${s.id}'?null:'${s.id}');render()" style="width:100%">
           <div style="display:flex;justify-content:space-between;align-items:flex-start">
             <div>
-              <span style="font-size:13px;font-weight:700;color:#455A64;letter-spacing:1px">${s.id}</span>
+              <span style="font-size:13px;font-weight:700;color:#222">${s.cliente||'—'}</span>
               <span style="font-size:11px;color:#777;margin-left:6px">${s.fecha}</span>
             </div>
             ${badge}
           </div>
-          <div style="font-size:12px;font-weight:700;color:#222;margin-top:3px">${s.cliente||'—'}</div>
+          <div style="font-size:10px;color:#546E7A;font-weight:600;margin-top:2px">${s.conductor||'—'} · ${s.patente||'—'}</div>
           <div style="font-size:10px;color:#1565C0;font-weight:600">GD: ${(s.guias||[]).map(g=>g.num).filter(Boolean).join(', ')||'—'}</div>
           <div style="font-size:10px;color:#777">${s.fecha} · Descarga: ${(s.guias||[]).map(g=>g.fecha_descarga).filter(Boolean).join(', ')||'—'}</div>
           <div style="font-size:10px;color:#888">${s.origen||'—'} → ${destinos}</div>
@@ -7403,10 +7398,8 @@ function renderFase(fase) {
 
       return `<div style="margin-bottom:10px;padding:10px 12px;background:#f4f6f8;border-radius:10px;border:1px solid #dde4e8">
 
-        <!-- ID + FECHA -->
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:10px">
-          <div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">ID SERVICIO</div>
-            <div style="background:#455A64;color:white;border-radius:6px;padding:7px 9px;font-size:14px;font-weight:700;letter-spacing:2px">${nextId}</div></div>
+        <!-- FECHA -->
+        <div style="margin-bottom:10px">
           <div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">FECHA SALIDA</div>
             <input id="srv_fecha" type="date" value="${sfFecha}"
               onchange="if(!uiState.srvForm)uiState.srvForm={};uiState.srvForm.fecha=this.value"
@@ -7553,8 +7546,7 @@ function renderFase(fase) {
           const ultimos5 = verTodos ? serviciosPendientes : serviciosMes;
           const lista=ultimos5.length?ultimos5.map((s)=>{const idxReal=servicios.indexOf(s);const isExpanded=!!uiState['srv_exp_'+s.id];const expandKey='srv_exp_'+s.id;const isEditing=uiState.editando_srv_id===s.id;return '<div style="border-radius:8px;margin-bottom:4px;border:1px solid '+(isEditing?'#7E57C2':isExpanded?'#C7D2FE':'#e8eaec')+'">'+(isEditing?renderEditarServicio(s.id):('<div onclick="uiState[\'' +expandKey+ '\']=!uiState[\'' +expandKey+ '\'];render()" style="cursor:pointer;background:'+(isExpanded?'#EEF2FF':'white')+';border-radius:8px">'+srvVista(s)+'</div>'+(isExpanded?`<div style="padding:8px 12px;border-top:1px solid #eee;background:#f8f9fa">${srvDetalle(s)}<div style="display:flex;gap:6px;margin-top:8px"><button onclick="event.stopPropagation();editarServicio('${s.id}')" style="flex:1;background:#455A64;color:white;border:none;border-radius:6px;padding:8px;font-size:11px;font-weight:700;cursor:pointer">✎ Editar servicio</button><button onclick="event.stopPropagation();delServicio(${idxReal})" style="background:#FFEBEE;color:#C62828;border:1px solid #FFCDD2;border-radius:6px;padding:8px 12px;font-size:11px;cursor:pointer;font-weight:700">× Eliminar</button></div></div>`:'')))+'</div>';}).join(''):'<div style="font-size:11px;color:#bbb;padding:6px 0;text-align:center">Sin servicios registrados aún</div>';
           return '<div style="margin-bottom:10px;padding:10px 12px;background:#f4f6f8;border-radius:10px;border:1px solid #dde4e8">'
-            +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:10px"><div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">ID SERVICIO</div><div style="background:#455A64;color:white;border-radius:6px;padding:7px 9px;font-size:14px;font-weight:700;letter-spacing:2px">'+nextId+'</div></div>'
-            +'<div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">FECHA SALIDA</div><input id="srv_fecha" type="date" value="'+sfFecha+'" onchange="if(!uiState.srvForm)uiState.srvForm={};uiState.srvForm.fecha=this.value" style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit;background:white"></div></div>'
+            +'<div style="margin-bottom:10px"><div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">FECHA SALIDA</div><input id="srv_fecha" type="date" value="'+sfFecha+'" onchange="if(!uiState.srvForm)uiState.srvForm={};uiState.srvForm.fecha=this.value" style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit;background:white"></div></div>'
             +'<div style="font-size:10px;font-weight:800;color:#455A64;letter-spacing:1px;margin-bottom:8px;padding-bottom:5px;border-bottom:2px solid #CFD8DC">CONDUCTOR Y EQUIPO</div>'
             +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:10px">'
             +'<div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">CONDUCTOR</div><select id="srv_conductor" onchange="if(!uiState.srvForm)uiState.srvForm={};uiState.srvForm.conductor=this.value;toggleConductorTercero()" style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit;background:white;-webkit-appearance:auto"><option value="">Seleccionar...</option>'+conductoresOpts+'</select><div style="margin-top:3px"><span onclick="mostrarAgregarConductor()" style="font-size:10px;color:#607D8B;cursor:pointer;text-decoration:underline">+ Agregar nuevo</span></div></div>'
@@ -8736,7 +8728,6 @@ function renderInformes() {
           const estado=s.cerrado?'Cerrado':(s.estado==='borrador'?'Borrador':'Pendiente');
           const ec=s.cerrado?'#2E7D32':(s.estado==='borrador'?'#1565C0':'#888');
           return `<tr style="background:${i%2===0?'#fafbfc':'white'};border-bottom:1px solid #eee">
-            <td style="padding:6px 8px;font-size:10px;font-weight:700;color:#0B2545;white-space:nowrap">${s.id}</td>
             <td style="padding:6px 8px;font-size:10px;white-space:nowrap">${s.fecha||'—'}</td>
             <td style="padding:6px 8px;font-size:10px;font-weight:600">${s.cliente||'—'}</td>
             <td style="padding:6px 8px;font-size:10px">${s.conductor||'—'}</td>
@@ -8821,7 +8812,6 @@ function renderInformes() {
       <table style="width:100%;border-collapse:collapse;font-family:inherit;min-width:700px">
         <thead>
           <tr style="background:#0B2545;color:white;position:sticky;top:0">
-            <th style="padding:9px 8px;font-size:9px;font-weight:800;text-align:left">ID</th>
             <th style="padding:9px 8px;font-size:9px;font-weight:800;text-align:left">FECHA</th>
             <th style="padding:9px 8px;font-size:9px;font-weight:800;text-align:left">CLIENTE</th>
             <th style="padding:9px 8px;font-size:9px;font-weight:800;text-align:left">CONDUCTOR</th>
@@ -8859,7 +8849,6 @@ function renderInformes() {
       const guias=puntos.map(g=>g.num||g.guia).filter(Boolean).join(', ')||'—';
       const estado=s.cerrado?'Cerrado':(s.estado==='borrador'?'Borrador':'Pendiente');
       return `<tr style="background:${i%2===0?'#f5f7fa':'white'}">
-        <td>${s.id}</td>
         <td style="white-space:nowrap">${s.fecha||'—'}</td>
         <td>${s.cliente||'—'}</td>
         <td>${s.conductor||'—'}</td>
@@ -8919,7 +8908,7 @@ function renderInformes() {
       </div>
       <table>
         <thead><tr>
-          <th>ID</th><th>Fecha</th><th>Cliente</th><th>Conductor</th><th>Patente</th>
+          <th>Fecha</th><th>Cliente</th><th>Conductor</th><th>Patente</th>
           <th>Ruta</th><th>N° Guía</th><th class="r">Km</th><th class="r">Precio Neto</th><th>Estado</th>
         </tr></thead>
         <tbody>${filas||'<tr><td colspan="10" style="text-align:center;padding:16px;color:#aaa">Sin registros</td></tr>'}</tbody>
@@ -9172,7 +9161,7 @@ function renderInformes() {
     ${liquidados.length===0?`<div style="color:#aaa;font-size:12px;text-align:center;padding:10px">Sin servicios liquidados</div>`:
     liquidados.map(s=>`<div style="padding:8px 10px;background:#F8F9FA;border-radius:7px;margin-bottom:5px;border-left:3px solid #2E7D32">
       <div style="display:flex;justify-content:space-between">
-        <span style="font-size:11px;font-weight:700;color:#333">${s.id} · ${s.patente||'—'}</span>
+        <span style="font-size:11px;font-weight:700;color:#333">${s.cliente||'—'} · ${s.patente||'—'}</span>
         <span style="font-size:11px;font-weight:700;color:#2E7D32">${fmtPeso(s.precio)}</span>
       </div>
       <div style="font-size:10px;color:#777">${s.fecha} · ${s.cliente||'—'} · ${s.margen||0}% margen</div>
@@ -9354,7 +9343,7 @@ function renderAvanceLiquidacion() {
             const guias = (s.guias||[]).map(g=>g.num).filter(Boolean).join(', ') || '—';
             return `<div style="padding:6px 0;border-bottom:1px solid #f5f5f5;display:flex;justify-content:space-between;align-items:center">
               <div>
-                <div style="font-size:11px;font-weight:700;color:#333">${s.id} — ${s.cliente||'—'}</div>
+                <div style="font-size:11px;font-weight:700;color:#333">${s.cliente||'—'}</div>
                 <div style="font-size:9px;color:#777">${s.fecha} · ${s.patente} · Guías: ${guias}</div>
               </div>
               <div style="text-align:right">
@@ -9393,7 +9382,7 @@ function renderCierreLiquidacion() {
 
   const svcOpts = disponibles.map(s => {
     const guias = (s.guias||[]).map(g=>g.num).filter(Boolean).join(',') || '—';
-    return `<option value="${s.id}">${s.id} — ${s.cliente||'—'} — Guía ${guias} — $${(s.precio||0).toLocaleString()}</option>`;
+    return `<option value="${s.id}">${s.cliente||'—'} — Guía ${guias} — $${(s.precio||0).toLocaleString()}</option>`;
   }).join('');
 
   const formHTML = `<div style="padding:10px 12px;background:#f4f6f8;border-radius:10px;border:1px solid #dde4e8;margin-bottom:12px">
@@ -9434,7 +9423,7 @@ function renderCierreLiquidacion() {
         const gdDst=(s.guias||[]).map(g=>g.destino).filter(Boolean).join(' / ')||'—';
         return `<div style="padding:7px 10px;border-bottom:1px solid #f5f5f5;display:flex;justify-content:space-between;align-items:flex-start">
           <div style="flex:1">
-            <div style="font-size:11px;font-weight:800;color:#455A64">${s.id} <span style="color:#222;font-weight:700">${s.cliente||'—'}</span></div>
+            <div style="font-size:11px;font-weight:800;color:#222">${s.cliente||'—'}</div>
             <div style="font-size:10px;color:#1565C0;font-weight:600">GD: ${guias}</div>
             <div style="font-size:10px;color:#777">${s.fecha} · Descarga: ${gdFd}</div>
             <div style="font-size:10px;color:#888">${s.origen||'—'} → ${gdDst}</div>
@@ -9499,7 +9488,7 @@ function renderCierreLiquidacion() {
         ${svcsLiq.map(s => {
           const guias = (s.guias||[]).map(g=>g.num).filter(Boolean).join(', ') || '—';
           return `<div style="padding:5px 0;border-bottom:1px solid #f5f5f5;font-size:11px;color:#555">
-            <strong style="color:#333">${s.id}</strong> — ${s.cliente||'—'} — Guías: ${guias} — <strong>$${(s.precio||0).toLocaleString()}</strong>
+            <strong style="color:#333">${s.cliente||'—'}</strong> — Guías: ${guias} — <strong>$${(s.precio||0).toLocaleString()}</strong>
           </div>`;
         }).join('')}
         
@@ -9728,7 +9717,7 @@ function _armarTextoLiquidacion(liq) {
   lineas += `DETALLE DE SERVICIOS:\n`;
   svcs.forEach(s => {
     const guias = (s.guias||[]).map(g=>g.num).filter(Boolean).join(', ')||'—';
-    lineas += `• ${s.id} | ${s.cliente||'—'} | ${s.fecha} | Guías: ${guias} | $${(s.precio||0).toLocaleString()}\n`;
+    lineas += `• ${s.cliente||'—'} | ${s.fecha} | Guías: ${guias} | $${(s.precio||0).toLocaleString()}\n`;
   });
   lineas += `\nTOTAL: $${(liq.total||0).toLocaleString()}\n`;
   if (liq.nFactura) lineas += `Factura N°: ${liq.nFactura}\n`;
@@ -9745,7 +9734,7 @@ function descargarLiquidacion() {
   texto += `Fecha: ${lf.fecha||''}\n\nDETALLE:\n`;
   svcs.forEach(s => {
     const guias = (s.guias||[]).map(g=>g.num).filter(Boolean).join(', ')||'—';
-    texto += `• ${s.id} | ${s.cliente||'—'} | ${s.fecha} | Guías: ${guias} | $${(s.precio||0).toLocaleString()}\n`;
+    texto += `• ${s.cliente||'—'} | ${s.fecha} | Guías: ${guias} | $${(s.precio||0).toLocaleString()}\n`;
   });
   texto += `\nTOTAL: $${total.toLocaleString()}`;
   const blob = new Blob([texto], {type:'text/plain;charset=utf-8'});
@@ -9776,7 +9765,7 @@ function enviarLiquidacionMail() {
   let cuerpo = `Estimado cliente,%0D%0A%0D%0AAdjuntamos liquidación ${nextNum}.%0D%0A%0D%0ADETALLE:%0D%0A`;
   svcs.forEach(s => {
     const guias = (s.guias||[]).map(g=>g.num).filter(Boolean).join(', ')||'—';
-    cuerpo += `• ${s.id} | ${s.cliente||'—'} | ${s.fecha} | Guías: ${guias} | $${(s.precio||0).toLocaleString()}%0D%0A`;
+    cuerpo += `• ${s.cliente||'—'} | ${s.fecha} | Guías: ${guias} | $${(s.precio||0).toLocaleString()}%0D%0A`;
   });
   cuerpo += `%0D%0ATOTAL: $${total.toLocaleString()}%0D%0A%0D%0ASaludos,%0D%0AGlobal Solutions SpA`;
   window.location.href = `mailto:${email}?subject=Liquidación ${nextNum} — Global Solutions SpA&body=${cuerpo}`;
@@ -9790,7 +9779,7 @@ function enviarLiquidacionMailExistente(liqId) {
   let cuerpo = `Estimado cliente,%0D%0A%0D%0AAdjuntamos liquidación ${liq.id}.%0D%0A%0D%0ADETALLE:%0D%0A`;
   svcs.forEach(s => {
     const guias = (s.guias||[]).map(g=>g.num).filter(Boolean).join(', ')||'—';
-    cuerpo += `• ${s.id} | ${s.cliente||'—'} | ${s.fecha} | Guías: ${guias} | $${(s.precio||0).toLocaleString()}%0D%0A`;
+    cuerpo += `• ${s.cliente||'—'} | ${s.fecha} | Guías: ${guias} | $${(s.precio||0).toLocaleString()}%0D%0A`;
   });
   cuerpo += `%0D%0ATOTAL: $${(liq.total||0).toLocaleString()}%0D%0A%0D%0ASaludos,%0D%0AGlobal Solutions SpA`;
   window.location.href = `mailto:${liq.email||''}?subject=Liquidación ${liq.id} — Global Solutions SpA&body=${cuerpo}`;
