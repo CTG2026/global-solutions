@@ -5,7 +5,7 @@
   <meta http-equiv="cache-control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="pragma" content="no-cache">
   <meta http-equiv="expires" content="1775758565">
-  <meta name="version" content="1775951948">
+  <meta name="version" content="1775955013">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <script>
 // Desregistrar cualquier Service Worker existente de forma inmediata
@@ -17,7 +17,7 @@ if ('serviceWorker' in navigator) {
 </script>
 <script>
 (function() {
-  var VERSION = '1775951948';
+  var VERSION = '1775955013';
   var stored = localStorage.getItem('gs_app_version');
   if (stored !== VERSION) {
     var session = localStorage.getItem('gs_session');
@@ -5339,20 +5339,17 @@ function generarHTMLCotV2(c){
 
 
 // ── VISTA ESTÁNDAR SERVICIO v37g ─────────────────────────
-// Orden: ID / Cliente / GD (nº guía) / Fecha guía / Origen / Destino / Fecha descarga
+// Orden: Cliente / Chofer · Patente / GD / Fecha guía / Origen → Destino
 function srvVista(s) {
   const puntos = (s.puntos && s.puntos.length) ? s.puntos : (s.guias && s.guias.length) ? s.guias : [];
-  // Números de guía en orden P1, P2, P3... — lee guia o num según disponibilidad
   const gdNums = puntos.map(g=>g.guia||g.num||'').filter(Boolean).join(', ') || '—';
   const gdFechaGuia = puntos.map(g=>g.fecha_guia||g.fecha).filter(Boolean).slice(0,1)[0] || s.fecha || '—';
   const gdDescarga = puntos.map(g=>g.fecha_descarga).filter(Boolean).join(', ') || '—';
   const destinoFinal = puntos.map(g=>g.destino).filter(Boolean).slice(-1)[0] || s.destino || '—';
   return `<div style="padding:8px 10px;background:white;border:1px solid #e8eaec;border-radius:8px;margin-bottom:4px">
-    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-      <span style="font-size:12px;font-weight:900;color:#455A64;letter-spacing:1px">${s.id}</span>
-      <span style="font-size:12px;font-weight:700;color:#222">${s.cliente||'—'}</span>
-    </div>
-    <div style="font-size:10px;color:#1565C0;font-weight:700;margin-top:2px">GD: ${gdNums}</div>
+    <div style="font-size:13px;font-weight:800;color:#0B2545;margin-bottom:1px">${s.cliente||'—'}</div>
+    <div style="font-size:10px;color:#546E7A;font-weight:600;margin-bottom:3px">${s.conductor||'—'} · ${s.patente||'—'}</div>
+    <div style="font-size:10px;color:#1565C0;font-weight:700">GD: ${gdNums}</div>
     <div style="font-size:10px;color:#777;margin-top:1px">Fecha guia: ${gdFechaGuia} · Descarga: ${gdDescarga}</div>
     <div style="font-size:10px;color:#888;margin-top:1px">${s.origen||'—'} → ${destinoFinal}</div>
   </div>`;
@@ -5389,11 +5386,9 @@ function srvDetalle(s) {
       </div>`;
   return `<div style="background:#F8F9FA;border-radius:8px;padding:10px 12px;margin-top:6px;border:1px solid #e8eaec">
     <div style="margin-bottom:8px">
-      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:2px">
-        <span style="font-size:13px;font-weight:900;color:#455A64;letter-spacing:1px">ID: ${s.id}</span>
-      </div>
-      <div style="font-size:12px;font-weight:700;color:#222"><span style="font-size:9px;font-weight:400;color:#aaa;display:block">Cliente</span>${s.cliente||'—'}</div>
-      <div style="font-size:10px;color:#546E7A;margin-top:3px;font-weight:600">${nGuias} guía${nGuias!==1?'s':''}</div>
+      <div style="font-size:14px;font-weight:800;color:#0B2545;margin-bottom:2px">${s.cliente||'—'}</div>
+      <div style="font-size:11px;color:#546E7A;font-weight:700;margin-bottom:2px">${s.conductor||'—'} · ${s.patente||'—'}</div>
+      <div style="font-size:10px;color:#888;font-weight:600">${nGuias} guía${nGuias!==1?'s':''}</div>
     </div>
     ${rows}
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:8px">
