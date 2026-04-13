@@ -17,7 +17,7 @@ if ('serviceWorker' in navigator) {
 </script>
 <script>
 (function() {
-  var VERSION = '1775956403';
+  var VERSION = '1776119880';
   var stored = localStorage.getItem('gs_app_version');
   if (stored !== VERSION) {
     var session = localStorage.getItem('gs_session');
@@ -6408,6 +6408,7 @@ function renderHistorialRendimiento() {
   });
 
   const hdr = `<div onclick="uiState.historial_rend_open=${!isOpen};render()" style="display:flex;justify-content:space-between;align-items:center;cursor:pointer;padding:9px 12px;background:#EDE7F6;border-radius:${isOpen?'8px 8px 0 0':'8px'};border:1px solid #CE93D8;margin-top:8px">
+  ${s.precio ? `<div style="font-size:10px;font-weight:700;color:#2E7D32;margin-top:3px;">$${s.precio.toLocaleString('es-CL')} neto</div>` : ''}
     <div style="font-size:11px;font-weight:800;color:#4A148C;letter-spacing:1px">📋 HISTORIAL DE RENDIMIENTO ${hist.length?'('+hist.length+')':''}</div>
     <div style="font-size:10px;color:#7B1FA2">${isOpen?'▲ ocultar':'▼ ver'}</div>
   </div>`;
