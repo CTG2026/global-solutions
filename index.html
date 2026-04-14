@@ -17,7 +17,7 @@ if ('serviceWorker' in navigator) {
 </script>
 <script>
 (function() {
-  var VERSION = '1776121914';
+  var VERSION = '1776183814';
   var stored = localStorage.getItem('gs_app_version');
   if (stored !== VERSION) {
     var session = localStorage.getItem('gs_session');
@@ -7929,6 +7929,8 @@ async function syncServiciosDesdeSupabase() {
 }
 
 function _procesarRemotosServicios(data) {
+    // Preservar borradores locales antes de sobreescribir con Supabase
+    const borradorLocales = (appData.servicios||[]).filter(s => s.estado === 'borrador' && s.precio);
     appData.servicios = [];
     if (data && data.length > 0) {
       const remotos = data.map(r => ({
@@ -7956,6 +7958,14 @@ function _procesarRemotosServicios(data) {
       }));
       appData.servicios = remotos;
     }
+    // Restaurar borradores locales que no están en Supabase aún
+    borradorLocales.forEach(borrador => {
+      const enRemoto = appData.servicios.find(s => s.id === borrador.id);
+      if (enRemoto && !enRemoto.precio && borrador.precio) {
+        // El remoto no tiene precio pero el local sí — usar local
+        Object.assign(enRemoto, borrador);
+      }
+    });
     saveData(); render();
 }
 
