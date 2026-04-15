@@ -6955,15 +6955,12 @@ async function addServicio() {
   uiState.srvForm = {};
   saveData();
   render();
+  // Mostrar toast inmediatamente — no esperar respuesta de Supabase
+  mostrarToastServicio(supaConectado);
+  // Sincronizar con Supabase en background
   if (supaConectado && supa) {
-    try {
-      await upsertServicioSupabase(servicio);
-      mostrarToastServicio(true);
-    } catch(e) { mostrarToastServicio(false); }
-  } else {
-    mostrarToastServicio(false);
+    upsertServicioSupabase(servicio).catch(e => console.warn('Sync servicio:', e));
   }
-  render();
 }
 async function delServicio(si) {
   if (!appData.servicios) return;
@@ -7750,8 +7747,6 @@ function servicioToRow(s) {
     comision_conductor: s.comisionConductor || 0,
     monto_puntos: s.montoPuntos || 0,
     num_puntos: s.numPuntos || 1,
-    estadia: s.estadia || 'no',
-    estadia_dias: s.estadiaDias || 1,
     base_conductor: s.baseConductor || 0,
     gasto_financiero: s.gastoFinanciero || 0,
     documentos: s.documentos || [],
@@ -8007,8 +8002,6 @@ async function upsertServicioSupabase(s) {
       liquidacion_id: s.liquidacionId||'',
       monto_puntos: s.montoPuntos||0,
       num_puntos: s.numPuntos||1,
-      estadia: s.estadia||'no',
-      estadia_dias: s.estadiaDias||1,
       base_conductor: s.baseConductor||0,
       gasto_financiero: s.gastoFinanciero||0,
       documentos: s.documentos||[]
