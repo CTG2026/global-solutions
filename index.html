@@ -17,7 +17,7 @@ if ('serviceWorker' in navigator) {
 </script>
 <script>
 (function() {
-  var VERSION = '1776184260';
+  var VERSION = '1776229200';
   var stored = localStorage.getItem('gs_app_version');
   if (stored !== VERSION) {
     var session = localStorage.getItem('gs_session');
@@ -5617,7 +5617,7 @@ function renderEditarServicio(id) {
   </div>`;
 }
 
-const ESTRUCTURA_VERSION = '78'; // Incrementar cuando cambie la estructura del panel
+const ESTRUCTURA_VERSION = '79'; // Incrementar cuando cambie la estructura del panel
 
 function loadData() {
   // Si la versión estructural cambió, limpiar la estructura pero preservar datos
@@ -6957,8 +6957,8 @@ async function addServicio() {
   render();
   if (supaConectado && supa) {
     try {
-      const { error } = await supa.from('servicios').upsert(servicioToRow(servicio), {onConflict:'id'});
-      mostrarToastServicio(!error);
+      await upsertServicioSupabase(servicio);
+      mostrarToastServicio(true);
     } catch(e) { mostrarToastServicio(false); }
   } else {
     mostrarToastServicio(false);
@@ -7729,6 +7729,7 @@ function servicioToRow(s) {
     origen: s.origen || '',
     peajes: s.peajes || 0,
     guias: s.guias || [],
+    puntos: s.puntos || s.guias || [],
     precio: s.precio || 0,
     km: s.km || 0,
     litros: s.litros || 0,
@@ -7745,14 +7746,15 @@ function servicioToRow(s) {
     liquidacion_id: s.liquidacionId || '',
     cerrado: s.cerrado || false,
     estado: s.estado || 'activo',
-    puntos: s.puntos || s.guias || [],
     cf_prorrateado: s.cfProrrateado || 50800,
     comision_conductor: s.comisionConductor || 0,
     monto_puntos: s.montoPuntos || 0,
     num_puntos: s.numPuntos || 1,
+    estadia: s.estadia || 'no',
+    estadia_dias: s.estadiaDias || 1,
     base_conductor: s.baseConductor || 0,
     gasto_financiero: s.gastoFinanciero || 0,
-    documentos: s.documentos || []
+    documentos: s.documentos || [],
   };
 }
 
@@ -7923,8 +7925,7 @@ async function syncServiciosDesdeSupabase() {
     if (pendientesDeSubir.length > 0) {
       console.log(`Subiendo ${pendientesDeSubir.length} servicio(s) local(es) pendientes a Supabase...`);
       for (const s of pendientesDeSubir) {
-        try { await supa.from('servicios').upsert(servicioToRow(s), {onConflict:'id'}); }
-        catch(e) { console.warn('Error subiendo servicio pendiente:', s.id, e); }
+        await upsertServicioSupabase(s);
       }
       // Re-fetch para incluir los recién subidos
       const { data: data2, error: err2 } = await supa.from('servicios').select('*').order('created_at');
@@ -7961,20 +7962,26 @@ function _procesarRemotosServicios(data) {
         cfProrrateado: r.cf_prorrateado||50800,
         comisionConductor: r.comision_conductor||0,
         montoPuntos: r.monto_puntos||0,
-        numPuntos: r.num_puntos||1,
         baseConductor: r.base_conductor||0,
         gastoFinanciero: r.gasto_financiero||0,
         documentos: r.documentos||[],
       }));
       appData.servicios = remotos;
     }
-    // Restaurar borradores locales que no están en Supabase aún
+    // ── Restaurar borradores locales ──────────────────────────────────────────
+    // Se restaura si Supabase no lo tiene como 'borrador' o 'cerrado'
+    // (caso típico: upsert falló por columnas faltantes en la tabla)
     borradorLocales.forEach(borrador => {
-      const enRemoto = appData.servicios.find(s => s.id === borrador.id);
-      if (enRemoto && !enRemoto.precio && borrador.precio) {
-        // El remoto no tiene precio pero el local sí — usar local
-        Object.assign(enRemoto, borrador);
+      const idx = appData.servicios.findIndex(s => s.id === borrador.id);
+      if (idx === -1) {
+        // Servicio no existe en Supabase — agregar el borrador local
+        appData.servicios.push({...borrador});
+      } else if (appData.servicios[idx].estado !== 'borrador' && appData.servicios[idx].estado !== 'cerrado') {
+        // Supabase tiene el servicio pero sin estado borrador (upsert falló) — usar local
+        Object.assign(appData.servicios[idx], borrador);
       }
+      // Si Supabase ya tiene estado='borrador', sus datos son correctos — no tocar
+      // Si Supabase tiene estado='cerrado', no revertir a borrador
     });
     saveData(); render();
 }
@@ -8000,11 +8007,20 @@ async function upsertServicioSupabase(s) {
       liquidacion_id: s.liquidacionId||'',
       monto_puntos: s.montoPuntos||0,
       num_puntos: s.numPuntos||1,
+      estadia: s.estadia||'no',
+      estadia_dias: s.estadiaDias||1,
       base_conductor: s.baseConductor||0,
       gasto_financiero: s.gastoFinanciero||0,
       documentos: s.documentos||[]
     };
-    await supa.from('servicios').upsert(row, { onConflict: 'id' });
+    const { error } = await supa.from('servicios').upsert(row, { onConflict: 'id' });
+    if (error) {
+      // Fallback: reintentar sin columnas posiblemente faltantes en la tabla
+      console.warn('Upsert servicio falló, reintentando sin columnas nuevas:', error.message);
+      const { base_conductor, gasto_financiero, documentos, ...rowBase } = row;
+      const { error: err2 } = await supa.from('servicios').upsert(rowBase, { onConflict: 'id' });
+      if (err2) console.warn('Error upsert servicio (fallback):', err2.message);
+    }
   } catch(e) { console.warn('Error upsert servicio:', e); }
 }
 
@@ -11009,7 +11025,7 @@ function aplicarAcceso() {
 
 loadData(); iniciarLogin(); initSupabase();
 
-// ── AUTO-REFRESCO v37: cada 3 minutos ──────────────────
+// ── AUTO-REFRESCO v38: cada 1 minuto ──────────────────
 setInterval(async () => {
   if (!supaConectado || !supa) return;
   // No interrumpir si el usuario está llenando un formulario activo
@@ -11020,7 +11036,10 @@ setInterval(async () => {
     'fac_numero', 'fac_monto_neto'
   ];
   const _ae2 = document.activeElement;
-  const hayFormAbierto = formulariosActivos.some(id => document.getElementById(id) !== null)
+  // Detectar formulario de cierre de servicios abierto (IDs dinámicos como cs_precio_${id})
+  const hayCierreAbierto = !!document.querySelector('[id^="cs_precio_"]');
+  const hayFormAbierto = hayCierreAbierto
+    || formulariosActivos.some(id => document.getElementById(id) !== null)
     || (_ae2 && (_ae2.tagName==='INPUT'||_ae2.tagName==='TEXTAREA'||_ae2.tagName==='SELECT'));
   if (hayFormAbierto) return;
   try {
@@ -11038,6 +11057,7 @@ document.addEventListener('touchend', async e => {
   if (dy > 80 && window.scrollY === 0 && supaConectado) {
     const formulariosActivos = ['srv_fecha','srv_conductor','srv_patente','srv_cliente','pip_new_cliente','disp_fecha','liq_fecha_v2','ren_fecha','ren_responsable','ren_descripcion'];
     if (formulariosActivos.some(id => document.getElementById(id) !== null)) return;
+    if (document.querySelector('[id^="cs_precio_"]')) return;
     const el = document.getElementById('save-indicator');
     if (el) { el.textContent = '↻ Actualizando...'; el.classList.add('show'); }
     await syncServiciosDesdeSupabase();
