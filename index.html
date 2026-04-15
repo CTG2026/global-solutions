@@ -17,7 +17,7 @@ if ('serviceWorker' in navigator) {
 </script>
 <script>
 (function() {
-  var VERSION = '1776183814';
+  var VERSION = '1776229200';
   var stored = localStorage.getItem('gs_app_version');
   if (stored !== VERSION) {
     var session = localStorage.getItem('gs_session');
@@ -5617,7 +5617,7 @@ function renderEditarServicio(id) {
   </div>`;
 }
 
-const ESTRUCTURA_VERSION = '78'; // Incrementar cuando cambie la estructura del panel
+const ESTRUCTURA_VERSION = '79'; // Incrementar cuando cambie la estructura del panel
 
 function loadData() {
   // Si la versión estructural cambió, limpiar la estructura pero preservar datos
@@ -7958,12 +7958,13 @@ function _procesarRemotosServicios(data) {
       }));
       appData.servicios = remotos;
     }
-    // Restaurar borradores locales que no están en Supabase aún
+        // ── Restaurar borradores locales ──────────────────────────────────────────
     borradorLocales.forEach(borrador => {
-      const enRemoto = appData.servicios.find(s => s.id === borrador.id);
-      if (enRemoto && !enRemoto.precio && borrador.precio) {
-        // El remoto no tiene precio pero el local sí — usar local
-        Object.assign(enRemoto, borrador);
+      const idx = appData.servicios.findIndex(s => s.id === borrador.id);
+      if (idx === -1) {
+        appData.servicios.push({...borrador});
+      } else if (appData.servicios[idx].estado !== 'borrador' && appData.servicios[idx].estado !== 'cerrado') {
+        Object.assign(appData.servicios[idx], borrador);
       }
     });
     saveData(); render();
@@ -10999,7 +11000,7 @@ function aplicarAcceso() {
 
 loadData(); iniciarLogin(); initSupabase();
 
-// ── AUTO-REFRESCO v37: cada 3 minutos ──────────────────
+// ── AUTO-REFRESCO v38: cada 1 minutos ──────────────────
 setInterval(async () => {
   if (!supaConectado || !supa) return;
   // No interrumpir si el usuario está llenando un formulario activo
@@ -11010,7 +11011,9 @@ setInterval(async () => {
     'fac_numero', 'fac_monto_neto'
   ];
   const _ae2 = document.activeElement;
-  const hayFormAbierto = formulariosActivos.some(id => document.getElementById(id) !== null)
+    const hayCierreAbierto = !!document.querySelector('[id^="cs_precio_"]');
+  const hayFormAbierto = hayCierreAbierto
+    || formulariosActivos.some(id => document.getElementById(id) !== null)
     || (_ae2 && (_ae2.tagName==='INPUT'||_ae2.tagName==='TEXTAREA'||_ae2.tagName==='SELECT'));
   if (hayFormAbierto) return;
   try {
@@ -11026,9 +11029,14 @@ document.addEventListener('touchstart', e => { _ptY = e.touches[0].clientY; }, {
 document.addEventListener('touchend', async e => {
   const dy = e.changedTouches[0].clientY - _ptY;
   if (dy > 80 && window.scrollY === 0 && supaConectado) {
-    const formulariosActivos = ['srv_fecha','srv_conductor','srv_patente','srv_cliente','pip_new_cliente','disp_fecha','liq_fecha_v2','ren_fecha','ren_responsable','ren_descripcion'];
-    if (formulariosActivos.some(id => document.getElementById(id) !== null)) return;
-    const el = document.getElementById('save-indicator');
+      const hayCierreAbierto = !!document.querySelector('[id^="cs_precio_"]');
+  const hayFormAbierto = hayCierreAbierto
+    || formulariosActivos.some(id => document.getElementById(id) !== null)
+    || (_ae2 && (_ae2.tagName==='INPUT'||_ae2.tagName==='TEXTAREA'||_ae2.tagName==='SELECT'));
+  if (hayFormAbierto) return;
+  try {
+    await syncServiciosDesdeSupabase();
+    await syncDisponibilidadDesdeSupabase();
     if (el) { el.textContent = '↻ Actualizando...'; el.classList.add('show'); }
     await syncServiciosDesdeSupabase();
     await syncDisponibilidadDesdeSupabase();
