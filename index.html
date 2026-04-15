@@ -4,8 +4,8 @@
 <meta charset="UTF-8">
   <meta http-equiv="cache-control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="pragma" content="no-cache">
-  <meta http-equiv="expires" content="1776121914">
-  <meta name="version" content="1776121914">
+  <meta http-equiv="expires" content="1776184260">
+  <meta name="version" content="1776184260">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <script>
 // Desregistrar cualquier Service Worker existente de forma inmediata
@@ -17,7 +17,7 @@ if ('serviceWorker' in navigator) {
 </script>
 <script>
 (function() {
-  var VERSION = '1776229200';
+  var VERSION = '1776184260';
   var stored = localStorage.getItem('gs_app_version');
   if (stored !== VERSION) {
     var session = localStorage.getItem('gs_session');
@@ -1693,7 +1693,7 @@ function pdfRendicion(id) {
   const html = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
   <meta http-equiv="cache-control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="pragma" content="no-cache">
-  <meta http-equiv="expires" content="1776121914"><title>${ren.id} — Global Solutions SpA</title>
+  <meta http-equiv="expires" content="1776184260"><title>${ren.id} — Global Solutions SpA</title>
   <style>* {box-sizing:border-box;margin:0;padding:0;} body {font-family:'Segoe UI',Arial,sans-serif;color:#222;background:white;} .page {max-width:860px;margin:0 auto;padding:40px;} table {border-collapse:collapse;width:100%;} @media print {.no-print{display:none!important} .page{padding:20px}}</style>
   </head><body><div class="page">
     <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:24px;padding-bottom:16px;border-bottom:3px solid #0B2545">
@@ -4724,7 +4724,7 @@ function descargarLiqV2(liqId) {
   const html = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
   <meta http-equiv="cache-control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="pragma" content="no-cache">
-  <meta http-equiv="expires" content="1776121914">
+  <meta http-equiv="expires" content="1776184260">
   <title>${liq.id} — Global Solutions SpA</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -5279,7 +5279,7 @@ function abrirPreviewCotV2(){
   win.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8">
   <meta http-equiv="cache-control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="pragma" content="no-cache">
-  <meta http-equiv="expires" content="1776121914"><title>${numero}</title><style>body{font-family:'Segoe UI',sans-serif;padding:30px;max-width:680px;margin:0 auto}@media print{.no-print{display:none!important}}</style></head><body>${html}<script>setTimeout(()=>window.print(),400);<\/script></body></html>`);
+  <meta http-equiv="expires" content="1776184260"><title>${numero}</title><style>body{font-family:'Segoe UI',sans-serif;padding:30px;max-width:680px;margin:0 auto}@media print{.no-print{display:none!important}}</style></head><body>${html}<script>setTimeout(()=>window.print(),400);<\/script></body></html>`);
   win.document.close();
   // Guardar cotización
   if(!appData.cotizaciones) appData.cotizaciones=[];
@@ -5294,7 +5294,7 @@ function abrirPreviewCot(cotObj){
   win.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8">
   <meta http-equiv="cache-control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="pragma" content="no-cache">
-  <meta http-equiv="expires" content="1776121914"><title>${cotObj.numero}</title><style>body{font-family:'Segoe UI',sans-serif;padding:30px;max-width:680px;margin:0 auto}@media print{.no-print{display:none!important}}</style></head><body>${html}<script>setTimeout(()=>window.print(),400);<\/script></body></html>`);
+  <meta http-equiv="expires" content="1776184260"><title>${cotObj.numero}</title><style>body{font-family:'Segoe UI',sans-serif;padding:30px;max-width:680px;margin:0 auto}@media print{.no-print{display:none!important}}</style></head><body>${html}<script>setTimeout(()=>window.print(),400);<\/script></body></html>`);
   win.document.close();
 }
 
@@ -5617,7 +5617,7 @@ function renderEditarServicio(id) {
   </div>`;
 }
 
-const ESTRUCTURA_VERSION = '79'; // Incrementar cuando cambie la estructura del panel
+const ESTRUCTURA_VERSION = '78'; // Incrementar cuando cambie la estructura del panel
 
 function loadData() {
   // Si la versión estructural cambió, limpiar la estructura pero preservar datos
@@ -7743,6 +7743,16 @@ function servicioToRow(s) {
     rendimiento: s.rendimiento || 0,
     tag: s.tag || '',
     liquidacion_id: s.liquidacionId || '',
+    cerrado: s.cerrado || false,
+    estado: s.estado || 'activo',
+    puntos: s.puntos || s.guias || [],
+    cf_prorrateado: s.cfProrrateado || 50800,
+    comision_conductor: s.comisionConductor || 0,
+    monto_puntos: s.montoPuntos || 0,
+    num_puntos: s.numPuntos || 1,
+    base_conductor: s.baseConductor || 0,
+    gasto_financiero: s.gastoFinanciero || 0,
+    documentos: s.documentos || []
   };
 }
 
@@ -7958,13 +7968,12 @@ function _procesarRemotosServicios(data) {
       }));
       appData.servicios = remotos;
     }
-        // ── Restaurar borradores locales ──────────────────────────────────────────
+    // Restaurar borradores locales que no están en Supabase aún
     borradorLocales.forEach(borrador => {
-      const idx = appData.servicios.findIndex(s => s.id === borrador.id);
-      if (idx === -1) {
-        appData.servicios.push({...borrador});
-      } else if (appData.servicios[idx].estado !== 'borrador' && appData.servicios[idx].estado !== 'cerrado') {
-        Object.assign(appData.servicios[idx], borrador);
+      const enRemoto = appData.servicios.find(s => s.id === borrador.id);
+      if (enRemoto && !enRemoto.precio && borrador.precio) {
+        // El remoto no tiene precio pero el local sí — usar local
+        Object.assign(enRemoto, borrador);
       }
     });
     saveData(); render();
@@ -11000,7 +11009,7 @@ function aplicarAcceso() {
 
 loadData(); iniciarLogin(); initSupabase();
 
-// ── AUTO-REFRESCO v38: cada 1 minutos ──────────────────
+// ── AUTO-REFRESCO v37: cada 3 minutos ──────────────────
 setInterval(async () => {
   if (!supaConectado || !supa) return;
   // No interrumpir si el usuario está llenando un formulario activo
@@ -11011,9 +11020,7 @@ setInterval(async () => {
     'fac_numero', 'fac_monto_neto'
   ];
   const _ae2 = document.activeElement;
-    const hayCierreAbierto = !!document.querySelector('[id^="cs_precio_"]');
-  const hayFormAbierto = hayCierreAbierto
-    || formulariosActivos.some(id => document.getElementById(id) !== null)
+  const hayFormAbierto = formulariosActivos.some(id => document.getElementById(id) !== null)
     || (_ae2 && (_ae2.tagName==='INPUT'||_ae2.tagName==='TEXTAREA'||_ae2.tagName==='SELECT'));
   if (hayFormAbierto) return;
   try {
@@ -11029,14 +11036,9 @@ document.addEventListener('touchstart', e => { _ptY = e.touches[0].clientY; }, {
 document.addEventListener('touchend', async e => {
   const dy = e.changedTouches[0].clientY - _ptY;
   if (dy > 80 && window.scrollY === 0 && supaConectado) {
-      const hayCierreAbierto = !!document.querySelector('[id^="cs_precio_"]');
-  const hayFormAbierto = hayCierreAbierto
-    || formulariosActivos.some(id => document.getElementById(id) !== null)
-    || (_ae2 && (_ae2.tagName==='INPUT'||_ae2.tagName==='TEXTAREA'||_ae2.tagName==='SELECT'));
-  if (hayFormAbierto) return;
-  try {
-    await syncServiciosDesdeSupabase();
-    await syncDisponibilidadDesdeSupabase();
+    const formulariosActivos = ['srv_fecha','srv_conductor','srv_patente','srv_cliente','pip_new_cliente','disp_fecha','liq_fecha_v2','ren_fecha','ren_responsable','ren_descripcion'];
+    if (formulariosActivos.some(id => document.getElementById(id) !== null)) return;
+    const el = document.getElementById('save-indicator');
     if (el) { el.textContent = '↻ Actualizando...'; el.classList.add('show'); }
     await syncServiciosDesdeSupabase();
     await syncDisponibilidadDesdeSupabase();
