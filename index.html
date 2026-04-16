@@ -6844,6 +6844,7 @@ function buildGuiasRegistroHTML() {
       <div style="display:flex;gap:6px;flex-wrap:wrap">
         ${pill(sfOrigen==='Casablanca','Casablanca',"if(!uiState.srvForm)uiState.srvForm={};uiState.srvForm.origen='Casablanca';render()")}
         ${pill(sfOrigen==='Coltauco','Coltauco',"if(!uiState.srvForm)uiState.srvForm={};uiState.srvForm.origen='Coltauco';render()")}
+        ${pill(sfOrigen==='San Clemente','San Clemente',"if(!uiState.srvForm)uiState.srvForm={};uiState.srvForm.origen='San Clemente';render()")}
         ${pill(sfOrigen==='manual','Otro...',"if(!uiState.srvForm)uiState.srvForm={};uiState.srvForm.origen='manual';render()")}
       </div>
       ${sfOrigen==='manual'?`<input id="srv_origen_manual" value="${sfOrigenManual}" oninput="if(!uiState.srvForm)uiState.srvForm={};uiState.srvForm.origenManual=this.value" placeholder="Ingresar origen..." style="margin-top:8px;width:100%;border:2px solid #455A64;border-radius:8px;padding:12px;font-size:13px;outline:none;font-family:inherit">`:''}
