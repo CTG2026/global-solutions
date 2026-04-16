@@ -5843,7 +5843,11 @@ function saveUI() {
 
 function saveData() {
   try {
-    localStorage.setItem('gs_panel_v5', JSON.stringify(appData));
+    // Excluir fotos (base64) del save principal para evitar que appData sea demasiado grande
+    const appDataLite = (appData.servicios||[]).some(s=>s.fotos&&s.fotos.length)
+      ? {...appData, servicios: appData.servicios.map(s => s.fotos&&s.fotos.length ? (({fotos,...r})=>r)(s) : s)}
+      : appData;
+    localStorage.setItem('gs_panel_v5', JSON.stringify(appDataLite));
     localStorage.setItem('gs_panel_ui_v5', JSON.stringify(uiState));
     mostrarToastGuardado();
   } catch(e) {
@@ -6962,14 +6966,14 @@ async function addServicio() {
   }
   uiState.srv_guias = [{ num:'', destino:'', fecha_guia:'', fecha_descarga:'', kg:'', imagen_url:'' }];
   uiState.srvForm = {};
+  uiState.srv_listado_visible = false; // Colapsar historial para que el render post-save sea rápido
   saveData();
-  render();
-  // Mostrar toast inmediatamente — no esperar respuesta de Supabase
+  // Mostrar toast antes del render — doble rAF garantiza que el browser pinte el toast primero
   mostrarToastServicio(supaConectado);
-  // Sincronizar con Supabase en background
   if (supaConectado && supa) {
     upsertServicioSupabase(servicio).catch(e => console.warn('Sync servicio:', e));
   }
+  requestAnimationFrame(() => requestAnimationFrame(() => render()));
 }
 async function delServicio(si) {
   if (!appData.servicios) return;
@@ -7572,7 +7576,7 @@ function renderFase(fase) {
             +(filtroClienteOper?'<button onclick="uiState.srv_filtro_cliente=\'\';render()" style="padding:4px 8px;border-radius:5px;font-size:10px;cursor:pointer;border:1px solid #FFCDD2;background:#FFEBEE;color:#C62828;font-weight:700">✕ Limpiar</button>':'')
             +'</div>'
             +(serviciosPendientes.length?'<div style="margin-top:4px"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px"><div style="font-size:10px;font-weight:700;color:#607D8B;letter-spacing:1px">SERVICIOS PENDIENTES DE CERRAR ('+serviciosPendientes.length+')</div><span onclick="uiState.srv_ver_todos=!uiState.srv_ver_todos;render()" style="font-size:9px;color:#1565C0;cursor:pointer;text-decoration:underline">'+(verTodos?'Ver mes actual':'Ver todos')+'</span></div>'+lista+'</div>':'<div style="margin-top:6px">'+lista+'</div>')
-            +(_acceso==='conductor' ? '' : renderListadoRegistros(serviciosOrdenados))
+            +(_acceso==='conductor' ? '' : (uiState.srv_listado_visible ? renderListadoRegistros(serviciosOrdenados) : '<div style="margin-top:14px;border-top:2px solid #CFD8DC;padding-top:10px"><button onclick="uiState.srv_listado_visible=true;render()" style="width:100%;padding:10px;background:#ECEFF1;border:1px solid #CFD8DC;border-radius:8px;font-size:11px;font-weight:700;color:#607D8B;cursor:pointer">📋 Ver historial de registros ('+serviciosOrdenados.length+')</button></div>'))
             +'</div>';
         })(); return '<div style="margin:-4px">'+serviciosBlock+'</div>'; })() : ''}
         ${tarea.cierreServicioTask ? `<div style="margin:-4px">${renderCierreServicios()}</div>` : ''}
