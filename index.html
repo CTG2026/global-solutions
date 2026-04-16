@@ -7968,22 +7968,23 @@ function _procesarRemotosServicios(data) {
       appData.servicios = remotos;
     }
     // ── Restaurar borradores locales ──────────────────────────────────────────
-    // Se restaura si Supabase no lo tiene como 'borrador' o 'cerrado'
-    // (caso típico: upsert falló por columnas faltantes en la tabla)
     borradorLocales.forEach(borrador => {
       const idx = appData.servicios.findIndex(s => s.id === borrador.id);
       if (idx === -1) {
-        // Servicio no existe en Supabase — agregar el borrador local
         appData.servicios.push({...borrador});
       } else if (appData.servicios[idx].estado !== 'borrador' && appData.servicios[idx].estado !== 'cerrado') {
-        // Supabase tiene el servicio pero sin estado borrador (upsert falló) — usar local
         Object.assign(appData.servicios[idx], borrador);
       }
-      // Si Supabase ya tiene estado='borrador', sus datos son correctos — no tocar
-      // Si Supabase tiene estado='cerrado', no revertir a borrador
     });
-    saveData(); render();
+    saveData();
+    // Solo renderizar si la cantidad o estado de servicios cambió
+    const _hashNuevo = appData.servicios.map(s=>s.id+'|'+s.estado+'|'+(s.precio||0)).join(',');
+    if (typeof _ultimoHashServicios === 'undefined' || _ultimoHashServicios !== _hashNuevo) {
+      _ultimoHashServicios = _hashNuevo;
+      render();
+    }
 }
+let _ultimoHashServicios = '';
 
 async function upsertServicioSupabase(s) {
   if (!supa || !supaConectado) return;
@@ -10791,7 +10792,15 @@ function saveDashSingle() {
   saveData(); render();
 }
 
+let _renderTimer = null;
 function render() {
+  if (_renderTimer) return; // ya hay un render pendiente
+  _renderTimer = requestAnimationFrame(() => {
+    _renderTimer = null;
+    _renderImpl();
+  });
+}
+function _renderImpl() {
   _deduplicarFases();
   const dashEl = document.getElementById('dashboard-container');
   // Ocultar dashboard cuando se filtra por un ámbito específico
@@ -11042,7 +11051,7 @@ setInterval(async () => {
   try {
     await syncServiciosDesdeSupabase();
     await syncDisponibilidadDesdeSupabase();
-    render();
+    // render() ya es llamado por _procesarRemotosServicios — no duplicar
   } catch(e) {}
 }, 1 * 60 * 1000); // 1 minuto
 
