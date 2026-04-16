@@ -5504,9 +5504,9 @@ async function guardarEdicionServicio() {
   Object.assign(appData.servicios[idx], {fecha:fechaFinal, conductor, patente, tipoEquipo, cliente, origen, estadia, estadiaDias, numPuntos, puntos, guias:puntos});
   delete uiState.editando_srv_id;
   delete uiState.edit_srv_puntos;
-  await upsertServicioSupabase(appData.servicios[idx]);
   saveData(); render();
   showToastGeneral('✅ Servicio actualizado','#2E7D32');
+  if (supaConectado && supa) upsertServicioSupabase(appData.servicios[idx]).catch(e => console.warn('Sync servicio edición:', e));
 }
 function renderEditarServicio(id) {
   const s = (appData.servicios||[]).find(sv=>sv.id===id);
@@ -5842,9 +5842,14 @@ function saveUI() {
 }
 
 function saveData() {
-  localStorage.setItem('gs_panel_v5', JSON.stringify(appData));
-  localStorage.setItem('gs_panel_ui_v5', JSON.stringify(uiState));
-  mostrarToastGuardado();
+  try {
+    localStorage.setItem('gs_panel_v5', JSON.stringify(appData));
+    localStorage.setItem('gs_panel_ui_v5', JSON.stringify(uiState));
+    mostrarToastGuardado();
+  } catch(e) {
+    console.warn('saveData error:', e);
+    mostrarToastGuardado('⚠️ Sin espacio local');
+  }
 }
 function mostrarToastGuardado(msg) {
   const ind = document.getElementById('save-indicator');
@@ -7505,7 +7510,7 @@ function renderFase(fase) {
         <span class="acord-count" onclick="toggleAcord('${fase.id}',${tiReal})">${tarea.subtareas.length}</span>
       </div>
       <div class="acord-body ${isOpen?'open':''}">
-        ${liquidacionHTML}
+        ${!isOpen?'':`${liquidacionHTML}
         ${tarea.registroServicio ? (() => { const serviciosBlock = (()=>{
           const servicios=appData.servicios||[];
           const hoyISO=(()=>{const h=new Date();return h.getFullYear()+'-'+String(h.getMonth()+1).padStart(2,'0')+'-'+String(h.getDate()).padStart(2,'0');})();
@@ -7588,7 +7593,7 @@ function renderFase(fase) {
           <input class="add-sub-input" id="sub_input_${fase.id}_${tiReal}" placeholder="+ Agregar paso..." onkeydown="if(event.key==='Enter')addSub('${fase.id}',${tiReal})">
           <button class="add-sub-btn" style="background:${fase.color}" onclick="addSub('${fase.id}',${tiReal})">+</button>
         </div>
-        ${procHTML}
+        ${procHTML}`}
       </div>
     </div>`;
   }).join('');
