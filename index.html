@@ -4,8 +4,8 @@
 <meta charset="UTF-8">
   <meta http-equiv="cache-control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="pragma" content="no-cache">
-  <meta http-equiv="expires" content="1776433224">
-  <meta name="version" content="1776433224">
+  <meta http-equiv="expires" content="1775758565">
+  <meta name="version" content="1775956403">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <script>
 // Desregistrar cualquier Service Worker existente de forma inmediata
@@ -17,7 +17,7 @@ if ('serviceWorker' in navigator) {
 </script>
 <script>
 (function() {
-  var VERSION = '1776433224';
+  var VERSION = '1776119880';
   var stored = localStorage.getItem('gs_app_version');
   if (stored !== VERSION) {
     var session = localStorage.getItem('gs_session');
@@ -1693,7 +1693,7 @@ function pdfRendicion(id) {
   const html = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
   <meta http-equiv="cache-control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="pragma" content="no-cache">
-  <meta http-equiv="expires" content="1776433224"><title>${ren.id} — Global Solutions SpA</title>
+  <meta http-equiv="expires" content="1775758565"><title>${ren.id} — Global Solutions SpA</title>
   <style>* {box-sizing:border-box;margin:0;padding:0;} body {font-family:'Segoe UI',Arial,sans-serif;color:#222;background:white;} .page {max-width:860px;margin:0 auto;padding:40px;} table {border-collapse:collapse;width:100%;} @media print {.no-print{display:none!important} .page{padding:20px}}</style>
   </head><body><div class="page">
     <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:24px;padding-bottom:16px;border-bottom:3px solid #0B2545">
@@ -4724,7 +4724,7 @@ function descargarLiqV2(liqId) {
   const html = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
   <meta http-equiv="cache-control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="pragma" content="no-cache">
-  <meta http-equiv="expires" content="1776433224">
+  <meta http-equiv="expires" content="1775758565">
   <title>${liq.id} — Global Solutions SpA</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -5279,7 +5279,7 @@ function abrirPreviewCotV2(){
   win.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8">
   <meta http-equiv="cache-control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="pragma" content="no-cache">
-  <meta http-equiv="expires" content="1776433224"><title>${numero}</title><style>body{font-family:'Segoe UI',sans-serif;padding:30px;max-width:680px;margin:0 auto}@media print{.no-print{display:none!important}}</style></head><body>${html}<script>setTimeout(()=>window.print(),400);<\/script></body></html>`);
+  <meta http-equiv="expires" content="1775758565"><title>${numero}</title><style>body{font-family:'Segoe UI',sans-serif;padding:30px;max-width:680px;margin:0 auto}@media print{.no-print{display:none!important}}</style></head><body>${html}<script>setTimeout(()=>window.print(),400);<\/script></body></html>`);
   win.document.close();
   // Guardar cotización
   if(!appData.cotizaciones) appData.cotizaciones=[];
@@ -5294,7 +5294,7 @@ function abrirPreviewCot(cotObj){
   win.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8">
   <meta http-equiv="cache-control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="pragma" content="no-cache">
-  <meta http-equiv="expires" content="1776433224"><title>${cotObj.numero}</title><style>body{font-family:'Segoe UI',sans-serif;padding:30px;max-width:680px;margin:0 auto}@media print{.no-print{display:none!important}}</style></head><body>${html}<script>setTimeout(()=>window.print(),400);<\/script></body></html>`);
+  <meta http-equiv="expires" content="1775758565"><title>${cotObj.numero}</title><style>body{font-family:'Segoe UI',sans-serif;padding:30px;max-width:680px;margin:0 auto}@media print{.no-print{display:none!important}}</style></head><body>${html}<script>setTimeout(()=>window.print(),400);<\/script></body></html>`);
   win.document.close();
 }
 
@@ -5347,7 +5347,6 @@ function srvVista(s) {
     <div style="font-size:10px;color:#1565C0;font-weight:700">GD: ${gdNums}</div>
     <div style="font-size:10px;color:#777;margin-top:1px">Fecha guia: ${gdFechaGuia} · Descarga: ${gdDescarga}</div>
     <div style="font-size:10px;color:#888;margin-top:1px">${s.origen||'—'} → ${destinoFinal}</div>
-    ${s.precio ? `<div style="font-size:11px;font-weight:700;color:#2E7D32;margin-top:3px">$${s.precio.toLocaleString('es-CL')} neto</div>` : ''}
   </div>`;
 }
 
@@ -6409,6 +6408,7 @@ function renderHistorialRendimiento() {
   });
 
   const hdr = `<div onclick="uiState.historial_rend_open=${!isOpen};render()" style="display:flex;justify-content:space-between;align-items:center;cursor:pointer;padding:9px 12px;background:#EDE7F6;border-radius:${isOpen?'8px 8px 0 0':'8px'};border:1px solid #CE93D8;margin-top:8px">
+  ${s.precio ? `<div style="font-size:10px;font-weight:700;color:#2E7D32;margin-top:3px;">$${s.precio.toLocaleString('es-CL')} neto</div>` : ''}
     <div style="font-size:11px;font-weight:800;color:#4A148C;letter-spacing:1px">📋 HISTORIAL DE RENDIMIENTO ${hist.length?'('+hist.length+')':''}</div>
     <div style="font-size:10px;color:#7B1FA2">${isOpen?'▲ ocultar':'▼ ver'}</div>
   </div>`;
@@ -7950,9 +7950,6 @@ function _procesarRemotosServicios(data) {
         comisionConductor: r.comision_conductor||0,
         montoPuntos: r.monto_puntos||0,
         numPuntos: r.num_puntos||1,
-        baseConductor: r.base_conductor||0,
-        gastoFinanciero: r.gasto_financiero||0,
-        documentos: r.documentos||[],
       }));
       appData.servicios = remotos;
     }
@@ -7979,10 +7976,7 @@ async function upsertServicioSupabase(s) {
       comision_conductor: s.comisionConductor||0,
       liquidacion_id: s.liquidacionId||'',
       monto_puntos: s.montoPuntos||0,
-      num_puntos: s.numPuntos||1,
-      base_conductor: s.baseConductor||0,
-      gasto_financiero: s.gastoFinanciero||0,
-      documentos: s.documentos||[]
+      num_puntos: s.numPuntos||1
     };
     await supa.from('servicios').upsert(row, { onConflict: 'id' });
   } catch(e) { console.warn('Error upsert servicio:', e); }
