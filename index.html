@@ -4,8 +4,8 @@
 <meta charset="UTF-8">
   <meta http-equiv="cache-control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="pragma" content="no-cache">
-  <meta http-equiv="expires" content="1776430406">
-  <meta name="version" content="1776430406">
+  <meta http-equiv="expires" content="1776431705">
+  <meta name="version" content="1776431705">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <script>
 // Desregistrar cualquier Service Worker existente de forma inmediata
@@ -17,7 +17,7 @@ if ('serviceWorker' in navigator) {
 </script>
 <script>
 (function() {
-  var VERSION = '1776430406';
+  var VERSION = '1776431705';
   var stored = localStorage.getItem('gs_app_version');
   if (stored !== VERSION) {
     var session = localStorage.getItem('gs_session');
@@ -1299,15 +1299,21 @@ function renderCierreServicios() {
     if (eo !== 0) return eo;
     return _fKeyC(b.fecha||'').localeCompare(_fKeyC(a.fecha||'')); // más reciente primero
   });
-  const clientesCierre = [...new Set(todosServicios.map(s=>(s.cliente||'').trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'es'));
+  // PAGINACIÓN: por defecto solo mostrar pendientes (no cerrados) para evitar DOM pesado
+  const mostrarCerrados = !!uiState.cs_mostrar_cerrados;
+  const serviciosFiltradosEstado = mostrarCerrados ? todosServicios : todosServicios.filter(s => !s.cerrado);
+  const clientesCierre = [...new Set(serviciosFiltradosEstado.map(s=>(s.cliente||'').trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'es'));
   const filtroCliente  = uiState.cs_filtro_cliente || '';
-  const servicios = filtroCliente ? todosServicios.filter(s=>(s.cliente||'').trim()===filtroCliente) : todosServicios;
+  const servicios = filtroCliente ? serviciosFiltradosEstado.filter(s=>(s.cliente||'').trim()===filtroCliente) : serviciosFiltradosEstado;
   const sinCerrar = servicios.filter(s=>!s.cerrado).length;
   const cfPorServ = todosServicios.length > 0 ? Math.round(CF_MES / todosServicios.length) : 0;
   return `<div style="padding:2px">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:wrap;gap:6px">
-      <div style="font-size:9px;font-weight:700;color:#546E7A;letter-spacing:0.5px">${sinCerrar} PENDIENTES · ${servicios.length - sinCerrar} CERRADOS${filtroCliente?' (filtrado)':''}</div>
-      <div style="font-size:9px;color:#888">CF/servicio: $${cfPorServ.toLocaleString('es-CL')}</div>
+      <div style="font-size:9px;font-weight:700;color:#546E7A;letter-spacing:0.5px">${sinCerrar} PENDIENTES · ${todosServicios.filter(s=>s.cerrado).length} CERRADOS${filtroCliente?' (filtrado)':''}</div>
+      <div style="display:flex;gap:6px;align-items:center">
+        <div style="font-size:9px;color:#888">CF/servicio: $${cfPorServ.toLocaleString('es-CL')}</div>
+        <button onclick="uiState.cs_mostrar_cerrados=!uiState.cs_mostrar_cerrados;uiState.cs_filtro_cliente='';render()" style="padding:2px 8px;border-radius:5px;font-size:9px;font-weight:700;cursor:pointer;border:1px solid #CFD8DC;background:${mostrarCerrados?'#455A64':'white'};color:${mostrarCerrados?'white':'#607D8B'}">${mostrarCerrados?'✓ Ver cerrados':'Ver cerrados'}</button>
+      </div>
     </div>
     <div style="display:flex;align-items:center;gap:6px;margin-bottom:10px;flex-wrap:wrap">
       <div style="font-size:9px;font-weight:700;color:#546E7A">CLIENTE:</div>
@@ -1702,7 +1708,7 @@ function pdfRendicion(id) {
   const html = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
   <meta http-equiv="cache-control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="pragma" content="no-cache">
-  <meta http-equiv="expires" content="1776430406"><title>${ren.id} — Global Solutions SpA</title>
+  <meta http-equiv="expires" content="1776431705"><title>${ren.id} — Global Solutions SpA</title>
   <style>* {box-sizing:border-box;margin:0;padding:0;} body {font-family:'Segoe UI',Arial,sans-serif;color:#222;background:white;} .page {max-width:860px;margin:0 auto;padding:40px;} table {border-collapse:collapse;width:100%;} @media print {.no-print{display:none!important} .page{padding:20px}}</style>
   </head><body><div class="page">
     <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:24px;padding-bottom:16px;border-bottom:3px solid #0B2545">
@@ -4733,7 +4739,7 @@ function descargarLiqV2(liqId) {
   const html = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
   <meta http-equiv="cache-control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="pragma" content="no-cache">
-  <meta http-equiv="expires" content="1776430406">
+  <meta http-equiv="expires" content="1776431705">
   <title>${liq.id} — Global Solutions SpA</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -5291,7 +5297,7 @@ function abrirPreviewCotV2(){
   win.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8">
   <meta http-equiv="cache-control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="pragma" content="no-cache">
-  <meta http-equiv="expires" content="1776430406"><title>${numero}</title><style>body{font-family:'Segoe UI',sans-serif;padding:30px;max-width:680px;margin:0 auto}@media print{.no-print{display:none!important}}</style></head><body>${html}<script>setTimeout(()=>window.print(),400);<\/script></body></html>`);
+  <meta http-equiv="expires" content="1776431705"><title>${numero}</title><style>body{font-family:'Segoe UI',sans-serif;padding:30px;max-width:680px;margin:0 auto}@media print{.no-print{display:none!important}}</style></head><body>${html}<script>setTimeout(()=>window.print(),400);<\/script></body></html>`);
   win.document.close();
   // Guardar cotización
   if(!appData.cotizaciones) appData.cotizaciones=[];
@@ -5306,7 +5312,7 @@ function abrirPreviewCot(cotObj){
   win.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8">
   <meta http-equiv="cache-control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="pragma" content="no-cache">
-  <meta http-equiv="expires" content="1776430406"><title>${cotObj.numero}</title><style>body{font-family:'Segoe UI',sans-serif;padding:30px;max-width:680px;margin:0 auto}@media print{.no-print{display:none!important}}</style></head><body>${html}<script>setTimeout(()=>window.print(),400);<\/script></body></html>`);
+  <meta http-equiv="expires" content="1776431705"><title>${cotObj.numero}</title><style>body{font-family:'Segoe UI',sans-serif;padding:30px;max-width:680px;margin:0 auto}@media print{.no-print{display:none!important}}</style></head><body>${html}<script>setTimeout(()=>window.print(),400);<\/script></body></html>`);
   win.document.close();
 }
 
@@ -6986,13 +6992,16 @@ async function addServicio() {
     if (supaConectado && supa) {
       await upsertServicioSupabase(servicio);
     }
-    // Colapsar el acordeón de registro antes del render para evitar freeze con DOM pesado
-    const faseOp = appData.fases.find(f => f.id === 'operacional');
-    if (faseOp) {
-      const idxReg = faseOp.rutinarias.findIndex(r => r.registroServicio);
-      if (idxReg !== -1) uiState['acord_operacional_' + idxReg] = false;
-    }
-    requestAnimationFrame(() => { _syncEnProceso = false; render(); });
+    // Post-guardado: ir a vista Control (liviana) para evitar freeze al renderizar Operacional completo
+    requestAnimationFrame(() => {
+      _syncEnProceso = false;
+      vistaActual = 'control';
+      document.querySelectorAll('.filter-btn').forEach(b => {
+        const oc = b.getAttribute('onclick') || '';
+        b.classList.toggle('active', oc.includes("'control'"));
+      });
+      render();
+    });
   } catch(e) {
     console.warn('Error al registrar servicio:', e);
     _syncEnProceso = false;
