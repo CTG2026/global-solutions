@@ -4,8 +4,8 @@
 <meta charset="UTF-8">
   <meta http-equiv="cache-control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="pragma" content="no-cache">
-  <meta http-equiv="expires" content="1776184260">
-  <meta name="version" content="1776184260">
+  <meta http-equiv="expires" content="1776398594">
+  <meta name="version" content="1776398594">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <script>
 // Desregistrar cualquier Service Worker existente de forma inmediata
@@ -17,7 +17,7 @@ if ('serviceWorker' in navigator) {
 </script>
 <script>
 (function() {
-  var VERSION = '1776229200';
+  var VERSION = '1776398594';
   var stored = localStorage.getItem('gs_app_version');
   if (stored !== VERSION) {
     var session = localStorage.getItem('gs_session');
@@ -1547,21 +1547,30 @@ async function guardarCierre(id) {
   if(!d.km) { if(!confirm('⚠️ Los kilómetros están en 0. ¿Deseas continuar de todas formas?')) return; }
   if(!d.petroleo && !d.litros) { if(!confirm('⚠️ El combustible está en 0. ¿Deseas continuar de todas formas?')) return; }
   if(!confirm(`¿Cerrar definitivamente el servicio ${id}?\nPrecio: $${d.precio.toLocaleString('es-CL')}\nEsta acción no se puede deshacer.`)) return;
-  const comisionConductor = d.comisionConductor; // manual desde formulario
-  Object.assign(appData.servicios[idx],{
-    precio: d.precio, km: d.km, tag: d.tag, oc: d.oc,
-    peajes: d.peajes, viaticos: d.viaticos, adicional: d.adicional,
-    litros: d.litros, petroleo: d.petroleo, cfProrrateado: d.cfProrrateado,
-    baseConductor: d.baseConductor, gastoFinanciero: d.gastoFinanciero,
-    comisionConductor, cerrado: true, estado: 'cerrado'
-  });
-  appData.dashboard.ventas_mes=(appData.servicios||[]).filter(s=>s.cerrado&&s.precio).reduce((a,s)=>a+(s.precio||0),0);
-  uiState['cs_'+id]=false;
-  if (uiState.cs_draft) delete uiState.cs_draft[id];
-  saveData();
-  await upsertServicioSupabase(appData.servicios[idx]);
-  showToastGeneral('✅ Servicio cerrado correctamente','#2E7D32');
-  render();
+  _syncEnProceso = true;
+  try {
+    const comisionConductor = d.comisionConductor;
+    Object.assign(appData.servicios[idx],{
+      precio: d.precio, km: d.km, tag: d.tag, oc: d.oc,
+      peajes: d.peajes, viaticos: d.viaticos, adicional: d.adicional,
+      litros: d.litros, petroleo: d.petroleo, cfProrrateado: d.cfProrrateado,
+      baseConductor: d.baseConductor, gastoFinanciero: d.gastoFinanciero,
+      comisionConductor, cerrado: true, estado: 'cerrado'
+    });
+    appData.dashboard.ventas_mes=(appData.servicios||[]).filter(s=>s.cerrado&&s.precio).reduce((a,s)=>a+(s.precio||0),0);
+    uiState['cs_'+id]=false;
+    if (uiState.cs_draft) delete uiState.cs_draft[id];
+    saveData();
+    await upsertServicioSupabase(appData.servicios[idx]);
+    showToastGeneral('✅ Servicio cerrado correctamente','#2E7D32');
+    render();
+  } catch(e) {
+    console.warn('Error en guardarCierre:', e);
+    showToastGeneral('⚠️ Error al cerrar — datos guardados localmente','#E65100');
+    render();
+  } finally {
+    _syncEnProceso = false;
+  }
 }
 
 function agregarFotoServicio(id, input) {
@@ -1693,7 +1702,7 @@ function pdfRendicion(id) {
   const html = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
   <meta http-equiv="cache-control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="pragma" content="no-cache">
-  <meta http-equiv="expires" content="1776184260"><title>${ren.id} — Global Solutions SpA</title>
+  <meta http-equiv="expires" content="1776398594"><title>${ren.id} — Global Solutions SpA</title>
   <style>* {box-sizing:border-box;margin:0;padding:0;} body {font-family:'Segoe UI',Arial,sans-serif;color:#222;background:white;} .page {max-width:860px;margin:0 auto;padding:40px;} table {border-collapse:collapse;width:100%;} @media print {.no-print{display:none!important} .page{padding:20px}}</style>
   </head><body><div class="page">
     <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:24px;padding-bottom:16px;border-bottom:3px solid #0B2545">
@@ -4724,7 +4733,7 @@ function descargarLiqV2(liqId) {
   const html = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
   <meta http-equiv="cache-control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="pragma" content="no-cache">
-  <meta http-equiv="expires" content="1776184260">
+  <meta http-equiv="expires" content="1776398594">
   <title>${liq.id} — Global Solutions SpA</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -5282,7 +5291,7 @@ function abrirPreviewCotV2(){
   win.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8">
   <meta http-equiv="cache-control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="pragma" content="no-cache">
-  <meta http-equiv="expires" content="1776184260"><title>${numero}</title><style>body{font-family:'Segoe UI',sans-serif;padding:30px;max-width:680px;margin:0 auto}@media print{.no-print{display:none!important}}</style></head><body>${html}<script>setTimeout(()=>window.print(),400);<\/script></body></html>`);
+  <meta http-equiv="expires" content="1776398594"><title>${numero}</title><style>body{font-family:'Segoe UI',sans-serif;padding:30px;max-width:680px;margin:0 auto}@media print{.no-print{display:none!important}}</style></head><body>${html}<script>setTimeout(()=>window.print(),400);<\/script></body></html>`);
   win.document.close();
   // Guardar cotización
   if(!appData.cotizaciones) appData.cotizaciones=[];
@@ -5297,7 +5306,7 @@ function abrirPreviewCot(cotObj){
   win.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8">
   <meta http-equiv="cache-control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="pragma" content="no-cache">
-  <meta http-equiv="expires" content="1776184260"><title>${cotObj.numero}</title><style>body{font-family:'Segoe UI',sans-serif;padding:30px;max-width:680px;margin:0 auto}@media print{.no-print{display:none!important}}</style></head><body>${html}<script>setTimeout(()=>window.print(),400);<\/script></body></html>`);
+  <meta http-equiv="expires" content="1776398594"><title>${cotObj.numero}</title><style>body{font-family:'Segoe UI',sans-serif;padding:30px;max-width:680px;margin:0 auto}@media print{.no-print{display:none!important}}</style></head><body>${html}<script>setTimeout(()=>window.print(),400);<\/script></body></html>`);
   win.document.close();
 }
 
@@ -7916,6 +7925,7 @@ async function eliminarPipelineSupabase(id) {
 // ── SYNC SERVICIOS SUPABASE ───────────────────────────────
 async function syncServiciosDesdeSupabase() {
   if (!supa || !supaConectado) return;
+  if (_syncEnProceso) return; // No interrumpir guardados en curso
   try {
     const { data, error } = await supa.from('servicios').select('*').order('created_at');
     if (error) { console.warn('Error sync servicios:', error); return; }
@@ -7989,6 +7999,7 @@ function _procesarRemotosServicios(data) {
     }
 }
 let _ultimoHashServicios = '';
+let _syncEnProceso = false; // Flag para bloquear auto-sync durante guardados críticos
 
 async function upsertServicioSupabase(s) {
   if (!supa || !supaConectado) return;
