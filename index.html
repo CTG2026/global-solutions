@@ -7906,7 +7906,9 @@ async function eliminarPipelineSupabase(id) {
 async function syncServiciosDesdeSupabase() {
   if (!supa || !supaConectado) return;
   try {
-    const { data, error } = await supa.from('servicios').select('*').order('created_at');
+    const _d60 = new Date(); _d60.setDate(_d60.getDate() - 60);
+    const fechaHace60Dias = _d60.toISOString().split('T')[0];
+    const { data, error } = await supa.from('servicios').select('*').gte('fecha', fechaHace60Dias).order('created_at');
     if (error) { console.warn('Error sync servicios:', error); return; }
 
     // ─── RESCATE: subir servicios locales que no están en Supabase ───────────
@@ -7921,7 +7923,7 @@ async function syncServiciosDesdeSupabase() {
         catch(e) { console.warn('Error subiendo servicio pendiente:', s.id, e); }
       }
       // Re-fetch para incluir los recién subidos
-      const { data: data2, error: err2 } = await supa.from('servicios').select('*').order('created_at');
+      const { data: data2, error: err2 } = await supa.from('servicios').select('*').gte('fecha', fechaHace60Dias).order('created_at');
       if (!err2 && data2) {
         return _procesarRemotosServicios(data2);
       }
