@@ -4,8 +4,8 @@
 <meta charset="UTF-8">
   <meta http-equiv="cache-control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="pragma" content="no-cache">
-  <meta http-equiv="expires" content="1776431705">
-  <meta name="version" content="1776431705">
+  <meta http-equiv="expires" content="1776121914">
+  <meta name="version" content="1776121914">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <script>
 // Desregistrar cualquier Service Worker existente de forma inmediata
@@ -17,7 +17,7 @@ if ('serviceWorker' in navigator) {
 </script>
 <script>
 (function() {
-  var VERSION = '1776431705';
+  var VERSION = '1776183814';
   var stored = localStorage.getItem('gs_app_version');
   if (stored !== VERSION) {
     var session = localStorage.getItem('gs_session');
@@ -1299,21 +1299,15 @@ function renderCierreServicios() {
     if (eo !== 0) return eo;
     return _fKeyC(b.fecha||'').localeCompare(_fKeyC(a.fecha||'')); // más reciente primero
   });
-  // PAGINACIÓN: por defecto solo mostrar pendientes (no cerrados) para evitar DOM pesado
-  const mostrarCerrados = !!uiState.cs_mostrar_cerrados;
-  const serviciosFiltradosEstado = mostrarCerrados ? todosServicios : todosServicios.filter(s => !s.cerrado);
-  const clientesCierre = [...new Set(serviciosFiltradosEstado.map(s=>(s.cliente||'').trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'es'));
+  const clientesCierre = [...new Set(todosServicios.map(s=>(s.cliente||'').trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'es'));
   const filtroCliente  = uiState.cs_filtro_cliente || '';
-  const servicios = filtroCliente ? serviciosFiltradosEstado.filter(s=>(s.cliente||'').trim()===filtroCliente) : serviciosFiltradosEstado;
+  const servicios = filtroCliente ? todosServicios.filter(s=>(s.cliente||'').trim()===filtroCliente) : todosServicios;
   const sinCerrar = servicios.filter(s=>!s.cerrado).length;
   const cfPorServ = todosServicios.length > 0 ? Math.round(CF_MES / todosServicios.length) : 0;
   return `<div style="padding:2px">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:wrap;gap:6px">
-      <div style="font-size:9px;font-weight:700;color:#546E7A;letter-spacing:0.5px">${sinCerrar} PENDIENTES · ${todosServicios.filter(s=>s.cerrado).length} CERRADOS${filtroCliente?' (filtrado)':''}</div>
-      <div style="display:flex;gap:6px;align-items:center">
-        <div style="font-size:9px;color:#888">CF/servicio: $${cfPorServ.toLocaleString('es-CL')}</div>
-        <button onclick="uiState.cs_mostrar_cerrados=!uiState.cs_mostrar_cerrados;uiState.cs_filtro_cliente='';render()" style="padding:2px 8px;border-radius:5px;font-size:9px;font-weight:700;cursor:pointer;border:1px solid #CFD8DC;background:${mostrarCerrados?'#455A64':'white'};color:${mostrarCerrados?'white':'#607D8B'}">${mostrarCerrados?'✓ Ver cerrados':'Ver cerrados'}</button>
-      </div>
+      <div style="font-size:9px;font-weight:700;color:#546E7A;letter-spacing:0.5px">${sinCerrar} PENDIENTES · ${servicios.length - sinCerrar} CERRADOS${filtroCliente?' (filtrado)':''}</div>
+      <div style="font-size:9px;color:#888">CF/servicio: $${cfPorServ.toLocaleString('es-CL')}</div>
     </div>
     <div style="display:flex;align-items:center;gap:6px;margin-bottom:10px;flex-wrap:wrap">
       <div style="font-size:9px;font-weight:700;color:#546E7A">CLIENTE:</div>
@@ -1553,30 +1547,21 @@ async function guardarCierre(id) {
   if(!d.km) { if(!confirm('⚠️ Los kilómetros están en 0. ¿Deseas continuar de todas formas?')) return; }
   if(!d.petroleo && !d.litros) { if(!confirm('⚠️ El combustible está en 0. ¿Deseas continuar de todas formas?')) return; }
   if(!confirm(`¿Cerrar definitivamente el servicio ${id}?\nPrecio: $${d.precio.toLocaleString('es-CL')}\nEsta acción no se puede deshacer.`)) return;
-  _syncEnProceso = true;
-  try {
-    const comisionConductor = d.comisionConductor;
-    Object.assign(appData.servicios[idx],{
-      precio: d.precio, km: d.km, tag: d.tag, oc: d.oc,
-      peajes: d.peajes, viaticos: d.viaticos, adicional: d.adicional,
-      litros: d.litros, petroleo: d.petroleo, cfProrrateado: d.cfProrrateado,
-      baseConductor: d.baseConductor, gastoFinanciero: d.gastoFinanciero,
-      comisionConductor, cerrado: true, estado: 'cerrado'
-    });
-    appData.dashboard.ventas_mes=(appData.servicios||[]).filter(s=>s.cerrado&&s.precio).reduce((a,s)=>a+(s.precio||0),0);
-    uiState['cs_'+id]=false;
-    if (uiState.cs_draft) delete uiState.cs_draft[id];
-    saveData();
-    await upsertServicioSupabase(appData.servicios[idx]);
-    showToastGeneral('✅ Servicio cerrado correctamente','#2E7D32');
-    render();
-  } catch(e) {
-    console.warn('Error en guardarCierre:', e);
-    showToastGeneral('⚠️ Error al cerrar — datos guardados localmente','#E65100');
-    render();
-  } finally {
-    _syncEnProceso = false;
-  }
+  const comisionConductor = d.comisionConductor; // manual desde formulario
+  Object.assign(appData.servicios[idx],{
+    precio: d.precio, km: d.km, tag: d.tag, oc: d.oc,
+    peajes: d.peajes, viaticos: d.viaticos, adicional: d.adicional,
+    litros: d.litros, petroleo: d.petroleo, cfProrrateado: d.cfProrrateado,
+    baseConductor: d.baseConductor, gastoFinanciero: d.gastoFinanciero,
+    comisionConductor, cerrado: true, estado: 'cerrado'
+  });
+  appData.dashboard.ventas_mes=(appData.servicios||[]).filter(s=>s.cerrado&&s.precio).reduce((a,s)=>a+(s.precio||0),0);
+  uiState['cs_'+id]=false;
+  if (uiState.cs_draft) delete uiState.cs_draft[id];
+  saveData();
+  await upsertServicioSupabase(appData.servicios[idx]);
+  showToastGeneral('✅ Servicio cerrado correctamente','#2E7D32');
+  render();
 }
 
 function agregarFotoServicio(id, input) {
@@ -1708,7 +1693,7 @@ function pdfRendicion(id) {
   const html = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
   <meta http-equiv="cache-control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="pragma" content="no-cache">
-  <meta http-equiv="expires" content="1776431705"><title>${ren.id} — Global Solutions SpA</title>
+  <meta http-equiv="expires" content="1776121914"><title>${ren.id} — Global Solutions SpA</title>
   <style>* {box-sizing:border-box;margin:0;padding:0;} body {font-family:'Segoe UI',Arial,sans-serif;color:#222;background:white;} .page {max-width:860px;margin:0 auto;padding:40px;} table {border-collapse:collapse;width:100%;} @media print {.no-print{display:none!important} .page{padding:20px}}</style>
   </head><body><div class="page">
     <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:24px;padding-bottom:16px;border-bottom:3px solid #0B2545">
@@ -4739,7 +4724,7 @@ function descargarLiqV2(liqId) {
   const html = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
   <meta http-equiv="cache-control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="pragma" content="no-cache">
-  <meta http-equiv="expires" content="1776431705">
+  <meta http-equiv="expires" content="1776121914">
   <title>${liq.id} — Global Solutions SpA</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -4941,8 +4926,7 @@ function imprimirCalculadora() {
     +(c.tramo?'<tr><td style="padding:4px 8px;color:#888">Ruta</td><td style="padding:4px 8px">'+c.tramo+'</td></tr>':'')
     +'</table>'
     +(tramosRows?'<table><thead><tr><th>TRAMO</th><th style="text-align:right">DISTANCIA</th></tr></thead><tbody>'+tramosRows+'</tbody>'+(r.totalKm?'<tfoot><tr><td style="padding:6px 10px;font-weight:800;border:1px solid #ddd">TOTAL KILÓMETROS</td><td style="padding:6px 10px;text-align:right;font-weight:800;border:1px solid #ddd">'+r.totalKm+' km</td></tr></tfoot>':'')+'</table>':'')
-    +(secs.precio&&r.precio?'<div style="margin-bottom:4px;padding:14px;background:#F1F8E9;border:2px solid #2E7D32;border-radius:8px;display:flex;justify-content:space-between;align-items:center"><span style="font-size:13px;font-weight:800;color:#1B5E20">PRECIO NETO</span><span style="font-size:20px;font-weight:900;color:#1B5E20">$'+r.precio.toLocaleString('es-CL')+'</span></div>':'')
-    +(secs.precio&&r.precio&&r.totalKm?'<div style="margin-bottom:16px;padding:8px 14px;background:#F1F8E9;border:1px solid #A5D6A7;border-radius:6px;display:flex;justify-content:space-between;align-items:center"><span style="font-size:12px;font-weight:700;color:#2E7D32">PRECIO / KM</span><span style="font-size:15px;font-weight:800;color:#2E7D32">$'+Math.round(r.precio/r.totalKm).toLocaleString('es-CL')+'/km</span></div>':'')
+    +(secs.precio&&r.precio?'<div style="margin-bottom:16px;padding:14px;background:#F1F8E9;border:2px solid #2E7D32;border-radius:8px;display:flex;justify-content:space-between;align-items:center"><span style="font-size:13px;font-weight:800;color:#1B5E20">PRECIO NETO</span><span style="font-size:20px;font-weight:900;color:#1B5E20">$'+r.precio.toLocaleString('es-CL')+'</span></div>':'')
     +(costRows?'<table><thead><tr><th>CONCEPTO</th><th style="text-align:right">MONTO</th></tr></thead><tbody>'+costRows+'</tbody>'+(secs.total_costos&&r.totalCostos?'<tfoot><tr><td style="padding:6px 10px;font-weight:800;border:1px solid #ddd">TOTAL COSTOS</td><td style="padding:6px 10px;text-align:right;font-weight:800;color:#C62828;border:1px solid #ddd">-$'+r.totalCostos.toLocaleString('es-CL')+'</td></tr></tfoot>':'')+'</table>':'')
     +((secs.margen_neto||secs.margen_pct||secs.por_km)?'<div style="background:#F4F6F8;border:1px solid #CFD8DC;border-radius:8px;padding:14px;margin-bottom:20px">'+(secs.margen_neto&&(r.precio||r.totalCostos)?'<div style="display:flex;justify-content:space-between;padding:4px 0"><span style="font-size:13px;font-weight:800;color:'+mc+'">MARGEN NETO</span><span style="font-size:18px;font-weight:900;color:'+mc+'">$'+r.margen.toLocaleString('es-CL')+'</span></div>':'')+(secs.margen_pct&&r.margenPct!==null?'<div style="display:flex;justify-content:space-between;padding:3px 0;font-size:12px"><span style="color:'+mc+';font-weight:700">MARGEN %</span><span style="color:'+mc+';font-weight:800">'+r.margenPct+'%</span></div>':'')+(secs.por_km&&r.porKm!==null?'<div style="display:flex;justify-content:space-between;padding:3px 0;font-size:12px"><span style="color:#546E7A;font-weight:700">RESULTADO / KM</span><span style="color:'+mc+';font-weight:800">$'+r.porKm.toLocaleString('es-CL')+'/km</span></div>':'')+'</div>':'')
     +'<div style="border-top:1px solid #eee;padding-top:14px;font-size:10px;color:#888;display:flex;justify-content:space-between">'
@@ -4985,7 +4969,6 @@ function _resumenHTML(r) {
     +'<span style="font-size:11px;font-weight:800;color:#333">PRECIO NETO</span>'
     +'<span style="font-size:14px;font-weight:900;color:#1B5E20">'+(r.precio ? '$'+r.precio.toLocaleString('es-CL') : '—')+'</span>'
     +'</div>'
-    +(r.precio&&r.totalKm?'<div style="display:flex;justify-content:space-between;padding:2px 0 3px;font-size:11px"><span style="color:#2E7D32;font-weight:700">PRECIO / KM</span><span style="color:#2E7D32;font-weight:800">$'+Math.round(r.precio/r.totalKm).toLocaleString('es-CL')+'/km</span></div>':'')
     +sep2
     +(costos ? '<div style="padding:2px 0">'+costos+'</div>'+sep2 : '')
     +(r.totalCostos ? '<div style="display:flex;justify-content:space-between;align-items:baseline;padding:3px 0 5px;font-size:11px"><span style="font-weight:800;color:#333">TOTAL COSTOS</span><span style="font-weight:900;color:#C62828">-$'+r.totalCostos.toLocaleString('es-CL')+'</span></div>'+sep2 : '')
@@ -5082,7 +5065,6 @@ function renderCalculadoraServicios() {
     +(secs.ident&&(c.cliente||c.tramo||c.fecha)?'<div style="margin-bottom:8px"><div style="font-size:8px;font-weight:800;color:#546E7A;letter-spacing:1px;margin-bottom:4px;border-bottom:1px solid #ECEFF1;padding-bottom:3px">IDENTIFICACIÓN</div>'+(c.cliente?'<div style="font-size:11px;margin-bottom:2px"><b>Cliente:</b> '+c.cliente+'</div>':'')+(c.tramo?'<div style="font-size:11px;margin-bottom:2px"><b>Tramo:</b> '+c.tramo+'</div>':'')+(c.fecha?'<div style="font-size:11px"><b>Fecha:</b> '+c.fecha+'</div>':'')+'</div>':'')
     +(secs.tramos&&tramosPreview?'<div style="margin-bottom:8px"><div style="font-size:8px;font-weight:800;color:#546E7A;letter-spacing:1px;margin-bottom:4px;border-bottom:1px solid #ECEFF1;padding-bottom:3px">TRAMOS'+(r.totalKm?' — '+r.totalKm+' KM TOTALES':'')+'</div><table style="width:100%;border-collapse:collapse">'+tramosPreview+'</table></div>':'')
     +(secs.precio&&r.precio?'<div style="display:flex;justify-content:space-between;align-items:baseline;padding:4px 0 5px"><span style="font-size:11px;font-weight:800;color:#333">PRECIO NETO</span><span style="font-size:14px;font-weight:900;color:#1B5E20">$'+r.precio.toLocaleString('es-CL')+'</span></div>':'')
-    +(secs.precio&&r.precio&&r.totalKm?'<div style="display:flex;justify-content:space-between;padding:2px 0 3px;font-size:11px"><span style="color:#2E7D32;font-weight:700">PRECIO / KM</span><span style="color:#2E7D32;font-weight:800">$'+Math.round(r.precio/r.totalKm).toLocaleString('es-CL')+'/km</span></div>':'')
     +(pvCostRows?_sep+'<div style="padding:2px 0">'+pvCostRows+'</div>':'')
     +(secs.total_costos&&r.totalCostos?_sep+'<div style="display:flex;justify-content:space-between;padding:3px 0;font-size:11px"><span style="font-weight:800;color:#333">TOTAL COSTOS</span><span style="font-weight:900;color:#C62828">-$'+r.totalCostos.toLocaleString('es-CL')+'</span></div>':'')
     +((secs.margen_neto||secs.margen_pct||secs.por_km)?_sep:'')
@@ -5297,7 +5279,7 @@ function abrirPreviewCotV2(){
   win.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8">
   <meta http-equiv="cache-control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="pragma" content="no-cache">
-  <meta http-equiv="expires" content="1776431705"><title>${numero}</title><style>body{font-family:'Segoe UI',sans-serif;padding:30px;max-width:680px;margin:0 auto}@media print{.no-print{display:none!important}}</style></head><body>${html}<script>setTimeout(()=>window.print(),400);<\/script></body></html>`);
+  <meta http-equiv="expires" content="1776121914"><title>${numero}</title><style>body{font-family:'Segoe UI',sans-serif;padding:30px;max-width:680px;margin:0 auto}@media print{.no-print{display:none!important}}</style></head><body>${html}<script>setTimeout(()=>window.print(),400);<\/script></body></html>`);
   win.document.close();
   // Guardar cotización
   if(!appData.cotizaciones) appData.cotizaciones=[];
@@ -5312,7 +5294,7 @@ function abrirPreviewCot(cotObj){
   win.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8">
   <meta http-equiv="cache-control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="pragma" content="no-cache">
-  <meta http-equiv="expires" content="1776431705"><title>${cotObj.numero}</title><style>body{font-family:'Segoe UI',sans-serif;padding:30px;max-width:680px;margin:0 auto}@media print{.no-print{display:none!important}}</style></head><body>${html}<script>setTimeout(()=>window.print(),400);<\/script></body></html>`);
+  <meta http-equiv="expires" content="1776121914"><title>${cotObj.numero}</title><style>body{font-family:'Segoe UI',sans-serif;padding:30px;max-width:680px;margin:0 auto}@media print{.no-print{display:none!important}}</style></head><body>${html}<script>setTimeout(()=>window.print(),400);<\/script></body></html>`);
   win.document.close();
 }
 
@@ -5519,9 +5501,9 @@ async function guardarEdicionServicio() {
   Object.assign(appData.servicios[idx], {fecha:fechaFinal, conductor, patente, tipoEquipo, cliente, origen, estadia, estadiaDias, numPuntos, puntos, guias:puntos});
   delete uiState.editando_srv_id;
   delete uiState.edit_srv_puntos;
+  await upsertServicioSupabase(appData.servicios[idx]);
   saveData(); render();
   showToastGeneral('✅ Servicio actualizado','#2E7D32');
-  if (supaConectado && supa) upsertServicioSupabase(appData.servicios[idx]).catch(e => console.warn('Sync servicio edición:', e));
 }
 function renderEditarServicio(id) {
   const s = (appData.servicios||[]).find(sv=>sv.id===id);
@@ -5635,7 +5617,7 @@ function renderEditarServicio(id) {
   </div>`;
 }
 
-const ESTRUCTURA_VERSION = '79'; // Incrementar cuando cambie la estructura del panel
+const ESTRUCTURA_VERSION = '78'; // Incrementar cuando cambie la estructura del panel
 
 function loadData() {
   // Si la versión estructural cambió, limpiar la estructura pero preservar datos
@@ -5857,20 +5839,8 @@ function saveUI() {
 }
 
 function saveData() {
-  // Usar setTimeout para liberar el hilo principal antes de serializar
-  setTimeout(() => {
-    try {
-      // Excluir fotos (base64) y imagen_url grandes del save para reducir tamaño
-      const appDataLite = {...appData, servicios: (appData.servicios||[]).map(s => {
-        const {fotos, ...rest} = s;
-        return rest;
-      })};
-      localStorage.setItem('gs_panel_v5', JSON.stringify(appDataLite));
-      localStorage.setItem('gs_panel_ui_v5', JSON.stringify(uiState));
-    } catch(e) {
-      console.warn('saveData error:', e);
-    }
-  }, 0);
+  localStorage.setItem('gs_panel_v5', JSON.stringify(appData));
+  localStorage.setItem('gs_panel_ui_v5', JSON.stringify(uiState));
   mostrarToastGuardado();
 }
 function mostrarToastGuardado(msg) {
@@ -6871,7 +6841,6 @@ function buildGuiasRegistroHTML() {
       <div style="display:flex;gap:6px;flex-wrap:wrap">
         ${pill(sfOrigen==='Casablanca','Casablanca',"if(!uiState.srvForm)uiState.srvForm={};uiState.srvForm.origen='Casablanca';render()")}
         ${pill(sfOrigen==='Coltauco','Coltauco',"if(!uiState.srvForm)uiState.srvForm={};uiState.srvForm.origen='Coltauco';render()")}
-        ${pill(sfOrigen==='San Clemente','San Clemente',"if(!uiState.srvForm)uiState.srvForm={};uiState.srvForm.origen='San Clemente';render()")}
         ${pill(sfOrigen==='manual','Otro...',"if(!uiState.srvForm)uiState.srvForm={};uiState.srvForm.origen='manual';render()")}
       </div>
       ${sfOrigen==='manual'?`<input id="srv_origen_manual" value="${sfOrigenManual}" oninput="if(!uiState.srvForm)uiState.srvForm={};uiState.srvForm.origenManual=this.value" placeholder="Ingresar origen..." style="margin-top:8px;width:100%;border:2px solid #455A64;border-radius:8px;padding:12px;font-size:13px;outline:none;font-family:inherit">`:''}
@@ -6984,29 +6953,17 @@ async function addServicio() {
   }
   uiState.srv_guias = [{ num:'', destino:'', fecha_guia:'', fecha_descarga:'', kg:'', imagen_url:'' }];
   uiState.srvForm = {};
-  uiState.srv_listado_visible = false;
-  _syncEnProceso = true;
-  try {
-    saveData();
-    mostrarToastServicio(supaConectado);
-    if (supaConectado && supa) {
-      await upsertServicioSupabase(servicio);
-    }
-    // Post-guardado: ir a vista Control (liviana) para evitar freeze al renderizar Operacional completo
-    requestAnimationFrame(() => {
-      _syncEnProceso = false;
-      vistaActual = 'control';
-      document.querySelectorAll('.filter-btn').forEach(b => {
-        const oc = b.getAttribute('onclick') || '';
-        b.classList.toggle('active', oc.includes("'control'"));
-      });
-      render();
-    });
-  } catch(e) {
-    console.warn('Error al registrar servicio:', e);
-    _syncEnProceso = false;
-    render();
+  saveData();
+  render();
+  if (supaConectado && supa) {
+    try {
+      const { error } = await supa.from('servicios').upsert(servicioToRow(servicio), {onConflict:'id'});
+      mostrarToastServicio(!error);
+    } catch(e) { mostrarToastServicio(false); }
+  } else {
+    mostrarToastServicio(false);
   }
+  render();
 }
 async function delServicio(si) {
   if (!appData.servicios) return;
@@ -7547,7 +7504,7 @@ function renderFase(fase) {
         <span class="acord-count" onclick="toggleAcord('${fase.id}',${tiReal})">${tarea.subtareas.length}</span>
       </div>
       <div class="acord-body ${isOpen?'open':''}">
-        ${!isOpen?'':`${liquidacionHTML}
+        ${liquidacionHTML}
         ${tarea.registroServicio ? (() => { const serviciosBlock = (()=>{
           const servicios=appData.servicios||[];
           const hoyISO=(()=>{const h=new Date();return h.getFullYear()+'-'+String(h.getMonth()+1).padStart(2,'0')+'-'+String(h.getDate()).padStart(2,'0');})();
@@ -7609,7 +7566,7 @@ function renderFase(fase) {
             +(filtroClienteOper?'<button onclick="uiState.srv_filtro_cliente=\'\';render()" style="padding:4px 8px;border-radius:5px;font-size:10px;cursor:pointer;border:1px solid #FFCDD2;background:#FFEBEE;color:#C62828;font-weight:700">✕ Limpiar</button>':'')
             +'</div>'
             +(serviciosPendientes.length?'<div style="margin-top:4px"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px"><div style="font-size:10px;font-weight:700;color:#607D8B;letter-spacing:1px">SERVICIOS PENDIENTES DE CERRAR ('+serviciosPendientes.length+')</div><span onclick="uiState.srv_ver_todos=!uiState.srv_ver_todos;render()" style="font-size:9px;color:#1565C0;cursor:pointer;text-decoration:underline">'+(verTodos?'Ver mes actual':'Ver todos')+'</span></div>'+lista+'</div>':'<div style="margin-top:6px">'+lista+'</div>')
-            +(_acceso==='conductor' ? '' : (uiState.srv_listado_visible ? renderListadoRegistros(serviciosOrdenados) : '<div style="margin-top:14px;border-top:2px solid #CFD8DC;padding-top:10px"><button onclick="uiState.srv_listado_visible=true;render()" style="width:100%;padding:10px;background:#ECEFF1;border:1px solid #CFD8DC;border-radius:8px;font-size:11px;font-weight:700;color:#607D8B;cursor:pointer">📋 Ver historial de registros ('+serviciosOrdenados.length+')</button></div>'))
+            +(_acceso==='conductor' ? '' : renderListadoRegistros(serviciosOrdenados))
             +'</div>';
         })(); return '<div style="margin:-4px">'+serviciosBlock+'</div>'; })() : ''}
         ${tarea.cierreServicioTask ? `<div style="margin:-4px">${renderCierreServicios()}</div>` : ''}
@@ -7630,7 +7587,7 @@ function renderFase(fase) {
           <input class="add-sub-input" id="sub_input_${fase.id}_${tiReal}" placeholder="+ Agregar paso..." onkeydown="if(event.key==='Enter')addSub('${fase.id}',${tiReal})">
           <button class="add-sub-btn" style="background:${fase.color}" onclick="addSub('${fase.id}',${tiReal})">+</button>
         </div>
-        ${procHTML}`}
+        ${procHTML}
       </div>
     </div>`;
   }).join('');
@@ -7712,12 +7669,17 @@ function renderFase(fase) {
     </div>`;
   }
 
+  const miDiaContent = fase.id === 'control' ? renderMiDia() : '';
+  const personalContent = fase.id === 'control' ? renderPersonal() : '';
+  const informesContent = fase.id === 'control' ? renderInformes() : '';
+  const pipelineContent = fase.id === 'comercial' ? renderPipeline() : '';
+  const disponibilidadContent = fase.id === 'operacional' ? renderDisponibilidad() : '';
   const tabContent = tab==='rutinarias' ? rutHTML + addTareaHTML :
-    tab==='midia' ? (fase.id==='control' ? renderMiDia() : '') :
-    tab==='informes' ? (fase.id==='control' ? renderInformes() : '') :
-    tab==='personal' ? (fase.id==='control' ? renderPersonal() : '') :
-    tab==='pipeline' ? (fase.id==='comercial' ? renderPipeline() : '') :
-    tab==='disponibilidad' ? (fase.id==='operacional' ? renderDisponibilidad() : '') :
+    tab==='midia' ? miDiaContent :
+    tab==='informes' ? informesContent :
+    tab==='personal' ? personalContent :
+    tab==='pipeline' ? pipelineContent :
+    tab==='disponibilidad' ? disponibilidadContent :
     `<div class="section-label">PENDIENTES PRIORITARIOS</div>${pendsHTML}${addPendHTML}`;
 
   const extraTabControl = fase.id === 'control' ? `<button class="tab-btn ${tab==='midia'?'active':''}" onclick="setTab('${fase.id}','midia')" style="${tab==='midia'?`color:${fase.color};border-bottom-color:${fase.color};background:${fase.colorClaro};font-weight:900`:'font-weight:700'}">⚡ DÍA</button><button class="tab-btn ${tab==='informes'?'active':''}" onclick="setTab('${fase.id}','informes')" style="${tab==='informes'?`color:${fase.color};border-bottom-color:${fase.color};background:${fase.colorClaro};font-weight:900`:'font-weight:700'}">📊 Informes</button><button class="tab-btn ${tab==='personal'?'active':''}" onclick="abrirPersonal('${fase.id}')" style="${tab==='personal'?`color:${fase.color};border-bottom-color:${fase.color};background:${fase.colorClaro};font-weight:900`:'font-weight:700'}">🔒 Personal</button>` : '';
@@ -7767,7 +7729,6 @@ function servicioToRow(s) {
     origen: s.origen || '',
     peajes: s.peajes || 0,
     guias: s.guias || [],
-    puntos: s.puntos || s.guias || [],
     precio: s.precio || 0,
     km: s.km || 0,
     litros: s.litros || 0,
@@ -7782,15 +7743,6 @@ function servicioToRow(s) {
     rendimiento: s.rendimiento || 0,
     tag: s.tag || '',
     liquidacion_id: s.liquidacionId || '',
-    cerrado: s.cerrado || false,
-    estado: s.estado || 'activo',
-    cf_prorrateado: s.cfProrrateado || 50800,
-    comision_conductor: s.comisionConductor || 0,
-    monto_puntos: s.montoPuntos || 0,
-    num_puntos: s.numPuntos || 1,
-    base_conductor: s.baseConductor || 0,
-    gasto_financiero: s.gastoFinanciero || 0,
-    documentos: s.documentos || [],
   };
 }
 
@@ -7949,7 +7901,6 @@ async function eliminarPipelineSupabase(id) {
 // ── SYNC SERVICIOS SUPABASE ───────────────────────────────
 async function syncServiciosDesdeSupabase() {
   if (!supa || !supaConectado) return;
-  if (_syncEnProceso) return; // No interrumpir guardados en curso
   try {
     const { data, error } = await supa.from('servicios').select('*').order('created_at');
     if (error) { console.warn('Error sync servicios:', error); return; }
@@ -7962,7 +7913,8 @@ async function syncServiciosDesdeSupabase() {
     if (pendientesDeSubir.length > 0) {
       console.log(`Subiendo ${pendientesDeSubir.length} servicio(s) local(es) pendientes a Supabase...`);
       for (const s of pendientesDeSubir) {
-        await upsertServicioSupabase(s);
+        try { await supa.from('servicios').upsert(servicioToRow(s), {onConflict:'id'}); }
+        catch(e) { console.warn('Error subiendo servicio pendiente:', s.id, e); }
       }
       // Re-fetch para incluir los recién subidos
       const { data: data2, error: err2 } = await supa.from('servicios').select('*').order('created_at');
@@ -7999,30 +7951,23 @@ function _procesarRemotosServicios(data) {
         cfProrrateado: r.cf_prorrateado||50800,
         comisionConductor: r.comision_conductor||0,
         montoPuntos: r.monto_puntos||0,
+        numPuntos: r.num_puntos||1,
         baseConductor: r.base_conductor||0,
         gastoFinanciero: r.gasto_financiero||0,
         documentos: r.documentos||[],
       }));
       appData.servicios = remotos;
     }
-    // ── Restaurar borradores locales ──────────────────────────────────────────
+    // Restaurar borradores locales que no están en Supabase aún
     borradorLocales.forEach(borrador => {
-      const idx = appData.servicios.findIndex(s => s.id === borrador.id);
-      if (idx === -1) {
-        appData.servicios.push({...borrador});
-      } else if (appData.servicios[idx].estado !== 'borrador' && appData.servicios[idx].estado !== 'cerrado') {
-        Object.assign(appData.servicios[idx], borrador);
+      const enRemoto = appData.servicios.find(s => s.id === borrador.id);
+      if (enRemoto && !enRemoto.precio && borrador.precio) {
+        // El remoto no tiene precio pero el local sí — usar local
+        Object.assign(enRemoto, borrador);
       }
     });
-    // Solo renderizar si la cantidad o estado de servicios cambió
-    const _hashNuevo = appData.servicios.map(s=>s.id+'|'+s.estado+'|'+(s.precio||0)).join(',');
-    if (typeof _ultimoHashServicios === 'undefined' || _ultimoHashServicios !== _hashNuevo) {
-      _ultimoHashServicios = _hashNuevo;
-      render();
-    }
+    saveData(); render();
 }
-let _ultimoHashServicios = '';
-let _syncEnProceso = false; // Flag para bloquear auto-sync durante guardados críticos
 
 async function upsertServicioSupabase(s) {
   if (!supa || !supaConectado) return;
@@ -8049,14 +7994,7 @@ async function upsertServicioSupabase(s) {
       gasto_financiero: s.gastoFinanciero||0,
       documentos: s.documentos||[]
     };
-    const { error } = await supa.from('servicios').upsert(row, { onConflict: 'id' });
-    if (error) {
-      // Fallback: reintentar sin columnas posiblemente faltantes en la tabla
-      console.warn('Upsert servicio falló, reintentando sin columnas nuevas:', error.message);
-      const { base_conductor, gasto_financiero, documentos, ...rowBase } = row;
-      const { error: err2 } = await supa.from('servicios').upsert(rowBase, { onConflict: 'id' });
-      if (err2) console.warn('Error upsert servicio (fallback):', err2.message);
-    }
+    await supa.from('servicios').upsert(row, { onConflict: 'id' });
   } catch(e) { console.warn('Error upsert servicio:', e); }
 }
 
@@ -10830,15 +10768,7 @@ function saveDashSingle() {
   saveData(); render();
 }
 
-let _renderTimer = null;
 function render() {
-  if (_renderTimer) return; // ya hay un render pendiente
-  _renderTimer = requestAnimationFrame(() => {
-    _renderTimer = null;
-    _renderImpl();
-  });
-}
-function _renderImpl() {
   _deduplicarFases();
   const dashEl = document.getElementById('dashboard-container');
   // Ocultar dashboard cuando se filtra por un ámbito específico
@@ -11069,7 +10999,7 @@ function aplicarAcceso() {
 
 loadData(); iniciarLogin(); initSupabase();
 
-// ── AUTO-REFRESCO v38: cada 1 minuto ──────────────────
+// ── AUTO-REFRESCO v37: cada 3 minutos ──────────────────
 setInterval(async () => {
   if (!supaConectado || !supa) return;
   // No interrumpir si el usuario está llenando un formulario activo
@@ -11080,16 +11010,13 @@ setInterval(async () => {
     'fac_numero', 'fac_monto_neto'
   ];
   const _ae2 = document.activeElement;
-  // Detectar formulario de cierre de servicios abierto (IDs dinámicos como cs_precio_${id})
-  const hayCierreAbierto = !!document.querySelector('[id^="cs_precio_"]');
-  const hayFormAbierto = hayCierreAbierto
-    || formulariosActivos.some(id => document.getElementById(id) !== null)
+  const hayFormAbierto = formulariosActivos.some(id => document.getElementById(id) !== null)
     || (_ae2 && (_ae2.tagName==='INPUT'||_ae2.tagName==='TEXTAREA'||_ae2.tagName==='SELECT'));
   if (hayFormAbierto) return;
   try {
     await syncServiciosDesdeSupabase();
     await syncDisponibilidadDesdeSupabase();
-    // render() ya es llamado por _procesarRemotosServicios — no duplicar
+    render();
   } catch(e) {}
 }, 1 * 60 * 1000); // 1 minuto
 
@@ -11101,7 +11028,6 @@ document.addEventListener('touchend', async e => {
   if (dy > 80 && window.scrollY === 0 && supaConectado) {
     const formulariosActivos = ['srv_fecha','srv_conductor','srv_patente','srv_cliente','pip_new_cliente','disp_fecha','liq_fecha_v2','ren_fecha','ren_responsable','ren_descripcion'];
     if (formulariosActivos.some(id => document.getElementById(id) !== null)) return;
-    if (document.querySelector('[id^="cs_precio_"]')) return;
     const el = document.getElementById('save-indicator');
     if (el) { el.textContent = '↻ Actualizando...'; el.classList.add('show'); }
     await syncServiciosDesdeSupabase();
