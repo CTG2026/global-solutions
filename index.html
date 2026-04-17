@@ -7679,17 +7679,12 @@ function renderFase(fase) {
     </div>`;
   }
 
-  const miDiaContent = fase.id === 'control' ? renderMiDia() : '';
-  const personalContent = fase.id === 'control' ? renderPersonal() : '';
-  const informesContent = fase.id === 'control' ? renderInformes() : '';
-  const pipelineContent = fase.id === 'comercial' ? renderPipeline() : '';
-  const disponibilidadContent = fase.id === 'operacional' ? renderDisponibilidad() : '';
   const tabContent = tab==='rutinarias' ? rutHTML + addTareaHTML :
-    tab==='midia' ? miDiaContent :
-    tab==='informes' ? informesContent :
-    tab==='personal' ? personalContent :
-    tab==='pipeline' ? pipelineContent :
-    tab==='disponibilidad' ? disponibilidadContent :
+    tab==='midia' ? (fase.id==='control' ? renderMiDia() : '') :
+    tab==='informes' ? (fase.id==='control' ? renderInformes() : '') :
+    tab==='personal' ? (fase.id==='control' ? renderPersonal() : '') :
+    tab==='pipeline' ? (fase.id==='comercial' ? renderPipeline() : '') :
+    tab==='disponibilidad' ? (fase.id==='operacional' ? renderDisponibilidad() : '') :
     `<div class="section-label">PENDIENTES PRIORITARIOS</div>${pendsHTML}${addPendHTML}`;
 
   const extraTabControl = fase.id === 'control' ? `<button class="tab-btn ${tab==='midia'?'active':''}" onclick="setTab('${fase.id}','midia')" style="${tab==='midia'?`color:${fase.color};border-bottom-color:${fase.color};background:${fase.colorClaro};font-weight:900`:'font-weight:700'}">⚡ DÍA</button><button class="tab-btn ${tab==='informes'?'active':''}" onclick="setTab('${fase.id}','informes')" style="${tab==='informes'?`color:${fase.color};border-bottom-color:${fase.color};background:${fase.colorClaro};font-weight:900`:'font-weight:700'}">📊 Informes</button><button class="tab-btn ${tab==='personal'?'active':''}" onclick="abrirPersonal('${fase.id}')" style="${tab==='personal'?`color:${fase.color};border-bottom-color:${fase.color};background:${fase.colorClaro};font-weight:900`:'font-weight:700'}">🔒 Personal</button>` : '';
