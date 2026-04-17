@@ -4,8 +4,8 @@
 <meta charset="UTF-8">
   <meta http-equiv="cache-control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="pragma" content="no-cache">
-  <meta http-equiv="expires" content="1776430050">
-  <meta name="version" content="1776430050">
+  <meta http-equiv="expires" content="1776430406">
+  <meta name="version" content="1776430406">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <script>
 // Desregistrar cualquier Service Worker existente de forma inmediata
@@ -17,7 +17,7 @@ if ('serviceWorker' in navigator) {
 </script>
 <script>
 (function() {
-  var VERSION = '1776430050';
+  var VERSION = '1776430406';
   var stored = localStorage.getItem('gs_app_version');
   if (stored !== VERSION) {
     var session = localStorage.getItem('gs_session');
@@ -1702,7 +1702,7 @@ function pdfRendicion(id) {
   const html = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
   <meta http-equiv="cache-control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="pragma" content="no-cache">
-  <meta http-equiv="expires" content="1776430050"><title>${ren.id} — Global Solutions SpA</title>
+  <meta http-equiv="expires" content="1776430406"><title>${ren.id} — Global Solutions SpA</title>
   <style>* {box-sizing:border-box;margin:0;padding:0;} body {font-family:'Segoe UI',Arial,sans-serif;color:#222;background:white;} .page {max-width:860px;margin:0 auto;padding:40px;} table {border-collapse:collapse;width:100%;} @media print {.no-print{display:none!important} .page{padding:20px}}</style>
   </head><body><div class="page">
     <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:24px;padding-bottom:16px;border-bottom:3px solid #0B2545">
@@ -4733,7 +4733,7 @@ function descargarLiqV2(liqId) {
   const html = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
   <meta http-equiv="cache-control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="pragma" content="no-cache">
-  <meta http-equiv="expires" content="1776430050">
+  <meta http-equiv="expires" content="1776430406">
   <title>${liq.id} — Global Solutions SpA</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -5291,7 +5291,7 @@ function abrirPreviewCotV2(){
   win.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8">
   <meta http-equiv="cache-control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="pragma" content="no-cache">
-  <meta http-equiv="expires" content="1776430050"><title>${numero}</title><style>body{font-family:'Segoe UI',sans-serif;padding:30px;max-width:680px;margin:0 auto}@media print{.no-print{display:none!important}}</style></head><body>${html}<script>setTimeout(()=>window.print(),400);<\/script></body></html>`);
+  <meta http-equiv="expires" content="1776430406"><title>${numero}</title><style>body{font-family:'Segoe UI',sans-serif;padding:30px;max-width:680px;margin:0 auto}@media print{.no-print{display:none!important}}</style></head><body>${html}<script>setTimeout(()=>window.print(),400);<\/script></body></html>`);
   win.document.close();
   // Guardar cotización
   if(!appData.cotizaciones) appData.cotizaciones=[];
@@ -5306,7 +5306,7 @@ function abrirPreviewCot(cotObj){
   win.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8">
   <meta http-equiv="cache-control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="pragma" content="no-cache">
-  <meta http-equiv="expires" content="1776430050"><title>${cotObj.numero}</title><style>body{font-family:'Segoe UI',sans-serif;padding:30px;max-width:680px;margin:0 auto}@media print{.no-print{display:none!important}}</style></head><body>${html}<script>setTimeout(()=>window.print(),400);<\/script></body></html>`);
+  <meta http-equiv="expires" content="1776430406"><title>${cotObj.numero}</title><style>body{font-family:'Segoe UI',sans-serif;padding:30px;max-width:680px;margin:0 auto}@media print{.no-print{display:none!important}}</style></head><body>${html}<script>setTimeout(()=>window.print(),400);<\/script></body></html>`);
   win.document.close();
 }
 
@@ -5851,18 +5851,21 @@ function saveUI() {
 }
 
 function saveData() {
-  try {
-    // Excluir fotos (base64) del save principal para evitar que appData sea demasiado grande
-    const appDataLite = (appData.servicios||[]).some(s=>s.fotos&&s.fotos.length)
-      ? {...appData, servicios: appData.servicios.map(s => s.fotos&&s.fotos.length ? (({fotos,...r})=>r)(s) : s)}
-      : appData;
-    localStorage.setItem('gs_panel_v5', JSON.stringify(appDataLite));
-    localStorage.setItem('gs_panel_ui_v5', JSON.stringify(uiState));
-    mostrarToastGuardado();
-  } catch(e) {
-    console.warn('saveData error:', e);
-    mostrarToastGuardado('⚠️ Sin espacio local');
-  }
+  // Usar setTimeout para liberar el hilo principal antes de serializar
+  setTimeout(() => {
+    try {
+      // Excluir fotos (base64) y imagen_url grandes del save para reducir tamaño
+      const appDataLite = {...appData, servicios: (appData.servicios||[]).map(s => {
+        const {fotos, ...rest} = s;
+        return rest;
+      })};
+      localStorage.setItem('gs_panel_v5', JSON.stringify(appDataLite));
+      localStorage.setItem('gs_panel_ui_v5', JSON.stringify(uiState));
+    } catch(e) {
+      console.warn('saveData error:', e);
+    }
+  }, 0);
+  mostrarToastGuardado();
 }
 function mostrarToastGuardado(msg) {
   const ind = document.getElementById('save-indicator');
@@ -6982,6 +6985,12 @@ async function addServicio() {
     mostrarToastServicio(supaConectado);
     if (supaConectado && supa) {
       await upsertServicioSupabase(servicio);
+    }
+    // Colapsar el acordeón de registro antes del render para evitar freeze con DOM pesado
+    const faseOp = appData.fases.find(f => f.id === 'operacional');
+    if (faseOp) {
+      const idxReg = faseOp.rutinarias.findIndex(r => r.registroServicio);
+      if (idxReg !== -1) uiState['acord_operacional_' + idxReg] = false;
     }
     requestAnimationFrame(() => { _syncEnProceso = false; render(); });
   } catch(e) {
