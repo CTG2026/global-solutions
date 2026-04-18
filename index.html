@@ -4,8 +4,8 @@
 <meta charset="UTF-8">
   <meta http-equiv="cache-control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="pragma" content="no-cache">
-  <meta http-equiv="expires" content="1776440713">
-  <meta name="version" content="1776440713">
+  <meta http-equiv="expires" content="1776121914">
+  <meta name="version" content="1776121914">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <script>
 // Desregistrar cualquier Service Worker existente de forma inmediata
@@ -17,7 +17,7 @@ if ('serviceWorker' in navigator) {
 </script>
 <script>
 (function() {
-  var VERSION = '1776440713';
+  var VERSION = '1776121914';
   var stored = localStorage.getItem('gs_app_version');
   if (stored !== VERSION) {
     var session = localStorage.getItem('gs_session');
@@ -1693,7 +1693,7 @@ function pdfRendicion(id) {
   const html = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
   <meta http-equiv="cache-control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="pragma" content="no-cache">
-  <meta http-equiv="expires" content="1776440713"><title>${ren.id} — Global Solutions SpA</title>
+  <meta http-equiv="expires" content="1776121914"><title>${ren.id} — Global Solutions SpA</title>
   <style>* {box-sizing:border-box;margin:0;padding:0;} body {font-family:'Segoe UI',Arial,sans-serif;color:#222;background:white;} .page {max-width:860px;margin:0 auto;padding:40px;} table {border-collapse:collapse;width:100%;} @media print {.no-print{display:none!important} .page{padding:20px}}</style>
   </head><body><div class="page">
     <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:24px;padding-bottom:16px;border-bottom:3px solid #0B2545">
@@ -4724,7 +4724,7 @@ function descargarLiqV2(liqId) {
   const html = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
   <meta http-equiv="cache-control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="pragma" content="no-cache">
-  <meta http-equiv="expires" content="1776440713">
+  <meta http-equiv="expires" content="1776121914">
   <title>${liq.id} — Global Solutions SpA</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -5279,7 +5279,7 @@ function abrirPreviewCotV2(){
   win.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8">
   <meta http-equiv="cache-control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="pragma" content="no-cache">
-  <meta http-equiv="expires" content="1776440713"><title>${numero}</title><style>body{font-family:'Segoe UI',sans-serif;padding:30px;max-width:680px;margin:0 auto}@media print{.no-print{display:none!important}}</style></head><body>${html}<script>setTimeout(()=>window.print(),400);<\/script></body></html>`);
+  <meta http-equiv="expires" content="1776121914"><title>${numero}</title><style>body{font-family:'Segoe UI',sans-serif;padding:30px;max-width:680px;margin:0 auto}@media print{.no-print{display:none!important}}</style></head><body>${html}<script>setTimeout(()=>window.print(),400);<\/script></body></html>`);
   win.document.close();
   // Guardar cotización
   if(!appData.cotizaciones) appData.cotizaciones=[];
@@ -5294,7 +5294,7 @@ function abrirPreviewCot(cotObj){
   win.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8">
   <meta http-equiv="cache-control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="pragma" content="no-cache">
-  <meta http-equiv="expires" content="1776440713"><title>${cotObj.numero}</title><style>body{font-family:'Segoe UI',sans-serif;padding:30px;max-width:680px;margin:0 auto}@media print{.no-print{display:none!important}}</style></head><body>${html}<script>setTimeout(()=>window.print(),400);<\/script></body></html>`);
+  <meta http-equiv="expires" content="1776121914"><title>${cotObj.numero}</title><style>body{font-family:'Segoe UI',sans-serif;padding:30px;max-width:680px;margin:0 auto}@media print{.no-print{display:none!important}}</style></head><body>${html}<script>setTimeout(()=>window.print(),400);<\/script></body></html>`);
   win.document.close();
 }
 
@@ -6062,9 +6062,7 @@ function checkGuiaDuplicada(gi, valor) {
 
 function renderListadoRegistros(serviciosOrdenados) {
   const modo   = uiState.srv_lista_modo || 'todos';
-  const _d60 = new Date(); _d60.setDate(_d60.getDate()-60);
-  const _defDesde = _d60.toISOString().split('T')[0];
-  const desde  = uiState.srv_lista_desde || _defDesde;
+  const desde  = uiState.srv_lista_desde || '';
   const hasta  = uiState.srv_lista_hasta || '';
 
   // Filtrar por período seleccionado
@@ -6955,21 +6953,17 @@ async function addServicio() {
   }
   uiState.srv_guias = [{ num:'', destino:'', fecha_guia:'', fecha_descarga:'', kg:'', imagen_url:'' }];
   uiState.srvForm = {};
-  // Colapsar acordeón de registro para que el render sea liviano
-  const _faseOp = appData.fases ? appData.fases.find(f => f.id === 'operacional') : null;
-  if (_faseOp) {
-    _faseOp.rutinarias.forEach((r, i) => { if (r.registroServicio) uiState['acord_operacional_' + i] = false; });
-  }
-  // Sync Supabase en background — NO bloquea el render
+  saveData();
+  render();
   if (supaConectado && supa) {
-    supa.from('servicios').upsert(servicioToRow(servicio), {onConflict:'id'})
-      .then(({error}) => mostrarToastServicio(!error))
-      .catch(() => mostrarToastServicio(false));
+    try {
+      const { error } = await supa.from('servicios').upsert(servicioToRow(servicio), {onConflict:'id'});
+      mostrarToastServicio(!error);
+    } catch(e) { mostrarToastServicio(false); }
   } else {
     mostrarToastServicio(false);
   }
-  saveData();
-  setTimeout(() => render(), 0); // diferir render para mostrar toast antes
+  render();
 }
 async function delServicio(si) {
   if (!appData.servicios) return;
@@ -7908,9 +7902,7 @@ async function eliminarPipelineSupabase(id) {
 async function syncServiciosDesdeSupabase() {
   if (!supa || !supaConectado) return;
   try {
-    const _d60 = new Date(); _d60.setDate(_d60.getDate() - 60);
-    const fechaHace60Dias = _d60.toISOString().split('T')[0];
-    const { data, error } = await supa.from('servicios').select('*').gte('fecha', fechaHace60Dias).order('created_at');
+    const { data, error } = await supa.from('servicios').select('*').order('created_at');
     if (error) { console.warn('Error sync servicios:', error); return; }
 
     // ─── RESCATE: subir servicios locales que no están en Supabase ───────────
@@ -7925,7 +7917,7 @@ async function syncServiciosDesdeSupabase() {
         catch(e) { console.warn('Error subiendo servicio pendiente:', s.id, e); }
       }
       // Re-fetch para incluir los recién subidos
-      const { data: data2, error: err2 } = await supa.from('servicios').select('*').gte('fecha', fechaHace60Dias).order('created_at');
+      const { data: data2, error: err2 } = await supa.from('servicios').select('*').order('created_at');
       if (!err2 && data2) {
         return _procesarRemotosServicios(data2);
       }
