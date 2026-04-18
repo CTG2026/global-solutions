@@ -7509,7 +7509,7 @@ function renderFase(fase) {
       </div>
       <div class="acord-body ${isOpen?'open':''}">
         ${liquidacionHTML}
-        ${tarea.registroServicio && isOpen ? (() => { const serviciosBlock = (()=>{
+        ${tarea.registroServicio ? (() => { const serviciosBlock = (()=>{
           const servicios=appData.servicios||[];
           const hoyISO=(()=>{const h=new Date();return h.getFullYear()+'-'+String(h.getMonth()+1).padStart(2,'0')+'-'+String(h.getDate()).padStart(2,'0');})();
           const nextId=generarIdServicio(servicios, null);
