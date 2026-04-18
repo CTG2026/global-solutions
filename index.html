@@ -7508,8 +7508,8 @@ function renderFase(fase) {
         <span class="acord-count" onclick="toggleAcord('${fase.id}',${tiReal})">${tarea.subtareas.length}</span>
       </div>
       <div class="acord-body ${isOpen?'open':''}">
-        ${isOpen ? liquidacionHTML : ''}
-        ${tarea.registroServicio && isOpen ? (() => { const serviciosBlock = (()=>{
+        ${liquidacionHTML}
+        ${tarea.registroServicio ? (() => { const serviciosBlock = (()=>{
           const servicios=appData.servicios||[];
           const hoyISO=(()=>{const h=new Date();return h.getFullYear()+'-'+String(h.getMonth()+1).padStart(2,'0')+'-'+String(h.getDate()).padStart(2,'0');})();
           const nextId=generarIdServicio(servicios, null);
@@ -7573,18 +7573,18 @@ function renderFase(fase) {
             +(_acceso==='conductor' ? '' : renderListadoRegistros(serviciosOrdenados))
             +'</div>';
         })(); return '<div style="margin:-4px">'+serviciosBlock+'</div>'; })() : ''}
-        ${tarea.cierreServicioTask && isOpen ? `<div style="margin:-4px">${renderCierreServicios()}</div>` : ''}
-        ${tarea.liquidacionTask && isOpen ? `<div style="margin:-4px">${renderLiquidacionesV2()}</div>` : ''}
-        ${tarea.rendimientoCombTask && isOpen ? `<div style="margin:-4px">${renderRendimientoComb()}</div>` : ''}
-        ${tarea.cotizacionTask && isOpen ? `<div style="margin:-4px">${renderCotizacionPDF()}</div>` : ''}
-        ${tarea.calculadoraTask && isOpen ? `<div style="margin:-4px">${renderCalculadoraServicios()}</div>` : ''}
-        ${tarea.disponibilidadDiaria && isOpen ? `<div style="margin:-4px">${renderDisponibilidad()}</div>` : ''}
-        ${tarea.pipelineTask && isOpen ? `<div style="margin-bottom:8px">${renderPipeline()}</div>` : ''}
-        ${tarea.rendicionTask && isOpen ? `<div style="margin:-4px">${renderRendiciones()}</div>` : ''}
-        ${tarea.facturaTask && isOpen ? `<div style="margin:-4px">${renderFacturas()}</div>` : ''}
-        ${tarea.costosTask && isOpen ? `<div style="margin:-4px">${renderCostos()}</div>` : ''}
-        ${tarea.cajaResumenTask && isOpen ? `<div style="margin:-4px">${renderCajaResumen()}</div>` : ''}
-        ${tarea.respaldoTask && isOpen ? `<div style="padding:8px 0">
+        ${tarea.cierreServicioTask ? `<div style="margin:-4px">${renderCierreServicios()}</div>` : ''}
+        ${tarea.liquidacionTask ? `<div style="margin:-4px">${renderLiquidacionesV2()}</div>` : ''}
+        ${tarea.rendimientoCombTask ? `<div style="margin:-4px">${renderRendimientoComb()}</div>` : ''}
+        ${tarea.cotizacionTask ? `<div style="margin:-4px">${renderCotizacionPDF()}</div>` : ''}
+        ${tarea.calculadoraTask ? `<div style="margin:-4px">${renderCalculadoraServicios()}</div>` : ''}
+        ${tarea.disponibilidadDiaria ? `<div style="margin:-4px">${renderDisponibilidad()}</div>` : ''}
+        ${tarea.pipelineTask ? `<div style="margin-bottom:8px">${renderPipeline()}</div>` : ''}
+        ${tarea.rendicionTask ? `<div style="margin:-4px">${renderRendiciones()}</div>` : ''}
+        ${tarea.facturaTask ? `<div style="margin:-4px">${renderFacturas()}</div>` : ''}
+        ${tarea.costosTask ? `<div style="margin:-4px">${renderCostos()}</div>` : ''}
+        ${tarea.cajaResumenTask ? `<div style="margin:-4px">${renderCajaResumen()}</div>` : ''}
+        ${tarea.respaldoTask ? `<div style="padding:8px 0">
           <button onclick="descargarRespaldo()" style="width:100%;padding:12px;background:#37474F;color:white;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer">💾 Descargar respaldo</button></div>` : ''}
         ${subsHTML}
         <div class="add-sub-row" style="--fc:${fase.color}">
