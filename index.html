@@ -6062,7 +6062,9 @@ function checkGuiaDuplicada(gi, valor) {
 
 function renderListadoRegistros(serviciosOrdenados) {
   const modo   = uiState.srv_lista_modo || 'todos';
-  const desde  = uiState.srv_lista_desde || '';
+  const _d60 = new Date(); _d60.setDate(_d60.getDate()-60);
+  const _defDesde = _d60.toISOString().split('T')[0];
+  const desde  = uiState.srv_lista_desde || _defDesde;
   const hasta  = uiState.srv_lista_hasta || '';
 
   // Filtrar por período seleccionado
@@ -6967,7 +6969,7 @@ async function addServicio() {
     mostrarToastServicio(false);
   }
   saveData();
-  render(); // UN solo render, con acordeón cerrado
+  setTimeout(() => render(), 0); // diferir render para mostrar toast antes
 }
 async function delServicio(si) {
   if (!appData.servicios) return;
