@@ -1541,7 +1541,7 @@ async function guardarCierre(id) {
     baseConductor: d.baseConductor, gastoFinanciero: d.gastoFinanciero,
     comisionConductor, cerrado: true, estado: 'cerrado'
   });
-  appData.dashboard.ventas_mes=(appData.servicios||[]).filter(s=>s.cerrado&&s.precio).reduce((a,s)=>a+(s.precio||0),0);
+  appData.dashboard.ventas_mes=(appData.servicios||[]).filter(s=>(s.cerrado||s.estado==='borrador')&&s.precio).reduce((a,s)=>a+(s.precio||0),0);
   uiState['cs_'+id]=false;
   if (uiState.cs_draft) delete uiState.cs_draft[id];
   saveData();
@@ -2905,8 +2905,8 @@ function _costoTabRemuneraciones(mes, anio) {
     const liqExistente = _getLiqRem(empId, remMes, remAnio);
     const mesLabelRem = MNOMBRES[parseInt(remMes)-1]+' '+remAnio;
 
-    // Auto-calcular comisión (10% servicios cerrados del mes por conductor)
-    const svcsEmp = (appData.servicios||[]).filter(s=>s.cerrado&&s.conductor===emp.nombre&&s.mes===remMes&&s.anio===remAnio);
+    // Auto-calcular comisión (10% servicios cerrados/borrador del mes por conductor)
+    const svcsEmp = (appData.servicios||[]).filter(s=>(s.cerrado||s.estado==='borrador')&&s.conductor===emp.nombre&&s.mes===remMes&&s.anio===remAnio);
     const totalSvcs = svcsEmp.reduce((a,s)=>a+(s.precio||0),0);
     const comisionSug = Math.round(totalSvcs*0.10);
 
@@ -5378,7 +5378,7 @@ function srvDetalle(s) {
       <div><span style="font-size:9px;color:#aaa">Patente</span><div style="font-size:11px;color:#333">${s.patente||'—'}</div></div>
       <div style="grid-column:1/-1"><span style="font-size:9px;color:#aaa">Tipo de equipo</span><div style="font-size:11px;color:#333">${s.tipoEquipo||'—'}</div></div>
     </div>
-    ${s.cerrado && s.precio ? `<div style="margin-top:8px;padding:6px 8px;background:#E8F5E9;border-radius:6px;display:flex;justify-content:space-between;align-items:center">
+    ${(s.cerrado || s.estado==='borrador') && s.precio ? `<div style="margin-top:8px;padding:6px 8px;background:#E8F5E9;border-radius:6px;display:flex;justify-content:space-between;align-items:center">
       <span style="font-size:9px;color:#2E7D32;font-weight:700">PRECIO NETO</span>
       <span style="font-size:13px;font-weight:800;color:#2E7D32">$${s.precio.toLocaleString('es-CL')}</span>
     </div>
@@ -9911,7 +9911,8 @@ function renderMiDia() {
     : `<div style="text-align:center;padding:16px;color:#4CAF50;font-size:12px;font-weight:700">✅ Sin prioridades urgentes — todo al día</div>`;
 
   // ── INFORME DE CAJA ───────────────────────────────────────
-  const ventasMes = appData.dashboard?.ventas_mes || 0;
+  const _vMes=String(hoy.getMonth()+1).padStart(2,'0'),_vAnio=String(hoy.getFullYear());
+  const ventasMes=servicios.filter(s=>(s.cerrado||s.estado==='borrador')&&s.precio&&s.mes===_vMes&&s.anio===_vAnio).reduce((a,s)=>a+(s.precio||0),0);
   const liqPagadas = liquidaciones.filter(l => l.estado==='pagada').reduce((a,l)=>a+(l.total||0),0);
   const porCobrar = liquidaciones.filter(l => l.estado==='facturada'||l.estado==='enviada').reduce((a,l)=>a+(l.total||0),0);
   const cajaHTML = `
