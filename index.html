@@ -2017,8 +2017,8 @@ function renderFacturas() {
   const parseFechaFac=f=>{if(!f)return null;const p=f.split('-');return p[0].length===2?new Date(p[2],p[1]-1,p[0]):new Date(p[0],p[1]-1,p[2]);};
   const esMesActual=f=>{const d=parseFechaFac(f);return d&&d.getMonth()+1===parseInt(mesPad)&&d.getFullYear()===parseInt(anioStr);};
 
-  // 1. Servicios realizados: cerrado o borrador del mes
-  const svcRealizados=(appData.servicios||[]).filter(s=>(s.cerrado||s.estado==='borrador')&&s.precio&&s.mes===mesPad&&s.anio===anioStr).reduce((a,s)=>a+(s.precio||0),0);
+  // 1. Servicios realizados: cerrado o borrador del mes — Total con IVA (precio neto * 1.19)
+  const svcRealizados=(appData.servicios||[]).filter(s=>(s.cerrado||s.estado==='borrador')&&s.precio&&s.mes===mesPad&&s.anio===anioStr).reduce((a,s)=>a+Math.round((s.precio||0)*1.19),0);
   // 2. Facturados: facturas del mes
   const facsMes=(appData.facturas||[]).filter(f=>esMesActual(f.fecha));
   const svcFacturados=facsMes.reduce((a,f)=>a+(f.monto||0),0);
