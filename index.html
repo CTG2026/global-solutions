@@ -2012,6 +2012,21 @@ function renderFacturas() {
   const parseFecha=f=>{if(!f)return null;const p=f.split('-');if(p[0].length===2)return new Date(p[2],p[1]-1,p[0]);return new Date(p[0],p[1]-1,p[2]);};
   const diasDesde=f=>{const d=parseFecha(f);if(!d)return 0;return Math.floor((new Date()-d)/86400000);};
 
+  const hoy=new Date();
+  const mesPad=String(hoy.getMonth()+1).padStart(2,'0'), anioStr=String(hoy.getFullYear());
+  const parseFechaFac=f=>{if(!f)return null;const p=f.split('-');return p[0].length===2?new Date(p[2],p[1]-1,p[0]):new Date(p[0],p[1]-1,p[2]);};
+  const esMesActual=f=>{const d=parseFechaFac(f);return d&&d.getMonth()+1===parseInt(mesPad)&&d.getFullYear()===parseInt(anioStr);};
+
+  // 1. Servicios realizados: cerrado o borrador del mes
+  const svcRealizados=(appData.servicios||[]).filter(s=>(s.cerrado||s.estado==='borrador')&&s.precio&&s.mes===mesPad&&s.anio===anioStr).reduce((a,s)=>a+(s.precio||0),0);
+  // 2. Facturados: facturas del mes
+  const facsMes=(appData.facturas||[]).filter(f=>esMesActual(f.fecha));
+  const svcFacturados=facsMes.reduce((a,f)=>a+(f.monto||0),0);
+  // 3. Cobrados: facturas cobradas o pagadas del mes
+  const svcCobrados=facsMes.filter(f=>f.estado==='cobrada'||f.estado==='pagada').reduce((a,f)=>a+(f.monto||0),0);
+  // 4. Por cobrar: diferencia
+  const svcPorCobrar=svcFacturados-svcCobrados;
+
   const totalPendiente=(appData.facturas||[]).filter(f=>f.estado!=='cobrada').reduce((a,f)=>a+(f.monto||0),0);
   const totalCobrado=(appData.facturas||[]).filter(f=>f.estado==='cobrada').reduce((a,f)=>a+(f.monto||0),0);
 
@@ -2101,15 +2116,23 @@ function renderFacturas() {
   }).join(''):'<div style="text-align:center;color:#aaa;font-size:11px;padding:12px">Sin facturas registradas aún</div>';
 
   return `<div style="padding:2px">
-    <!-- RESUMEN -->
+    <!-- RESUMEN 4 MÉTRICAS -->
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:10px">
-      <div style="background:#FFEBEE;border-radius:8px;padding:8px 10px;text-align:center">
-        <div style="font-size:9px;font-weight:700;color:#C62828;margin-bottom:2px">POR COBRAR</div>
-        <div style="font-size:14px;font-weight:900;color:#C62828">$${totalPendiente.toLocaleString('es-CL')}</div>
+      <div style="background:#EDE7F6;border-radius:8px;padding:8px 10px;text-align:center">
+        <div style="font-size:9px;font-weight:700;color:#4527A0;margin-bottom:2px">SERVICIOS REALIZADOS</div>
+        <div style="font-size:13px;font-weight:900;color:#4527A0">$${svcRealizados.toLocaleString('es-CL')}</div>
+      </div>
+      <div style="background:#E3F2FD;border-radius:8px;padding:8px 10px;text-align:center">
+        <div style="font-size:9px;font-weight:700;color:#1565C0;margin-bottom:2px">SERVICIOS FACTURADOS</div>
+        <div style="font-size:13px;font-weight:900;color:#1565C0">$${svcFacturados.toLocaleString('es-CL')}</div>
       </div>
       <div style="background:#E8F5E9;border-radius:8px;padding:8px 10px;text-align:center">
-        <div style="font-size:9px;font-weight:700;color:#2E7D32;margin-bottom:2px">COBRADO MES</div>
-        <div style="font-size:14px;font-weight:900;color:#2E7D32">$${totalCobrado.toLocaleString('es-CL')}</div>
+        <div style="font-size:9px;font-weight:700;color:#2E7D32;margin-bottom:2px">SERVICIOS COBRADOS</div>
+        <div style="font-size:13px;font-weight:900;color:#2E7D32">$${svcCobrados.toLocaleString('es-CL')}</div>
+      </div>
+      <div style="background:#FFF3E0;border-radius:8px;padding:8px 10px;text-align:center">
+        <div style="font-size:9px;font-weight:700;color:#E65100;margin-bottom:2px">SERVICIOS POR COBRAR</div>
+        <div style="font-size:13px;font-weight:900;color:#E65100">$${svcPorCobrar.toLocaleString('es-CL')}</div>
       </div>
     </div>
     <!-- FORMULARIO NUEVA FACTURA -->
