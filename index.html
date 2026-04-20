@@ -1319,6 +1319,8 @@ function renderCierreServicios() {
           <span style="font-size:10px;color:#aaa;margin-left:8px">${isOpen?'▲':'▼'}</span>
         </div>
         ${isOpen?`<div style="padding:10px 12px;background:#FAFAFA;border-top:1px solid #eee">
+          ${uiState.editando_srv_id===s.id ? renderEditarServicio(s.id) : (()=>`
+          <button onclick="editarServicio('${s.id}')" style="width:100%;padding:8px;background:#EDE7F6;color:#4527A0;border:1px solid #D1C4E9;border-radius:7px;font-size:11px;font-weight:700;cursor:pointer;margin-bottom:10px">✎ Editar datos del servicio</button>
           ${srvDetalle(s)}
           <div style="height:1px;background:#eee;margin:10px 0"></div>
           ${(()=>{
@@ -1465,6 +1467,7 @@ function renderCierreServicios() {
           <div style="border-top:1px solid #FFCDD2;margin-top:10px;padding-top:8px">
             <button onclick="eliminarServicioCierre('${s.id}')" style="width:100%;padding:8px;background:#FFEBEE;color:#C62828;border:1px solid #FFCDD2;border-radius:7px;font-size:11px;font-weight:700;cursor:pointer">🗑️ Eliminar este servicio</button>
           </div>
+          `)()}
         </div>`:''}
       </div>`;
     }).join('')}
