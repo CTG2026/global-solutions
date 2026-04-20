@@ -4191,12 +4191,7 @@ function renderCajaResumen() {
     ` : ''}
   </div>`;
 
-  const pdfBtn = `<div style="display:flex;justify-content:flex-end;margin-bottom:8px">
-    <button onclick="generarPDFCaja()" style="background:#0B2545;color:white;border:none;border-radius:7px;padding:7px 14px;font-size:11px;font-weight:700;cursor:pointer">📄 Generar PDF</button>
-  </div>`;
-
   return '<div style="padding:2px">'
-    + pdfBtn
     + row('Servicios mes',        svcsTotal,        '#0B2545')
     + row('Servicios cobrados',   svcsCobr,         '#2E7D32')
     + row('Servicios pagados',    svcsPag,          '#1565C0')
@@ -4206,92 +4201,6 @@ function renderCajaResumen() {
     + row('Gastos proyectados',   gastosProyectados,'#C62828')
     + row('Caja proyectada',      cajaProyectada,   clr(cajaProyectada))
     + '</div>';
-}
-
-function generarPDFCaja() {
-  const hoy = new Date();
-  const mesPadded = String(hoy.getMonth()+1).padStart(2,'0');
-  const anioStr   = String(hoy.getFullYear());
-  const mesesNombre = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
-  const mesNombre = mesesNombre[hoy.getMonth()];
-
-  const parseFecha = f => { if(!f) return null; const p=f.split('-'); return p[0].length===2?new Date(parseInt(p[2]),parseInt(p[1])-1,parseInt(p[0])):new Date(parseInt(p[0]),parseInt(p[1])-1,parseInt(p[2])); };
-  const esMes = s => { const d=parseFecha(s.fecha||''); return d&&(d.getMonth()+1)===parseInt(mesPadded)&&d.getFullYear()===parseInt(anioStr); };
-  const svcs       = (appData.servicios||[]).filter(esMes);
-  const svcsCierre = svcs.filter(s=>(s.estado==='cerrado'||s.estado==='borrador')&&s.precio);
-  const svcsTotal  = svcsCierre.reduce((a,s)=>a+(s.precio||0),0);
-  const svcsCobr   = svcsCierre.filter(s=>s.cobrado).reduce((a,s)=>a+(s.precio||0),0);
-  const svcsPag    = svcsCierre.filter(s=>s.liquidado).reduce((a,s)=>a+(s.precio||0),0);
-  const svcsPorCobr= svcsTotal - svcsCobr;
-  const gastoCopec = (appData.copec||[]).filter(c=>c.mes===mesPadded&&c.anio===anioStr).reduce((a,c)=>a+(c.monto||0),0);
-  const gastoVia   = svcsCierre.reduce((a,s)=>a+(s.viaticos||0),0);
-  const gastoPeaj  = svcsCierre.reduce((a,s)=>a+(s.peajes||0),0);
-  const gastosFecha= gastoVia + gastoPeaj + gastoCopec;
-  const gastosProy = svcsCierre.reduce((a,s)=>a+(s.baseConductor||0)+(s.comisionConductor||0)+(s.cfProrrateado||0)+(s.gastoFinanciero||0)+(parseInt(s.tag)||0),0);
-  const cajaEfec   = (appData.dashboardData||{}).caja||0;
-  const cajaProy   = cajaEfec + svcsPorCobr - gastosProy;
-
-  const fmt = v => (v<0?'−':'')+'$'+Math.abs(v).toLocaleString('es-CL');
-  const clr = v => v<0?'#C62828':'#0B2545';
-
-  const fila = (label, val, color, bold) =>
-    `<tr><td style="padding:8px 12px;font-size:12px;color:#546E7A;font-weight:${bold?'700':'500'}">${label}</td>
-     <td style="padding:8px 12px;text-align:right;font-size:13px;font-weight:900;color:${color}">${fmt(val)}</td></tr>`;
-  const sep = `<tr><td colspan="2" style="padding:0;border-top:2px solid #eee"></td></tr>`;
-
-  // Desglose gastos
-  const desglose = [
-    gastoCopec ? `<tr style="background:#FFF8F8"><td style="padding:5px 24px;font-size:11px;color:#B71C1C">Combustible</td><td style="padding:5px 24px;text-align:right;font-size:11px;color:#C62828;font-weight:700">${fmt(gastoCopec)}</td></tr>` : '',
-    gastoVia   ? `<tr style="background:#FFF8F8"><td style="padding:5px 24px;font-size:11px;color:#B71C1C">Viáticos</td><td style="padding:5px 24px;text-align:right;font-size:11px;color:#C62828;font-weight:700">${fmt(gastoVia)}</td></tr>` : '',
-    gastoPeaj  ? `<tr style="background:#FFF8F8"><td style="padding:5px 24px;font-size:11px;color:#B71C1C">Peajes</td><td style="padding:5px 24px;text-align:right;font-size:11px;color:#C62828;font-weight:700">${fmt(gastoPeaj)}</td></tr>` : '',
-  ].join('');
-
-  const html = `
-    <div style="font-family:'Segoe UI',Arial,sans-serif;max-width:600px;margin:0 auto;padding:30px">
-      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:24px;border-bottom:3px solid #0B2545;padding-bottom:12px">
-        <div>
-          <div style="font-size:11px;font-weight:700;color:#607D8B;letter-spacing:2px">GLOBAL SOLUTIONS SpA</div>
-          <div style="font-size:22px;font-weight:900;color:#0B2545">Resumen de Caja</div>
-          <div style="font-size:13px;color:#607D8B;margin-top:2px">${mesNombre} ${anioStr}</div>
-        </div>
-        <div style="font-size:11px;color:#aaa;text-align:right">Generado: ${hoy.toLocaleDateString('es-CL')}<br>${hoy.toLocaleTimeString('es-CL',{hour:'2-digit',minute:'2-digit'})}</div>
-      </div>
-      <table style="width:100%;border-collapse:collapse;background:white;border-radius:10px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,0.08)">
-        <thead><tr style="background:#F4F6F8"><td colspan="2" style="padding:8px 12px;font-size:10px;font-weight:800;color:#607D8B;letter-spacing:1px">INGRESOS</td></tr></thead>
-        <tbody>
-          ${fila('Servicios mes',        svcsTotal,   '#0B2545', true)}
-          ${fila('Servicios cobrados',   svcsCobr,    '#2E7D32', false)}
-          ${fila('Servicios pagados',    svcsPag,     '#1565C0', false)}
-          ${fila('Servicios por cobrar', svcsPorCobr, '#E65100', false)}
-          ${sep}
-        </tbody>
-        <thead><tr style="background:#F4F6F8"><td colspan="2" style="padding:8px 12px;font-size:10px;font-weight:800;color:#607D8B;letter-spacing:1px">GASTOS</td></tr></thead>
-        <tbody>
-          ${fila('Gastos a la fecha', gastosFecha, '#C62828', true)}
-          ${desglose}
-          ${fila('Gastos proyectados', gastosProy, '#C62828', false)}
-          ${sep}
-        </tbody>
-        <thead><tr style="background:#F4F6F8"><td colspan="2" style="padding:8px 12px;font-size:10px;font-weight:800;color:#607D8B;letter-spacing:1px">POSICIÓN</td></tr></thead>
-        <tbody>
-          ${fila('Caja efectiva',   cajaEfec, clr(cajaEfec),  false)}
-          ${fila('Caja proyectada', cajaProy, clr(cajaProy),  true)}
-        </tbody>
-      </table>
-    </div>`;
-
-  const w = window.open('','_blank');
-  w.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Caja ${mesNombre} ${anioStr}</title>
-    <style>@media print{.no-print{display:none!important}}body{margin:0;background:#f5f5f5}</style>
-    </head><body>
-    <div class="no-print" style="padding:12px 30px;background:#0B2545;display:flex;gap:10px">
-      <button onclick="window.print()" style="background:#4CAF50;color:white;border:none;border-radius:7px;padding:8px 20px;font-size:13px;font-weight:700;cursor:pointer">🖨️ Imprimir / Guardar PDF</button>
-      <button onclick="window.close()" style="background:#607D8B;color:white;border:none;border-radius:7px;padding:8px 16px;font-size:13px;font-weight:700;cursor:pointer">✕ Cerrar</button>
-    </div>
-    ${html}
-    <scr`+`ipt>setTimeout(()=>window.print(),500);</scr`+`ipt>
-    </body></html>`);
-  w.document.close();
 }
 
 function renderCaja() {
