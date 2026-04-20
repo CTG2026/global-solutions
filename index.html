@@ -7992,36 +7992,33 @@ function _procesarRemotosServicios(data) {
 
 async function upsertServicioSupabase(s) {
   if (!supa || !supaConectado) return;
+  // Fila completa con todos los campos extra
+  const rowFull = {
+    ...servicioToRow(s),
+    cerrado: s.cerrado||false, estado: s.estado||'activo',
+    puntos: s.puntos||s.guias||[],
+    cf_prorrateado: s.cfProrrateado||50800,
+    comision_conductor: s.comisionConductor||0,
+    monto_puntos: s.montoPuntos||0,
+    num_puntos: s.numPuntos||1,
+    base_conductor: s.baseConductor||0,
+    gasto_financiero: s.gastoFinanciero||0,
+    documentos: s.documentos||[]
+  };
   try {
-    const row = {
-      id: s.id, fecha: s.fecha, anio: s.anio||'', mes: s.mes||'',
-      patente: s.patente||'', conductor: s.conductor||'',
-      tipo_equipo: s.tipoEquipo||'', cliente: s.cliente||'', tag: s.tag||'',
-      origen: s.origen||'', peajes: s.peajes||0,
-      guias: s.guias||[], precio: s.precio||0, km: s.km||0,
-      litros: s.litros||0, monto_comb: s.montoComb||0,
-      petroleo: s.petroleo||0, adicional: s.adicional||0,
-      viaticos: s.viaticos||0, cobro: s.cobro||'pendiente',
-      liquidado: s.liquidado||false, costo_total: s.costoTotal||0,
-      margen: s.margen||0, rendimiento: s.rendimiento||0,
-      cerrado: s.cerrado||false, estado: s.estado||'activo',
-      puntos: s.puntos||s.guias||[],
-      cf_prorrateado: s.cfProrrateado||50800,
-      comision_conductor: s.comisionConductor||0,
-      liquidacion_id: s.liquidacionId||'',
-      monto_puntos: s.montoPuntos||0,
-      num_puntos: s.numPuntos||1,
-      base_conductor: s.baseConductor||0,
-      gasto_financiero: s.gastoFinanciero||0,
-      oc: s.oc||'',
-      documentos: s.documentos||[]
-    };
-    const { error: upsertErr } = await supa.from('servicios').upsert(row, { onConflict: 'id' });
-    if (upsertErr) {
-      console.warn('Error upsert servicio:', upsertErr);
-      return false;
-    }
-    return true;
+    const { error } = await supa.from('servicios').upsert(rowFull, { onConflict: 'id' });
+    if (!error) return true;
+    // Falló con campos extra — intentar solo campos base + cerrado/estado
+    console.warn('Upsert completo falló, reintentando con campos base:', error.message);
+    const rowBase = { ...servicioToRow(s), cerrado: s.cerrado||false, estado: s.estado||'activo' };
+    const { error: err2 } = await supa.from('servicios').upsert(rowBase, { onConflict: 'id' });
+    if (!err2) return true;
+    // Último intento: solo campos originales sin cerrado/estado
+    console.warn('Upsert base falló, reintentando mínimo:', err2.message);
+    const { error: err3 } = await supa.from('servicios').upsert(servicioToRow(s), { onConflict: 'id' });
+    if (!err3) return true;
+    console.warn('Error upsert servicio (mínimo):', err3);
+    return false;
   } catch(e) { console.warn('Error upsert servicio:', e); return false; }
 }
 
@@ -11077,12 +11074,14 @@ if ('serviceWorker' in navigator) {
   });
 }
 // Limpiar localStorage de servicios al arrancar — Supabase es la única fuente
+// EXCEPCIÓN: conservar borradores pendientes de sincronizar
 try {
   const raw = localStorage.getItem('gs_panel_v5');
   if (raw) {
     const parsed = JSON.parse(raw);
     if (parsed.servicios && parsed.servicios.length > 0) {
-      parsed.servicios = [];
+      const borradores = parsed.servicios.filter(s => s.estado === 'borrador');
+      parsed.servicios = borradores; // mantener solo borradores, el resto viene de Supabase
       localStorage.setItem('gs_panel_v5', JSON.stringify(parsed));
     }
   }
