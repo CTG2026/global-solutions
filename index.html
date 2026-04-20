@@ -1367,7 +1367,7 @@ function renderCierreServicios() {
             <div style="grid-column:1/-1">
               <div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">PRECIO NETO ($)</div>
               <input id="cs_precio_${s.id}" type="number" value="${_csVal(s,'precio','')}" placeholder="ej: 450000"
-                oninput="updCS('${s.id}','precio',this.value);(function(v){const h=document.getElementById('cs_comision_hint_${s.id}');const sug=Math.round((parseInt(v)||0)*0.1);if(h)h.textContent='Sugerida 10%: $'+sug.toLocaleString('es-CL');})(this.value)"
+                oninput="updCS('${s.id}','precio',this.value)"
                 style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:14px;font-weight:700;outline:none;font-family:inherit">
             </div>
             <!-- CANTIDAD DE PUNTOS + MONTO TOTAL PUNTOS -->
@@ -1377,9 +1377,6 @@ function renderCierreServicios() {
               <input id="cs_comision_input_${s.id}" type="number" value="${_csVal(s,'comisionConductor','')}" placeholder="ej: 35000"
                 oninput="updCS('${s.id}','comisionConductor',this.value)"
                 style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit">
-              <div id="cs_comision_hint_${s.id}" style="font-size:9px;color:#888;margin-top:2px">
-                ${s.precio ? 'Sugerida 10%: $'+Math.round(s.precio*0.1).toLocaleString('es-CL') : 'Ingresa precio para ver sugerencia'}
-              </div>
             </div>
             <div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">KILÓMETROS</div>
               <input id="cs_km_${s.id}" type="number" value="${_csVal(s,'km','')}" placeholder="ej: 320" oninput="updCS('${s.id}','km',this.value)" style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit"></div>
@@ -1436,7 +1433,7 @@ function renderCierreServicios() {
               <div style="color:#555;font-weight:600">Total con IVA</div><div style="text-align:right;font-weight:700;color:#1B5E20">$${Math.round((s.precio||0)*1.19).toLocaleString('es-CL')}</div>
               <div style="border-top:1px solid #C8E6C9;grid-column:1/-1;margin:3px 0"></div>
               <div style="color:#777;font-size:9px;font-weight:700;grid-column:1/-1;margin-bottom:2px">COSTOS VARIABLES</div>
-              <div style="color:#555">Comisión conductor (10%)</div><div style="text-align:right;color:#E53935">−$${Math.round((s.precio||0)*0.1).toLocaleString('es-CL')}</div>
+              ${(()=>{const _com=parseInt(_csVal(s,'comisionConductor',0))||0;return`<div style="color:#555">Comisión conductor</div><div style="text-align:right;color:#E53935">−$${_com.toLocaleString('es-CL')}</div>`;})()}
               <div style="color:#555">Petróleo</div><div style="text-align:right;color:#E53935">−$${(s.petroleo||0).toLocaleString('es-CL')}</div>
               <div style="color:#555">Peajes</div><div style="text-align:right;color:#E53935">−$${(s.peajes||0).toLocaleString('es-CL')}</div>
               <div style="color:#555">Viáticos</div><div style="text-align:right;color:#E53935">−$${(s.viaticos||0).toLocaleString('es-CL')}</div>
@@ -1445,8 +1442,7 @@ function renderCierreServicios() {
               <div style="color:#777;font-size:9px;font-weight:700;grid-column:1/-1;margin-top:4px;margin-bottom:2px">COSTOS FIJOS</div>
               <div style="color:#555">CF prorrateado</div><div style="text-align:right;color:#E53935">−$${(s.cfProrrateado||50800).toLocaleString('es-CL')}</div>
               <div style="border-top:1px solid #C8E6C9;grid-column:1/-1;margin:3px 0"></div>
-              <div style="font-weight:800;color:#1B5E20">RESULTADO NETO</div>
-              <div style="text-align:right;font-weight:900;color:#1B5E20">$${((s.precio||0)-Math.round((s.precio||0)*0.1)-(s.petroleo||0)-(s.peajes||0)-(s.viaticos||0)-(s.adicional||0)-(s.cfProrrateado||50800)).toLocaleString('es-CL')}</div>
+              ${(()=>{const _com=parseInt(_csVal(s,'comisionConductor',0))||0;const _res=(s.precio||0)-_com-(s.petroleo||0)-(s.peajes||0)-(s.viaticos||0)-(s.adicional||0)-(s.cfProrrateado||50800);return`<div style="font-weight:800;color:#1B5E20">RESULTADO NETO</div><div style="text-align:right;font-weight:900;color:#1B5E20">$${_res.toLocaleString('es-CL')}</div>`;})()}
             </div>
           </div>` : ''}
           <!-- FOTO COMPROBANTE -->
@@ -2940,7 +2936,7 @@ function _costoTabRemuneraciones(mes, anio) {
     const sueldoBase  = parseInt(f.sueldoBase)||0;
     const horasExtra  = parseInt(f.horasExtra)||0;
     const bono        = parseInt(f.bono)||0;
-    const comision    = parseInt(f.comision)>=0 ? parseInt(f.comision) : comisionSug;
+    const comision    = parseInt(f.comision)>=0 ? parseInt(f.comision) : 0;
     const afp         = parseInt(f.afp)||0;
     const salud       = parseInt(f.salud)||0;
     const descuentos  = parseInt(f.descuentos)||0;
@@ -2998,8 +2994,8 @@ function _costoTabRemuneraciones(mes, anio) {
         <div><div style="font-size:9px;font-weight:700;color:#546E7A;margin-bottom:3px">BONO</div>${inp('bono',f.bono,'$0')}</div>
         <div>
           <div style="font-size:9px;font-weight:700;color:#546E7A;margin-bottom:3px">COMISIÓN</div>
-          ${inp('comision', f.comision!==undefined?f.comision:comisionSug,'$0')}
-          ${svcsEmp.length>0?`<div style="font-size:9px;color:#2E7D32;margin-top:2px">${svcsEmp.length} servicios · $${totalSvcs.toLocaleString('es-CL')} · Sugerida: $${comisionSug.toLocaleString('es-CL')}</div>`:'<div style="font-size:9px;color:#aaa;margin-top:2px">Sin servicios este mes</div>'}
+          ${inp('comision', f.comision!==undefined?f.comision:'','$0')}
+          ${svcsEmp.length>0?`<div style="font-size:9px;color:#888;margin-top:2px">${svcsEmp.length} servicios · $${totalSvcs.toLocaleString('es-CL')} en el mes</div>`:'<div style="font-size:9px;color:#aaa;margin-top:2px">Sin servicios este mes</div>'}
         </div>
       </div>
       <div style="margin-top:8px;padding:6px 10px;background:#E3F2FD;border-radius:7px;display:flex;justify-content:space-between">
@@ -5410,8 +5406,8 @@ function srvDetalle(s) {
       <span style="font-size:13px;font-weight:800;color:#2E7D32">$${s.precio.toLocaleString('es-CL')}</span>
     </div>
     <div style="margin-top:4px;padding:6px 8px;background:#E3F2FD;border-radius:6px;display:flex;justify-content:space-between;align-items:center">
-      <span style="font-size:9px;color:#1565C0;font-weight:700">COMISIÓN CONDUCTOR (10%)</span>
-      <span style="font-size:13px;font-weight:800;color:#1565C0">$${Math.round(s.precio*0.1).toLocaleString('es-CL')}</span>
+      <span style="font-size:9px;color:#1565C0;font-weight:700">COMISIÓN CONDUCTOR</span>
+      <span style="font-size:13px;font-weight:800;color:#1565C0">$${(s.comisionConductor||0).toLocaleString('es-CL')}</span>
     </div>` : ''}
   </div>`;
 }
