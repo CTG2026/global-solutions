@@ -1447,16 +1447,10 @@ function renderCierreServicios() {
               ${(()=>{const _com=parseInt(_csVal(s,'comisionConductor',0))||0;const _res=(s.precio||0)-_com-(s.petroleo||0)-(s.peajes||0)-(s.viaticos||0)-(s.adicional||0)-(s.cfProrrateado||50800);return`<div style="font-weight:800;color:#1B5E20">RESULTADO NETO</div><div style="text-align:right;font-weight:900;color:#1B5E20">$${_res.toLocaleString('es-CL')}</div>`;})()}
             </div>
           </div>` : ''}
-          <!-- FOTO COMPROBANTE -->
+          <!-- COBRO -->
           <div style="margin-bottom:8px">
-            <div style="font-size:9px;font-weight:700;color:#888;margin-bottom:5px">📷 FOTO COMPROBANTE</div>
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
-              <button onclick="document.getElementById('foto_cam_${s.id}').click()" style="padding:9px;background:#E3F2FD;color:#1565C0;border:1px solid #BBDEFB;border-radius:7px;font-size:11px;font-weight:700;cursor:pointer">📷 Tomar foto</button>
-              <button onclick="document.getElementById('foto_lib_${s.id}').click()" style="padding:9px;background:#F3E5F5;color:#6A1B9A;border:1px solid #E1BEE7;border-radius:7px;font-size:11px;font-weight:700;cursor:pointer">🖼️ Elegir</button>
-            </div>
-            <input type="file" id="foto_cam_${s.id}" accept="image/*" capture="environment" style="display:none" onchange="agregarFotoServicio('${s.id}',this)">
-            <input type="file" id="foto_lib_${s.id}" accept="image/*" style="display:none" onchange="agregarFotoServicio('${s.id}',this)">
-            ${(s.fotos&&s.fotos.length)?`<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">${s.fotos.map((f,fi)=>`<div style="position:relative"><img src="${f}" style="width:64px;height:64px;object-fit:cover;border-radius:6px;border:1px solid #dde"><span onclick="eliminarFotoServicio('${s.id}',${fi})" style="position:absolute;top:-5px;right:-5px;background:#C62828;color:white;border-radius:50%;width:16px;height:16px;font-size:10px;display:flex;align-items:center;justify-content:center;cursor:pointer;font-weight:700;line-height:16px;text-align:center">×</span></div>`).join('')}</div>`:''}
+            <div style="font-size:9px;font-weight:700;color:#888;margin-bottom:5px">ESTADO DE COBRO</div>
+            <button onclick="togglePagadoServicio('${s.id}')" style="width:100%;padding:10px;background:${s.cobro==='pagado'?'#E8F5E9':'#F5F5F5'};color:${s.cobro==='pagado'?'#2E7D32':'#546E7A'};border:2px solid ${s.cobro==='pagado'?'#A5D6A7':'#CFD8DC'};border-radius:7px;font-size:12px;font-weight:700;cursor:pointer">${s.cobro==='pagado'?'✅ PAGADO':'⬜ Marcar como pagado'}</button>
           </div>
           <!-- BOTONES -->
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:4px">
@@ -10469,6 +10463,14 @@ function setCobro(id, estado) {
     btn.style.borderColor = activo ? (e==='pendiente'?'#F9A825':e==='pagado'?'#2E7D32':'#1565C0') : '#dde';
     btn.style.color = activo ? (e==='pendiente'?'#F9A825':e==='pagado'?'#2E7D32':'#1565C0') : '#888';
   });
+}
+async function togglePagadoServicio(id) {
+  const idx = (appData.servicios||[]).findIndex(s => s.id === id);
+  if (idx === -1) return;
+  appData.servicios[idx].cobro = appData.servicios[idx].cobro === 'pagado' ? 'pendiente' : 'pagado';
+  saveData();
+  await upsertServicioSupabase(appData.servicios[idx]);
+  render();
 }
 
 function liquidarServicio(id) {
