@@ -1280,20 +1280,37 @@ function renderCierreServicios() {
   const CF_MES = (appData.config && appData.config.costosFijosMes) || 5080000;
   const estadoOrden = s => s.cerrado ? 2 : s.precio ? 1 : 0;
   const _fKeyC = f => { if(!f) return ''; const p=f.split('-'); return p[0].length===4?f:p[2]+'-'+p[1]+'-'+p[0]; };
+  const _getMesAnio = s => {
+    if (s.mes && s.anio) return [String(s.mes).padStart(2,'0'), String(s.anio)];
+    const p = (s.fecha||'').split('-');
+    if (p.length !== 3) return ['',''];
+    return p[0].length === 4 ? [p[1], p[0]] : [p[1], p[2]];
+  };
+  const _hoy = new Date();
+  const periodoActual = `${_hoy.getFullYear()}-${String(_hoy.getMonth()+1).padStart(2,'0')}`;
+  const filtroPeriodo = uiState.cs_filtro_periodo !== undefined ? uiState.cs_filtro_periodo : periodoActual;
   const todosServicios=(appData.servicios||[]).slice().sort((a,b)=>{
     const eo = estadoOrden(a) - estadoOrden(b);
     if (eo !== 0) return eo;
     return _fKeyC(b.fecha||'').localeCompare(_fKeyC(a.fecha||'')); // más reciente primero
   });
-  const clientesCierre = [...new Set(todosServicios.map(s=>(s.cliente||'').trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'es'));
+  const serviciosPeriodo = filtroPeriodo
+    ? todosServicios.filter(s => { const [m,a]=_getMesAnio(s); return m===filtroPeriodo.split('-')[1] && a===filtroPeriodo.split('-')[0]; })
+    : todosServicios;
+  const clientesCierre = [...new Set(serviciosPeriodo.map(s=>(s.cliente||'').trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'es'));
   const filtroCliente  = uiState.cs_filtro_cliente || '';
-  const servicios = filtroCliente ? todosServicios.filter(s=>(s.cliente||'').trim()===filtroCliente) : todosServicios;
+  const servicios = filtroCliente ? serviciosPeriodo.filter(s=>(s.cliente||'').trim()===filtroCliente) : serviciosPeriodo;
   const sinCerrar = servicios.filter(s=>!s.cerrado).length;
-  const cfPorServ = todosServicios.length > 0 ? Math.round(CF_MES / todosServicios.length) : 0;
+  const cfPorServ = serviciosPeriodo.length > 0 ? Math.round(CF_MES / serviciosPeriodo.length) : 0;
   return `<div style="padding:2px">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:wrap;gap:6px">
       <div style="font-size:9px;font-weight:700;color:#546E7A;letter-spacing:0.5px">${sinCerrar} PENDIENTES · ${servicios.length - sinCerrar} CERRADOS${filtroCliente?' (filtrado)':''}</div>
       <div style="font-size:9px;color:#888">CF/servicio: $${cfPorServ.toLocaleString('es-CL')}</div>
+    </div>
+    <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;flex-wrap:wrap">
+      <div style="font-size:9px;font-weight:700;color:#546E7A">PERÍODO:</div>
+      <input type="month" value="${filtroPeriodo}" onchange="uiState.cs_filtro_periodo=this.value;uiState.cs_filtro_cliente='';render()" style="border:1px solid #CFD8DC;border-radius:6px;padding:4px 8px;font-size:11px;font-family:inherit;outline:none;background:white;flex:1;min-width:140px">
+      ${filtroPeriodo?`<button onclick="uiState.cs_filtro_periodo='';uiState.cs_filtro_cliente='';render()" style="padding:4px 8px;border-radius:5px;font-size:10px;cursor:pointer;border:1px solid #CFD8DC;background:#ECEFF1;color:#546E7A;font-weight:700">Todos</button>`:''}
     </div>
     <div style="display:flex;align-items:center;gap:6px;margin-bottom:10px;flex-wrap:wrap">
       <div style="font-size:9px;font-weight:700;color:#546E7A">CLIENTE:</div>
