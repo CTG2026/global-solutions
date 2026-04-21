@@ -4148,9 +4148,9 @@ function renderCajaResumen() {
   const svcs        = (appData.servicios||[]).filter(esMes);
   const svcsCierre  = svcs.filter(s => (s.estado==='cerrado' || s.estado==='borrador') && s.precio);
   const svcsTotal   = svcsCierre.reduce((a,s)=>a+(s.precio||0),0);
-  const svcsCobr    = svcsCierre.filter(s=>s.cobrado).reduce((a,s)=>a+(s.precio||0),0);
-  const svcsPag     = svcsCierre.filter(s=>s.liquidado).reduce((a,s)=>a+(s.precio||0),0);
-  const svcsPorCobr = svcsTotal - svcsCobr;
+  const svcsCobr    = svcsCierre.filter(s=>s.cobro==='facturado').reduce((a,s)=>a+(s.precio||0),0);
+  const svcsPag     = svcsCierre.filter(s=>s.cobro==='pagado').reduce((a,s)=>a+(s.precio||0),0);
+  const svcsPorCobr = svcsTotal - svcsCobr - svcsPag;
 
   // Gastos a la fecha: viáticos + peajes de servicios en cierre + combustible sección petróleo (Copec)
   const gastoCopec    = (appData.copec||[]).filter(c=>c.mes===mesPadded&&c.anio===anioStr).reduce((a,c)=>a+(c.monto||0),0);
@@ -4176,6 +4176,39 @@ function renderCajaResumen() {
     <span style="font-size:12px;font-weight:700;color:#546E7A">${label}</span>
     <span style="font-size:14px;font-weight:900;color:${color}">${fmt(val)}</span>
   </div>`;
+
+  const _agruparPorCliente = lista => {
+    const map = {};
+    lista.forEach(s => {
+      const c = (s.cliente||'Sin cliente').trim();
+      if (!map[c]) map[c] = { count: 0, total: 0 };
+      map[c].count++;
+      map[c].total += s.precio || 0;
+    });
+    return Object.entries(map).sort((a,b) => b[1].total - a[1].total);
+  };
+
+  const svcAcord = (label, color, lista, openKey) => {
+    const total = lista.reduce((a,s) => a + (s.precio||0), 0);
+    const isOpen = !!uiState[openKey];
+    const clientes = _agruparPorCliente(lista);
+    return `<div style="background:white;border:1px solid #eee;border-radius:8px;margin-bottom:5px;overflow:hidden">
+      <div onclick="uiState['${openKey}']=!uiState['${openKey}'];render()" style="display:flex;justify-content:space-between;align-items:center;padding:9px 12px;cursor:pointer">
+        <span style="font-size:12px;font-weight:700;color:#546E7A">${isOpen?'▾':'▸'} ${label}</span>
+        <span style="font-size:14px;font-weight:900;color:${color}">${fmt(total)}</span>
+      </div>
+      ${isOpen ? `<div style="border-top:1px solid #eee;padding:8px 12px">
+        <div style="display:grid;grid-template-columns:1fr 32px auto;gap:4px;font-size:9px;font-weight:700;color:#aaa;letter-spacing:0.5px;padding-bottom:4px;border-bottom:1px solid #f0f0f0;margin-bottom:4px">
+          <span>CLIENTE</span><span style="text-align:center">#</span><span style="text-align:right">MONTO</span>
+        </div>
+        ${clientes.length ? clientes.map(([c,d])=>`<div style="display:grid;grid-template-columns:1fr 32px auto;gap:4px;font-size:11px;padding:5px 0;border-bottom:1px solid #f8f8f8;align-items:center">
+          <span style="color:#455A64;font-weight:600">${c}</span>
+          <span style="text-align:center;background:#F1F8E9;color:#2E7D32;border-radius:10px;font-size:9px;font-weight:700;padding:1px 5px">${d.count}</span>
+          <span style="text-align:right;font-weight:800;color:${color}">${fmt(d.total)}</span>
+        </div>`).join('') : `<div style="color:#aaa;font-size:11px;padding:4px 0">Sin servicios en este período</div>`}
+      </div>` : ''}
+    </div>`;
+  };
 
   // Acordeón nivel 1: Gastos a la fecha
   const gfOpen = !!uiState.caja_gf_open;
@@ -4229,10 +4262,10 @@ function renderCajaResumen() {
   </div>`;
 
   return '<div style="padding:2px">'
-    + row('Servicios mes',        svcsTotal,        '#0B2545')
-    + row('Servicios cobrados',   svcsCobr,         '#2E7D32')
-    + row('Servicios pagados',    svcsPag,          '#1565C0')
-    + row('Servicios por cobrar', svcsPorCobr,      '#E65100')
+    + svcAcord('Servicios mes',        '#0B2545', svcsCierre,                                    'caja_svcs_mes_open')
+    + svcAcord('Servicios cobrados',   '#2E7D32', svcsCierre.filter(s=>s.cobro==='facturado'),   'caja_svcs_cobr_open')
+    + svcAcord('Servicios pagados',    '#1565C0', svcsCierre.filter(s=>s.cobro==='pagado'),      'caja_svcs_pag_open')
+    + svcAcord('Servicios por cobrar', '#E65100', svcsCierre.filter(s=>s.cobro!=='facturado'&&s.cobro!=='pagado'), 'caja_svcs_pcobr_open')
     + gastosDetalle
     + row('Caja efectiva',        cajaEfectiva,     clr(cajaEfectiva))
     + row('Gastos proyectados',   gastosProyectados,'#C62828')
