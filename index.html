@@ -1323,10 +1323,11 @@ function renderCierreServicios() {
     ${servicios.map(s=>{
       const isOpen=!!uiState['cs_'+s.id];
       const idxOrig=appData.servicios.findIndex(sv=>sv.id===s.id);
-      const estadoBadge = s.cerrado
+      const estadoBadge = (s.cerrado
         ? '<span style="font-size:9px;font-weight:700;background:#E8F5E9;color:#2E7D32;padding:2px 7px;border-radius:8px">✓ CERRADO</span>'
         : s.precio ? '<span style="font-size:9px;font-weight:700;background:#FFF3E0;color:#E65100;padding:2px 7px;border-radius:8px">📝 BORRADOR</span>'
-        : '<span style="font-size:9px;font-weight:700;background:#FFEBEE;color:#C62828;padding:2px 7px;border-radius:8px">⏳ PENDIENTE</span>';
+        : '<span style="font-size:9px;font-weight:700;background:#FFEBEE;color:#C62828;padding:2px 7px;border-radius:8px">⏳ PENDIENTE</span>')
+        + (s.cobro==='pagado' ? ' <span style="font-size:9px;font-weight:700;background:#E3F2FD;color:#1565C0;padding:2px 7px;border-radius:8px">💰 PAGADO</span>' : '');
       return `<div style="border:1px solid ${s.cerrado?'#A5D6A7':s.precio?'#FFCC80':'#dde'};border-radius:8px;margin-bottom:6px;overflow:hidden">
         <div onclick="uiState['cs_${s.id}']=!uiState['cs_${s.id}'];render()" style="padding:10px 12px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;background:${isOpen?'#F8F9FA':'white'}">
           <div style="flex:1">
