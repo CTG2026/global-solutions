@@ -1251,24 +1251,58 @@ function updCSGuia(svcId, pi, campo, valor) {
     if (campo==='num') uiState.cs_draft[svcId].guias[pi].guia = valor;
   }
 }
-
+function _initCSGuias(svcId) {
+  if (!uiState.cs_draft) uiState.cs_draft = {};
+  if (!uiState.cs_draft[svcId]) uiState.cs_draft[svcId] = {};
+  if (!uiState.cs_draft[svcId].guias) {
+    const svc = (appData.servicios||[]).find(s=>s.id===svcId);
+    const pts = svc ? ((svc.puntos&&svc.puntos.length)?svc.puntos:(svc.guias&&svc.guias.length)?svc.guias:[]) : [];
+    uiState.cs_draft[svcId].guias = pts.length ? pts.map(p=>({...p})) : [{num:'',guia:'',destino:'',origen:'',kg:'',fecha_guia:'',imagen_url:''}];
+  }
+}
+function _flushCSGuiaDom(svcId) {
+  const guias = uiState.cs_draft?.[svcId]?.guias;
+  if (!guias) return;
+  guias.forEach((g, i) => {
+    const n = document.getElementById(`cs_guia_${i}_num_${svcId}`);
+    const d = document.getElementById(`cs_guia_${i}_destino_${svcId}`);
+    const o = document.getElementById(`cs_guia_${i}_origen_${svcId}`);
+    const k = document.getElementById(`cs_guia_${i}_kg_${svcId}`);
+    if (n) { g.num = n.value; g.guia = n.value; }
+    if (d) g.destino = d.value;
+    if (o) g.origen = o.value;
+    if (k) g.kg = k.value;
+  });
+}
+function addCSPunto(svcId) {
+  _initCSGuias(svcId);
+  _flushCSGuiaDom(svcId);
+  uiState.cs_draft[svcId].guias.push({num:'',guia:'',destino:'',origen:'',kg:'',fecha_guia:'',imagen_url:''});
+  render();
+}
+function delCSPunto(svcId, pi) {
+  _initCSGuias(svcId);
+  if (uiState.cs_draft[svcId].guias.length <= 1) return;
+  _flushCSGuiaDom(svcId);
+  uiState.cs_draft[svcId].guias.splice(pi, 1);
+  render();
+}
 async function guardarEdicionGuias(svcId) {
   const idx = (appData.servicios||[]).findIndex(s=>s.id===svcId);
   if (idx===-1) return;
   const svc = appData.servicios[idx];
-  const puntos = (svc.puntos&&svc.puntos.length)?svc.puntos:(svc.guias&&svc.guias.length)?svc.guias:[];
-  if (!puntos.length) { showToastGeneral('Sin guías para editar','#888'); return; }
-  const nuevas = puntos.map((p, pi) => {
-    const g = campo => { const el=document.getElementById('cs_guia_'+pi+'_'+campo+'_'+svcId); return el?el.value:(p[campo]||''); };
-    return { ...p, num:g('num'), guia:g('num'), origen:g('origen'), destino:g('destino'), kg:g('kg') };
-  });
-  const usaPuntos = !!(svc.puntos&&svc.puntos.length);
-  if (usaPuntos) appData.servicios[idx].puntos = nuevas;
-  else           appData.servicios[idx].guias  = nuevas;
+  _initCSGuias(svcId);
+  _flushCSGuiaDom(svcId);
+  const nuevas = uiState.cs_draft[svcId].guias.map(g => ({
+    ...g, num: g.num||'', guia: g.num||''
+  }));
+  appData.servicios[idx].puntos = nuevas;
+  appData.servicios[idx].guias  = nuevas;
+  appData.servicios[idx].numPuntos = nuevas.length;
   if (uiState.cs_draft&&uiState.cs_draft[svcId]) delete uiState.cs_draft[svcId].guias;
   saveData();
   await upsertServicioSupabase(appData.servicios[idx]);
-  showToastGeneral('✅ Guías actualizadas','#2E7D32');
+  showToastGeneral('✅ Puntos actualizados','#2E7D32');
   render();
 }
 function _csVal(s, campo, fallback) {
@@ -1342,17 +1376,20 @@ function renderCierreServicios() {
           ${srvDetalle(s)}
           <div style="height:1px;background:#eee;margin:10px 0"></div>
           ${(()=>{
-            const pts=(s.puntos&&s.puntos.length)?s.puntos:(s.guias&&s.guias.length)?s.guias:[];
-            if(!pts.length) return '';
+            const _svcPts=(s.puntos&&s.puntos.length)?s.puntos:(s.guias&&s.guias.length)?s.guias:[];
+            const pts=(uiState.cs_draft&&uiState.cs_draft[s.id]&&uiState.cs_draft[s.id].guias)||_svcPts;
             const sinDest=pts.filter(p=>!p.destino).length;
             return `<div style="margin-bottom:12px;background:#EFF8FF;border:1px solid #BBDEFB;border-radius:8px;padding:10px">
               <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-                <div style="font-size:10px;font-weight:800;color:#1565C0">✏️ EDITAR PUNTOS / GUÍAS</div>
+                <div style="font-size:10px;font-weight:800;color:#1565C0">✏️ PUNTOS / GUÍAS (${pts.length})</div>
                 ${sinDest?`<span style="background:#FFEBEE;color:#C62828;border-radius:4px;padding:2px 7px;font-size:9px;font-weight:700">⚠️ ${sinDest} sin destino</span>`:''}
               </div>
               ${pts.map((p,pi)=>`
               <div style="background:white;border:1px solid ${!p.destino?'#FFCDD2':'#BBDEFB'};border-radius:6px;padding:8px;margin-bottom:6px">
-                <div style="font-size:9px;font-weight:700;color:#1565C0;margin-bottom:5px">PUNTO ${pi+1}</div>
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px">
+                  <span style="font-size:9px;font-weight:700;color:#1565C0">PUNTO ${pi+1}</span>
+                  ${pts.length>1?`<button onclick="delCSPunto('${s.id}',${pi})" style="background:#FFEBEE;color:#C62828;border:none;border-radius:4px;padding:1px 7px;font-size:12px;cursor:pointer;font-weight:700;line-height:1.6">×</button>`:''}
+                </div>
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:5px">
                   <div>
                     <div style="font-size:9px;color:#888;margin-bottom:2px">N° GUÍA</div>
@@ -1361,8 +1398,8 @@ function renderCierreServicios() {
                       style="width:100%;border:1px solid #dde;border-radius:5px;padding:5px 7px;font-size:11px;outline:none;font-family:inherit;box-sizing:border-box">
                   </div>
                   <div>
-                    <div style="font-size:9px;color:${!p.destino?'#C62828':'#888'};margin-bottom:2px;font-weight:${!p.destino?'700':'400'}">DESTINO${!p.destino?' ⚠️ VACÍO':''}</div>
-                    <input id="cs_guia_${pi}_destino_${s.id}" value="${p.destino||''}" placeholder="Destino del punto"
+                    <div style="font-size:9px;color:${!p.destino?'#C62828':'#888'};margin-bottom:2px;font-weight:${!p.destino?'700':'400'}">DESTINO${!p.destino?' ⚠️':''}</div>
+                    <input id="cs_guia_${pi}_destino_${s.id}" value="${p.destino||''}" placeholder="Destino"
                       oninput="updCSGuia('${s.id}',${pi},'destino',this.value)"
                       style="width:100%;border:1px solid ${!p.destino?'#FFCDD2':'#dde'};background:${!p.destino?'#FFF8F8':'white'};border-radius:5px;padding:5px 7px;font-size:11px;outline:none;font-family:inherit;box-sizing:border-box">
                   </div>
@@ -1380,7 +1417,8 @@ function renderCierreServicios() {
                   </div>
                 </div>
               </div>`).join('')}
-              <button onclick="guardarEdicionGuias('${s.id}')" style="width:100%;padding:9px;background:#1565C0;color:white;border:none;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer">💾 Guardar cambios de guías</button>
+              <button onclick="addCSPunto('${s.id}')" style="width:100%;padding:7px;background:white;color:#1565C0;border:1px dashed #90CAF9;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;margin-bottom:6px">+ Agregar punto</button>
+              <button onclick="guardarEdicionGuias('${s.id}')" style="width:100%;padding:9px;background:#1565C0;color:white;border:none;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer">💾 Guardar cambios de puntos</button>
             </div>`;
           })()}
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px">
@@ -1391,7 +1429,7 @@ function renderCierreServicios() {
                 style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:14px;font-weight:700;outline:none;font-family:inherit">
             </div>
             <!-- CANTIDAD DE PUNTOS + MONTO TOTAL PUNTOS -->
-            ${(()=>{const _pts=(s.puntos&&s.puntos.length)?s.puntos:(s.guias&&s.guias.length)?s.guias:[];const _np=_pts.length;return`<div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">CANTIDAD DE PUNTOS</div><div style="background:#F4F6F8;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:14px;font-weight:700;color:#455A64">${_np} punto${_np!==1?'s':''}</div></div><div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">MONTO TOTAL PUNTOS ($)</div><input id="cs_monto_puntos_${s.id}" type="number" value="${_csVal(s,'montoPuntos','')}" placeholder="ej: 50000" oninput="updCS('${s.id}','montoPuntos',this.value)" style="width:100%;border:1px solid #1565C0;border-radius:6px;padding:7px 9px;font-size:12px;font-weight:700;outline:none;font-family:inherit"></div>`;})()}
+            ${(()=>{const _ptsBase=(s.puntos&&s.puntos.length)?s.puntos:(s.guias&&s.guias.length)?s.guias:[];const _ptsDraft=(uiState.cs_draft&&uiState.cs_draft[s.id]&&uiState.cs_draft[s.id].guias)||_ptsBase;const _np=_ptsDraft.length;return`<div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">CANTIDAD DE PUNTOS</div><div style="background:#F4F6F8;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:14px;font-weight:700;color:#455A64">${_np} punto${_np!==1?'s':''}</div></div><div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">MONTO TOTAL PUNTOS ($)</div><input id="cs_monto_puntos_${s.id}" type="number" value="${_csVal(s,'montoPuntos','')}" placeholder="ej: 50000" oninput="updCS('${s.id}','montoPuntos',this.value)" style="width:100%;border:1px solid #1565C0;border-radius:6px;padding:7px 9px;font-size:12px;font-weight:700;outline:none;font-family:inherit"></div>`;})()}
             <div>
               <div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">COMISIÓN CONDUCTOR ($)</div>
               <input id="cs_comision_input_${s.id}" type="number" value="${_csVal(s,'comisionConductor','')}" placeholder="ej: 35000"
