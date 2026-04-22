@@ -5513,6 +5513,7 @@ function srvVista(s) {
     <div style="font-size:10px;color:#777;margin-top:1px">Fecha guia: ${gdFechaGuia} · Descarga: ${gdDescarga}</div>
     <div style="font-size:10px;color:#888;margin-top:1px">${s.origen||'—'} → ${destinoFinal}</div>
     ${s.precio ? `<div style="font-size:11px;font-weight:700;color:#2E7D32;margin-top:3px">$${s.precio.toLocaleString('es-CL')} neto</div>` : ''}
+    ${(s.numPuntos||s.montoPuntos) ? `<div style="font-size:10px;color:#1565C0;font-weight:600;margin-top:2px">${s.numPuntos?s.numPuntos+' punto'+(s.numPuntos!==1?'s':''):''}${s.numPuntos&&s.montoPuntos?' · ':''}${s.montoPuntos?'$'+Number(s.montoPuntos).toLocaleString('es-CL')+' puntos':''}</div>` : ''}
   </div>`;
 }
 
