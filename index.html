@@ -10967,7 +10967,21 @@ let pinIngresado = '';
 let pinTarget = null;
 
 function iniciarLogin() {
-  // Siempre mostrar pantalla de seleccion de perfil al abrir
+  const saved = localStorage.getItem('gs_session');
+  if (saved) {
+    try {
+      const sess = JSON.parse(saved);
+      if (sess && sess.rol && sess.rol.id) {
+        const rol = ROLES.find(r => r.id === sess.rol.id);
+        if (rol) {
+          sessionRol = rol;
+          sessionConductor = sess.conductor || null;
+          aplicarAcceso();
+          return;
+        }
+      }
+    } catch(e) {}
+  }
   mostrarLogin();
 }
 
