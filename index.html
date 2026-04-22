@@ -8108,11 +8108,14 @@ async function syncServiciosDesdeSupabase() {
 
 function _procesarRemotosServicios(data) {
     // Preservar borradores locales que aún no se confirmaron en Supabase
-    const localBorradores = (appData.servicios||[]).filter(s => s.estado === 'borrador');
+    const localServicios = (appData.servicios||[]);
+    const localMap = new Map(localServicios.map(s=>[s.id, s]));
 
     appData.servicios = [];
     if (data && data.length > 0) {
-      const remotos = data.map(r => ({
+      const remotos = data.map(r => {
+        const local = localMap.get(r.id) || {};
+        return {
         id: r.id, fecha: r.fecha, anio: r.anio, mes: r.mes,
         patente: r.patente, conductor: r.conductor, tipoEquipo: r.tipo_equipo,
         cliente: r.cliente, origen: r.origen, peajes: r.peajes||0,
@@ -8126,26 +8129,19 @@ function _procesarRemotosServicios(data) {
         margen: r.margen||0, rendimiento: r.rendimiento||0,
         tag: r.tag||'', liquidacionId: r.liquidacion_id||'',
         cerrado: r.cerrado||false, estado: r.estado||'activo',
-        numPuntos: r.num_puntos||1, estadia: r.estadia||'no', estadiaDias: r.estadia_dias||1,
+        estadia: r.estadia||'no', estadiaDias: r.estadia_dias||1,
         cfProrrateado: r.cf_prorrateado||50800,
         comisionConductor: r.comision_conductor||0,
-        montoPuntos: r.monto_puntos||0,
-        numPuntos: r.num_puntos||1,
+        montoPuntos: r.monto_puntos || local.montoPuntos || 0,
+        numPuntos:   r.num_puntos   || local.numPuntos   || 1,
         baseConductor: r.base_conductor||0,
         gastoFinanciero: r.gasto_financiero||0,
         oc: r.oc||'',
         documentos: r.documentos||[],
-      }));
+        };
+      });
       appData.servicios = remotos;
     }
-
-    // Si un borrador local tiene más datos que lo que trajo Supabase, conservar el local
-    localBorradores.forEach(lb => {
-      const remIdx = appData.servicios.findIndex(s => s.id === lb.id);
-      if (remIdx !== -1 && appData.servicios[remIdx].estado !== 'borrador') {
-        appData.servicios[remIdx] = lb;
-      }
-    });
 
     saveData(); render();
 }
