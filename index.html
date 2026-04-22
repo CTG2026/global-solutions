@@ -6718,11 +6718,10 @@ function pdfListadoRegistros() {
   const desde = uiState.srv_lista_desde || '';
   const hasta = uiState.srv_lista_hasta || '';
   const parseFechaYMD = f => { if(!f) return null; const p=f.split('-'); return p[0].length===4 ? new Date(f) : new Date(p[2],p[1]-1,p[0]); };
-  const todos = (appData.servicios||[]).slice().sort((a,b)=>{
-    const fa=(a.fecha||'').split('-').reverse().join('');
-    const fb=(b.fecha||'').split('-').reverse().join('');
-    return fa.localeCompare(fb);
-  }).filter(s => {
+  const toSortKey = f => { if(!f) return ''; const p=f.split('-'); if(p.length!==3) return f; return p[0].length===4 ? p.join('') : p[2]+p[1]+p[0]; };
+  const todos = (appData.servicios||[]).slice().sort((a,b) =>
+    toSortKey(a.fecha||'').localeCompare(toSortKey(b.fecha||''))
+  ).filter(s => {
     if (!desde && !hasta) return true;
     const fd = parseFechaYMD(s.fecha);
     if (!fd) return true;
