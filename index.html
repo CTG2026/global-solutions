@@ -5552,7 +5552,7 @@ async function guardarEdicionServicio() {
   const origen = document.getElementById('edit_srv_origen')?.value.trim() || s.origen || 'Casablanca';
   const estadia = document.getElementById('edit_srv_estadia')?.value || s.estadia || 'no';
   const estadiaDias = parseInt(document.getElementById('edit_srv_estadia_dias')?.value||s.estadiaDias||'1')||1;
-  const numPuntos = puntos.length;
+  const numPuntos = parseInt(document.getElementById('edit_srv_npuntos')?.value) || puntos.length;
   // Convertir fecha
   const fechaFinal = fecha ? (()=>{const p=fecha.split('-');return p.length===3&&p[0].length===4?`${p[2]}-${p[1]}-${p[0]}`:fecha;})() : s.fecha;
   Object.assign(appData.servicios[idx], {fecha:fechaFinal, conductor, patente, tipoEquipo, cliente, origen, estadia, estadiaDias, numPuntos, puntos, guias:puntos});
