@@ -1425,7 +1425,7 @@ function renderCierreServicios() {
             <div style="grid-column:1/-1">
               <div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">PRECIO NETO ($)</div>
               <input id="cs_precio_${s.id}" type="number" value="${_csVal(s,'precio','')}" placeholder="ej: 450000"
-                oninput="updCS('${s.id}','precio',this.value)"
+                oninput="updCS('${s.id}','precio',this.value);updateResumenCS('${s.id}')"
                 style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:14px;font-weight:700;outline:none;font-family:inherit">
             </div>
             <!-- CANTIDAD DE PUNTOS + MONTO TOTAL PUNTOS -->
@@ -1433,13 +1433,13 @@ function renderCierreServicios() {
             <div>
               <div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">COMISIÓN CONDUCTOR ($)</div>
               <input id="cs_comision_input_${s.id}" type="number" value="${_csVal(s,'comisionConductor','')}" placeholder="ej: 35000"
-                oninput="updCS('${s.id}','comisionConductor',this.value)"
+                oninput="updCS('${s.id}','comisionConductor',this.value);updateResumenCS('${s.id}')"
                 style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit">
             </div>
             <div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">KILÓMETROS</div>
               <input id="cs_km_${s.id}" type="number" value="${_csVal(s,'km','')}" placeholder="ej: 320" oninput="updCS('${s.id}','km',this.value)" style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit"></div>
             <div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">TAG</div>
-              <input id="cs_tag_${s.id}" value="${_csVal(s,'tag','')}" placeholder="ej: TAG-001" oninput="updCS('${s.id}','tag',this.value)" style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit"></div>
+              <input id="cs_tag_${s.id}" value="${_csVal(s,'tag','')}" placeholder="ej: TAG-001" oninput="updCS('${s.id}','tag',this.value);updateResumenCS('${s.id}')" style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit"></div>
             <div style="grid-column:1/-1"><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">OC (Orden de Compra del broker/cliente) <span style="font-weight:400;color:#aaa">— opcional</span></div>
               <input id="cs_oc_${s.id}" value="${_csVal(s,'oc','')}" placeholder="ej: OC-2026-001" oninput="updCS('${s.id}','oc',this.value)" style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit"></div>
             ${(s.puntos&&s.puntos.length>1)?`<div style="grid-column:1/-1">
@@ -1457,11 +1457,11 @@ function renderCierreServicios() {
                 </div>`).join('')}
             </div>`:''}
             <div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">PEAJES ($)</div>
-              <input id="cs_peajes_${s.id}" type="number" value="${_csVal(s,'peajes','')}" placeholder="ej: 8000" oninput="updCS('${s.id}','peajes',this.value)" style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit"></div>
+              <input id="cs_peajes_${s.id}" type="number" value="${_csVal(s,'peajes','')}" placeholder="ej: 8000" oninput="updCS('${s.id}','peajes',this.value);updateResumenCS('${s.id}')" style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit"></div>
             <div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">VIÁTICOS ($)</div>
-              <input id="cs_via_${s.id}" type="number" value="${_csVal(s,'viaticos','')}" placeholder="ej: 15000" oninput="updCS('${s.id}','viaticos',this.value)" style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit"></div>
+              <input id="cs_via_${s.id}" type="number" value="${_csVal(s,'viaticos','')}" placeholder="ej: 15000" oninput="updCS('${s.id}','viaticos',this.value);updateResumenCS('${s.id}')" style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit"></div>
             <div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">ADICIONAL ($)</div>
-              <input id="cs_adic_${s.id}" type="number" value="${_csVal(s,'adicional','')}" placeholder="ej: 30000" oninput="updCS('${s.id}','adicional',this.value)" style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit"></div>
+              <input id="cs_adic_${s.id}" type="number" value="${_csVal(s,'adicional','')}" placeholder="ej: 30000" oninput="updCS('${s.id}','adicional',this.value);updateResumenCS('${s.id}')" style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit"></div>
             <div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">BASE CONDUCTOR ($)</div>
               <input id="cs_base_cond_${s.id}" type="number" value="${_csVal(s,'baseConductor','')}" placeholder="ej: 80000" oninput="updCS('${s.id}','baseConductor',this.value)" style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit"></div>
             <div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">GASTO FINANCIERO ($)</div>
@@ -1473,36 +1473,46 @@ function renderCierreServicios() {
             <div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">LITROS CARGADOS</div>
               <input id="cs_litros_${s.id}" type="number" value="${_csVal(s,'litros','')}" placeholder="ej: 120" oninput="updCS('${s.id}','litros',this.value)" style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit"></div>
             <div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">MONTO PETRÓLEO ($)</div>
-              <input id="cs_petroleo_${s.id}" type="number" value="${_csVal(s,'petroleo','')}" placeholder="ej: 95000" oninput="updCS('${s.id}','petroleo',this.value)" style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit"></div>
+              <input id="cs_petroleo_${s.id}" type="number" value="${_csVal(s,'petroleo','')}" placeholder="ej: 95000" oninput="updCS('${s.id}','petroleo',this.value);updateResumenCS('${s.id}')" style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit"></div>
           </div>
           <!-- CF EDITABLE -->
           <div style="margin-bottom:8px">
             <div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">CF PRORRATEADO ($) <span style="font-weight:400;color:#aaa">— ingresar si aplica</span></div>
             <input id="cs_cf_${s.id}" type="number" value="${_csVal(s,'cfProrrateado','')}" placeholder="ej: 50800"
-              oninput="updCS('${s.id}','cfProrrateado',this.value)"
+              oninput="updCS('${s.id}','cfProrrateado',this.value);updateResumenCS('${s.id}')"
               style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit">
           </div>
-          <!-- RESUMEN COSTOS -->
-          ${s.precio ? `<div style="background:#F1F8E9;border-radius:8px;padding:8px 10px;margin-bottom:8px">
+          <!-- RESUMEN COSTOS (siempre visible, actualizado en tiempo real) -->
+          <div id="cs_resumen_${s.id}" style="background:#F1F8E9;border-radius:8px;padding:8px 10px;margin-bottom:8px">
             <div style="font-size:9px;font-weight:700;color:#2E7D32;margin-bottom:5px">RESUMEN DEL SERVICIO</div>
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:3px;font-size:10px">
-              <div style="color:#555">Precio neto</div><div style="text-align:right;font-weight:700;color:#2E7D32">$${(s.precio||0).toLocaleString('es-CL')}</div>
-              <div style="color:#555;font-size:9px;color:#888">IVA (19%)</div><div style="text-align:right;font-size:9px;color:#888">$${Math.round((s.precio||0)*0.19).toLocaleString('es-CL')}</div>
-              <div style="color:#555;font-weight:600">Total con IVA</div><div style="text-align:right;font-weight:700;color:#1B5E20">$${Math.round((s.precio||0)*1.19).toLocaleString('es-CL')}</div>
-              <div style="border-top:1px solid #C8E6C9;grid-column:1/-1;margin:3px 0"></div>
-              <div style="color:#777;font-size:9px;font-weight:700;grid-column:1/-1;margin-bottom:2px">COSTOS VARIABLES</div>
-              ${(()=>{const _com=parseInt(_csVal(s,'comisionConductor',0))||0;return`<div style="color:#555">Comisión conductor</div><div style="text-align:right;color:#E53935">−$${_com.toLocaleString('es-CL')}</div>`;})()}
-              <div style="color:#555">Petróleo</div><div style="text-align:right;color:#E53935">−$${(s.petroleo||0).toLocaleString('es-CL')}</div>
-              <div style="color:#555">Peajes</div><div style="text-align:right;color:#E53935">−$${(s.peajes||0).toLocaleString('es-CL')}</div>
-              <div style="color:#555">Viáticos</div><div style="text-align:right;color:#E53935">−$${(s.viaticos||0).toLocaleString('es-CL')}</div>
-              <div style="color:#555">Adicional</div><div style="text-align:right;color:#E53935">−$${(s.adicional||0).toLocaleString('es-CL')}</div>
-              ${s.tag?`<div style="color:#555">TAG</div><div style="text-align:right;color:#E53935">−$${(s.tag&&!isNaN(s.tag)?parseInt(s.tag):0).toLocaleString('es-CL')}</div>`:''}
-              <div style="color:#777;font-size:9px;font-weight:700;grid-column:1/-1;margin-top:4px;margin-bottom:2px">COSTOS FIJOS</div>
-              <div style="color:#555">CF prorrateado</div><div style="text-align:right;color:#E53935">−$${(s.cfProrrateado||50800).toLocaleString('es-CL')}</div>
-              <div style="border-top:1px solid #C8E6C9;grid-column:1/-1;margin:3px 0"></div>
-              ${(()=>{const _com=parseInt(_csVal(s,'comisionConductor',0))||0;const _res=(s.precio||0)-_com-(s.petroleo||0)-(s.peajes||0)-(s.viaticos||0)-(s.adicional||0)-(s.cfProrrateado||50800);return`<div style="font-weight:800;color:#1B5E20">RESULTADO NETO</div><div style="text-align:right;font-weight:900;color:#1B5E20">$${_res.toLocaleString('es-CL')}</div>`;})()}
-            </div>
-          </div>` : ''}
+            ${(()=>{
+              const _p=parseInt(_csVal(s,'precio',0))||0;const _com=parseInt(_csVal(s,'comisionConductor',0))||0;
+              const _pet=s.petroleo||0;const _pea=s.peajes||0;const _via=s.viaticos||0;const _adic=s.adicional||0;
+              const _tag=(!isNaN(s.tag)&&s.tag!==''&&s.tag!==null&&s.tag!==undefined)?parseInt(s.tag):0;
+              const _cf=parseInt(_csVal(s,'cfProrrateado',0))||(s.cfProrrateado||50800);
+              const _res=_p-_com-_pet-_pea-_via-_adic-_tag-_cf;
+              const f=v=>'$'+Math.abs(v).toLocaleString('es-CL');
+              if(!_p) return '<div style="color:#aaa;font-size:10px;text-align:center;padding:4px 0">Ingresa el precio para ver el resumen</div>';
+              return `<div style="display:grid;grid-template-columns:1fr 1fr;gap:3px;font-size:10px">
+                <div style="color:#555">Precio neto</div><div style="text-align:right;font-weight:700;color:#2E7D32">${f(_p)}</div>
+                <div style="font-size:9px;color:#888">IVA (19%)</div><div style="text-align:right;font-size:9px;color:#888">${f(Math.round(_p*.19))}</div>
+                <div style="color:#555;font-weight:600">Total con IVA</div><div style="text-align:right;font-weight:700;color:#1B5E20">${f(Math.round(_p*1.19))}</div>
+                <div style="border-top:1px solid #C8E6C9;grid-column:1/-1;margin:3px 0"></div>
+                <div style="color:#777;font-size:9px;font-weight:700;grid-column:1/-1;margin-bottom:2px">COSTOS VARIABLES</div>
+                <div style="color:#555">Comisión conductor</div><div style="text-align:right;color:#E53935">−${f(_com)}</div>
+                <div style="color:#555">Petróleo</div><div style="text-align:right;color:#E53935">−${f(_pet)}</div>
+                <div style="color:#555">Peajes</div><div style="text-align:right;color:#E53935">−${f(_pea)}</div>
+                <div style="color:#555">Viáticos</div><div style="text-align:right;color:#E53935">−${f(_via)}</div>
+                <div style="color:#555">Adicional</div><div style="text-align:right;color:#E53935">−${f(_adic)}</div>
+                ${_tag?`<div style="color:#555">TAG</div><div style="text-align:right;color:#E53935">−${f(_tag)}</div>`:''}
+                <div style="color:#777;font-size:9px;font-weight:700;grid-column:1/-1;margin-top:4px;margin-bottom:2px">COSTOS FIJOS</div>
+                <div style="color:#555">CF prorrateado</div><div style="text-align:right;color:#E53935">−${f(_cf)}</div>
+                <div style="border-top:1px solid #C8E6C9;grid-column:1/-1;margin:3px 0"></div>
+                <div style="font-weight:800;color:#1B5E20">RESULTADO NETO</div>
+                <div style="text-align:right;font-weight:900;color:${_res>=0?'#1B5E20':'#C62828'}">${_res<0?'−':''}${f(_res)}</div>
+              </div>`;
+            })()}
+          </div>
           <!-- COBRO -->
           <div style="margin-bottom:8px">
             <div style="font-size:9px;font-weight:700;color:#888;margin-bottom:5px">ESTADO DE COBRO</div>
@@ -1524,29 +1534,69 @@ function renderCierreServicios() {
   </div>`;
 }
 function _leerCamposCierre(id, idx) {
-  const s = appData.servicios[idx];
-  const dr = (uiState.cs_draft && uiState.cs_draft[id]) || {};
-  const _v = (domId, campo, def) => {
+  const _v = (domId, def) => {
     const el = document.getElementById(domId);
-    if (el && el.value !== '') return el.value;
-    if (dr[campo] !== undefined && dr[campo] !== '') return dr[campo];
-    return s && s[campo] !== undefined ? s[campo] : def;
+    return (el && el.value !== '') ? el.value : def;
   };
   return {
-    precio:       parseInt(_v('cs_precio_'  +id,'precio',   0))||0,
-    km:           parseInt(_v('cs_km_'      +id,'km',       0))||0,
-    tag:          (_v('cs_tag_'     +id,'tag',      '')||'').trim(),
-    oc:           (_v('cs_oc_'      +id,'oc',       '')||'').trim(),
-    peajes:       parseInt(_v('cs_peajes_'  +id,'peajes',   0))||0,
-    viaticos:     parseInt(_v('cs_via_'     +id,'viaticos', 0))||0,
-    adicional:    parseInt(_v('cs_adic_'    +id,'adicional',0))||0,
-    litros:       parseInt(_v('cs_litros_'  +id,'litros',   0))||0,
-    petroleo:     parseInt(_v('cs_petroleo_'+id,'petroleo', 0))||0,
-    comisionConductor: parseInt(_v('cs_comision_input_'+id,'comisionConductor',0))||0,
-    cfProrrateado:     parseInt(_v('cs_cf_'            +id,'cfProrrateado',  0))||0,
-    baseConductor:     parseInt(_v('cs_base_cond_'     +id,'baseConductor',  0))||0,
-    gastoFinanciero:   parseInt(_v('cs_gf_'            +id,'gastoFinanciero',0))||0,
+    precio:            parseInt(_v('cs_precio_'         +id, 0))||0,
+    km:                parseInt(_v('cs_km_'             +id, 0))||0,
+    tag:               (_v('cs_tag_'                    +id, '')||'').trim(),
+    oc:                (_v('cs_oc_'                     +id, '')||'').trim(),
+    peajes:            parseInt(_v('cs_peajes_'         +id, 0))||0,
+    viaticos:          parseInt(_v('cs_via_'            +id, 0))||0,
+    adicional:         parseInt(_v('cs_adic_'           +id, 0))||0,
+    litros:            parseInt(_v('cs_litros_'         +id, 0))||0,
+    petroleo:          parseInt(_v('cs_petroleo_'       +id, 0))||0,
+    comisionConductor: parseInt(_v('cs_comision_input_' +id, 0))||0,
+    cfProrrateado:     parseInt(_v('cs_cf_'             +id, 0))||0,
+    baseConductor:     parseInt(_v('cs_base_cond_'      +id, 0))||0,
+    gastoFinanciero:   parseInt(_v('cs_gf_'             +id, 0))||0,
+    montoPuntos:       parseInt(_v('cs_monto_puntos_'   +id, 0))||0,
   };
+}
+function updateResumenCS(id) {
+  const el = document.getElementById('cs_resumen_' + id);
+  if (!el) return;
+  const s = (appData.servicios||[]).find(sv=>sv.id===id) || {};
+  const domInt = domId => parseInt(document.getElementById(domId)?.value)||0;
+  const domStr = domId => (document.getElementById(domId)?.value||'').trim();
+  const precio    = domInt('cs_precio_'         + id);
+  const comision  = domInt('cs_comision_input_' + id);
+  const petroleo  = domInt('cs_petroleo_'       + id);
+  const peajes    = domInt('cs_peajes_'         + id);
+  const viaticos  = domInt('cs_via_'            + id);
+  const adicional = domInt('cs_adic_'           + id);
+  const tag       = domStr('cs_tag_'            + id);
+  const tagNum    = (!isNaN(tag) && tag !== '') ? parseInt(tag) : 0;
+  const cf        = domInt('cs_cf_'             + id) || (s.cfProrrateado || 50800);
+  const iva       = Math.round(precio * 0.19);
+  const total     = Math.round(precio * 1.19);
+  const resultado = precio - comision - petroleo - peajes - viaticos - adicional - tagNum - cf;
+  const f = v => '$' + Math.abs(v).toLocaleString('es-CL');
+  if (!precio) {
+    el.innerHTML = '<div style="color:#aaa;font-size:10px;text-align:center;padding:4px 0">Ingresa el precio para ver el resumen</div>';
+    return;
+  }
+  el.innerHTML = `<div style="display:grid;grid-template-columns:1fr 1fr;gap:3px;font-size:10px">
+    <div style="color:#555">Precio neto</div><div style="text-align:right;font-weight:700;color:#2E7D32">${f(precio)}</div>
+    <div style="font-size:9px;color:#888">IVA (19%)</div><div style="text-align:right;font-size:9px;color:#888">${f(iva)}</div>
+    <div style="color:#555;font-weight:600">Total con IVA</div><div style="text-align:right;font-weight:700;color:#1B5E20">${f(total)}</div>
+    <div style="border-top:1px solid #C8E6C9;grid-column:1/-1;margin:3px 0"></div>
+    <div style="color:#777;font-size:9px;font-weight:700;grid-column:1/-1;margin-bottom:2px">COSTOS VARIABLES</div>
+    <div style="color:#555">Comisión conductor</div><div style="text-align:right;color:#E53935">−${f(comision)}</div>
+    <div style="color:#555">Petróleo</div><div style="text-align:right;color:#E53935">−${f(petroleo)}</div>
+    <div style="color:#555">Peajes</div><div style="text-align:right;color:#E53935">−${f(peajes)}</div>
+    <div style="color:#555">Viáticos</div><div style="text-align:right;color:#E53935">−${f(viaticos)}</div>
+    <div style="color:#555">Adicional</div><div style="text-align:right;color:#E53935">−${f(adicional)}</div>
+    ${tagNum?`<div style="color:#555">TAG</div><div style="text-align:right;color:#E53935">−${f(tagNum)}</div>`:''}
+    <div style="color:#777;font-size:9px;font-weight:700;grid-column:1/-1;margin-top:4px;margin-bottom:2px">COSTOS FIJOS</div>
+    <div style="color:#555">CF prorrateado</div><div style="text-align:right;color:#E53935">−${f(cf)}</div>
+    <div style="border-top:1px solid #C8E6C9;grid-column:1/-1;margin:3px 0"></div>
+    <div style="font-weight:800;color:#1B5E20">RESULTADO NETO</div>
+    <div style="text-align:right;font-weight:900;color:${resultado>=0?'#1B5E20':'#C62828'}">${resultado<0?'−':''}${f(resultado)}</div>
+  </div>`;
+}
 }
 
 async function guardarBorradorCierre(id) {
