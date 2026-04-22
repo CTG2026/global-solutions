@@ -1597,7 +1597,6 @@ function updateResumenCS(id) {
     <div style="text-align:right;font-weight:900;color:${resultado>=0?'#1B5E20':'#C62828'}">${resultado<0?'−':''}${f(resultado)}</div>
   </div>`;
 }
-}
 
 async function guardarBorradorCierre(id) {
   const idx=appData.servicios.findIndex(s=>s.id===id);
