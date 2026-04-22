@@ -1429,7 +1429,16 @@ function renderCierreServicios() {
                 style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:14px;font-weight:700;outline:none;font-family:inherit">
             </div>
             <!-- CANTIDAD DE PUNTOS + MONTO TOTAL PUNTOS -->
-            ${(()=>{const _ptsBase=(s.puntos&&s.puntos.length)?s.puntos:(s.guias&&s.guias.length)?s.guias:[];const _ptsDraft=(uiState.cs_draft&&uiState.cs_draft[s.id]&&uiState.cs_draft[s.id].guias)||_ptsBase;const _np=_ptsDraft.length;return`<div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">CANTIDAD DE PUNTOS</div><div style="background:#F4F6F8;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:14px;font-weight:700;color:#455A64">${_np} punto${_np!==1?'s':''}</div></div><div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">MONTO TOTAL PUNTOS ($)</div><input id="cs_monto_puntos_${s.id}" type="number" value="${_csVal(s,'montoPuntos','')}" placeholder="ej: 50000" oninput="updCS('${s.id}','montoPuntos',this.value)" style="width:100%;border:1px solid #1565C0;border-radius:6px;padding:7px 9px;font-size:12px;font-weight:700;outline:none;font-family:inherit"></div>`;})()}
+            <div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">CANTIDAD DE PUNTOS</div>
+              <input id="cs_npuntos_${s.id}" type="number" min="1" value="${_csVal(s,'numPuntos','')}" placeholder="ej: 2"
+                oninput="updCS('${s.id}','numPuntos',this.value)"
+                style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:14px;font-weight:700;outline:none;font-family:inherit">
+            </div>
+            <div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">MONTO TOTAL PUNTOS ($)</div>
+              <input id="cs_monto_puntos_${s.id}" type="number" value="${_csVal(s,'montoPuntos','')}" placeholder="ej: 50000"
+                oninput="updCS('${s.id}','montoPuntos',this.value)"
+                style="width:100%;border:1px solid #1565C0;border-radius:6px;padding:7px 9px;font-size:12px;font-weight:700;outline:none;font-family:inherit">
+            </div>
             <div>
               <div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">COMISIÓN CONDUCTOR ($)</div>
               <input id="cs_comision_input_${s.id}" type="number" value="${_csVal(s,'comisionConductor','')}" placeholder="ej: 35000"
@@ -1553,6 +1562,7 @@ function _leerCamposCierre(id, idx) {
     baseConductor:     parseInt(_v('cs_base_cond_'      +id, 0))||0,
     gastoFinanciero:   parseInt(_v('cs_gf_'             +id, 0))||0,
     montoPuntos:       parseInt(_v('cs_monto_puntos_'   +id, 0))||0,
+    numPuntos:         parseInt(_v('cs_npuntos_'         +id, 0))||0,
   };
 }
 function updateResumenCS(id) {
@@ -1613,7 +1623,8 @@ async function guardarBorradorCierre(id) {
     peajes: d.peajes, viaticos: d.viaticos, adicional: d.adicional,
     litros: d.litros, petroleo: d.petroleo, cfProrrateado: d.cfProrrateado,
     baseConductor: d.baseConductor, gastoFinanciero: d.gastoFinanciero,
-    comisionConductor, cerrado: false, estado: 'borrador'
+    comisionConductor, numPuntos: d.numPuntos||undefined, montoPuntos: d.montoPuntos||undefined,
+    cerrado: false, estado: 'borrador'
   });
   // Limpiar borrador ya que los datos quedaron en appData
   if (uiState.cs_draft) delete uiState.cs_draft[id];
@@ -1641,7 +1652,8 @@ async function guardarCierre(id) {
     peajes: d.peajes, viaticos: d.viaticos, adicional: d.adicional,
     litros: d.litros, petroleo: d.petroleo, cfProrrateado: d.cfProrrateado,
     baseConductor: d.baseConductor, gastoFinanciero: d.gastoFinanciero,
-    comisionConductor, cerrado: true, estado: 'cerrado'
+    comisionConductor, numPuntos: d.numPuntos||undefined, montoPuntos: d.montoPuntos||undefined,
+    cerrado: true, estado: 'cerrado'
   });
   appData.dashboard.ventas_mes=(appData.servicios||[]).filter(s=>(s.cerrado||s.estado==='borrador')&&s.precio).reduce((a,s)=>a+(s.precio||0),0);
   uiState['cs_'+id]=false;
