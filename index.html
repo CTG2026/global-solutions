@@ -1501,13 +1501,16 @@ function renderCierreServicios() {
               const _tag=(!isNaN(s.tag)&&s.tag!==''&&s.tag!==null&&s.tag!==undefined)?parseInt(s.tag):0;
               const _cf=parseInt(_csVal(s,'cfProrrateado',0))||(s.cfProrrateado||50800);
               const _mp=parseInt(_csVal(s,'montoPuntos',0))||0;
-              const _res=_p-_com-_pet-_pea-_via-_adic-_tag-_cf-_mp;
+              const _totalNeto=_p+_mp;
+              const _res=_totalNeto-_com-_pet-_pea-_via-_adic-_tag-_cf;
               const f=v=>'$'+Math.abs(v).toLocaleString('es-CL');
               if(!_p) return '<div style="color:#aaa;font-size:10px;text-align:center;padding:4px 0">Ingresa el precio para ver el resumen</div>';
               return `<div style="display:grid;grid-template-columns:1fr 1fr;gap:3px;font-size:10px">
                 <div style="color:#555">Precio neto</div><div style="text-align:right;font-weight:700;color:#2E7D32">${f(_p)}</div>
-                <div style="font-size:9px;color:#888">IVA (19%)</div><div style="text-align:right;font-size:9px;color:#888">${f(Math.round(_p*.19))}</div>
-                <div style="color:#555;font-weight:600">Total con IVA</div><div style="text-align:right;font-weight:700;color:#1B5E20">${f(Math.round(_p*1.19))}</div>
+                ${_mp?`<div style="color:#1565C0">+ Monto puntos</div><div style="text-align:right;font-weight:700;color:#1565C0">+${f(_mp)}</div>`:''}
+                ${_mp?`<div style="color:#555;font-weight:700;border-top:1px solid #C8E6C9;padding-top:2px">Total neto</div><div style="text-align:right;font-weight:800;color:#2E7D32;border-top:1px solid #C8E6C9;padding-top:2px">${f(_totalNeto)}</div>`:''}
+                <div style="font-size:9px;color:#888">IVA (19%)</div><div style="text-align:right;font-size:9px;color:#888">${f(Math.round(_totalNeto*.19))}</div>
+                <div style="color:#555;font-weight:600">Total con IVA</div><div style="text-align:right;font-weight:700;color:#1B5E20">${f(Math.round(_totalNeto*1.19))}</div>
                 <div style="border-top:1px solid #C8E6C9;grid-column:1/-1;margin:3px 0"></div>
                 <div style="color:#777;font-size:9px;font-weight:700;grid-column:1/-1;margin-bottom:2px">COSTOS VARIABLES</div>
                 <div style="color:#555">Comisión conductor</div><div style="text-align:right;color:#E53935">−${f(_com)}</div>
@@ -1516,7 +1519,6 @@ function renderCierreServicios() {
                 <div style="color:#555">Viáticos</div><div style="text-align:right;color:#E53935">−${f(_via)}</div>
                 <div style="color:#555">Adicional</div><div style="text-align:right;color:#E53935">−${f(_adic)}</div>
                 ${_tag?`<div style="color:#555">TAG</div><div style="text-align:right;color:#E53935">−${f(_tag)}</div>`:''}
-                ${_mp?`<div style="color:#555">Monto puntos</div><div style="text-align:right;color:#E53935">−${f(_mp)}</div>`:''}
                 <div style="color:#777;font-size:9px;font-weight:700;grid-column:1/-1;margin-top:4px;margin-bottom:2px">COSTOS FIJOS</div>
                 <div style="color:#555">CF prorrateado</div><div style="text-align:right;color:#E53935">−${f(_cf)}</div>
                 <div style="border-top:1px solid #C8E6C9;grid-column:1/-1;margin:3px 0"></div>
@@ -1584,9 +1586,10 @@ function updateResumenCS(id) {
   const tagNum    = (!isNaN(tag) && tag !== '') ? parseInt(tag) : 0;
   const cf         = domInt('cs_cf_'             + id) || (s.cfProrrateado || 50800);
   const montoPuntos= domInt('cs_monto_puntos_'   + id);
-  const iva        = Math.round(precio * 0.19);
-  const total      = Math.round(precio * 1.19);
-  const resultado  = precio - comision - petroleo - peajes - viaticos - adicional - tagNum - cf - montoPuntos;
+  const totalNeto  = precio + montoPuntos;
+  const iva        = Math.round(totalNeto * 0.19);
+  const total      = Math.round(totalNeto * 1.19);
+  const resultado  = totalNeto - comision - petroleo - peajes - viaticos - adicional - tagNum - cf;
   const f = v => '$' + Math.abs(v).toLocaleString('es-CL');
   if (!precio) {
     el.innerHTML = '<div style="color:#aaa;font-size:10px;text-align:center;padding:4px 0">Ingresa el precio para ver el resumen</div>';
@@ -1594,6 +1597,8 @@ function updateResumenCS(id) {
   }
   el.innerHTML = `<div style="display:grid;grid-template-columns:1fr 1fr;gap:3px;font-size:10px">
     <div style="color:#555">Precio neto</div><div style="text-align:right;font-weight:700;color:#2E7D32">${f(precio)}</div>
+    ${montoPuntos?`<div style="color:#1565C0">+ Monto puntos</div><div style="text-align:right;font-weight:700;color:#1565C0">+${f(montoPuntos)}</div>`:''}
+    ${montoPuntos?`<div style="color:#555;font-weight:700;border-top:1px solid #C8E6C9;padding-top:2px">Total neto</div><div style="text-align:right;font-weight:800;color:#2E7D32;border-top:1px solid #C8E6C9;padding-top:2px">${f(totalNeto)}</div>`:''}
     <div style="font-size:9px;color:#888">IVA (19%)</div><div style="text-align:right;font-size:9px;color:#888">${f(iva)}</div>
     <div style="color:#555;font-weight:600">Total con IVA</div><div style="text-align:right;font-weight:700;color:#1B5E20">${f(total)}</div>
     <div style="border-top:1px solid #C8E6C9;grid-column:1/-1;margin:3px 0"></div>
@@ -1604,7 +1609,6 @@ function updateResumenCS(id) {
     <div style="color:#555">Viáticos</div><div style="text-align:right;color:#E53935">−${f(viaticos)}</div>
     <div style="color:#555">Adicional</div><div style="text-align:right;color:#E53935">−${f(adicional)}</div>
     ${tagNum?`<div style="color:#555">TAG</div><div style="text-align:right;color:#E53935">−${f(tagNum)}</div>`:''}
-    ${montoPuntos?`<div style="color:#555">Monto puntos</div><div style="text-align:right;color:#E53935">−${f(montoPuntos)}</div>`:''}
     <div style="color:#777;font-size:9px;font-weight:700;grid-column:1/-1;margin-top:4px;margin-bottom:2px">COSTOS FIJOS</div>
     <div style="color:#555">CF prorrateado</div><div style="text-align:right;color:#E53935">−${f(cf)}</div>
     <div style="border-top:1px solid #C8E6C9;grid-column:1/-1;margin:3px 0"></div>
