@@ -17,7 +17,7 @@ if ('serviceWorker' in navigator) {
 </script>
 <script>
 (function() {
-  var VERSION = '1776665000';
+  var VERSION = '1776700000';
   var stored = localStorage.getItem('gs_app_version');
   if (stored !== VERSION) {
     var session = localStorage.getItem('gs_session');
@@ -1632,7 +1632,7 @@ async function guardarBorradorCierre(id) {
     peajes: d.peajes, viaticos: d.viaticos, adicional: d.adicional,
     litros: d.litros, petroleo: d.petroleo, cfProrrateado: d.cfProrrateado,
     baseConductor: d.baseConductor, gastoFinanciero: d.gastoFinanciero,
-    comisionConductor, numPuntos: d.numPuntos||undefined, montoPuntos: d.montoPuntos||undefined,
+    comisionConductor, numPuntos: d.numPuntos||appData.servicios[idx].numPuntos||undefined, montoPuntos: d.montoPuntos||appData.servicios[idx].montoPuntos||undefined,
     cerrado: false, estado: 'borrador'
   });
   // Limpiar borrador ya que los datos quedaron en appData
@@ -1661,7 +1661,7 @@ async function guardarCierre(id) {
     peajes: d.peajes, viaticos: d.viaticos, adicional: d.adicional,
     litros: d.litros, petroleo: d.petroleo, cfProrrateado: d.cfProrrateado,
     baseConductor: d.baseConductor, gastoFinanciero: d.gastoFinanciero,
-    comisionConductor, numPuntos: d.numPuntos||undefined, montoPuntos: d.montoPuntos||undefined,
+    comisionConductor, numPuntos: d.numPuntos||appData.servicios[idx].numPuntos||undefined, montoPuntos: d.montoPuntos||appData.servicios[idx].montoPuntos||undefined,
     cerrado: true, estado: 'cerrado'
   });
   appData.dashboard.ventas_mes=(appData.servicios||[]).filter(s=>(s.cerrado||s.estado==='borrador')&&s.precio).reduce((a,s)=>a+(s.precio||0),0);
@@ -4747,7 +4747,7 @@ function renderLiquidacionesV2() {
 function toggleSrvLiq(id,checked){if(!uiState.liq_sel)uiState.liq_sel=[];if(checked){if(!uiState.liq_sel.includes(id))uiState.liq_sel.push(id);}else{uiState.liq_sel=uiState.liq_sel.filter(x=>x!==id);}render();}
 function toggleTodosClienteLiq(cl,checked){if(!uiState.liq_sel)uiState.liq_sel=[];const svcs=(appData.servicios||[]).filter(s=>s.cliente===cl&&(s.cerrado||s.estado==='borrador')&&!s.liquidacionId);svcs.forEach(s=>{if(checked){if(!uiState.liq_sel.includes(s.id))uiState.liq_sel.push(s.id);}else{uiState.liq_sel=uiState.liq_sel.filter(x=>x!==s.id);}});render();}
 function toggleRutLiq(rut,checked){if(!uiState.liq_ruts_sel)uiState.liq_ruts_sel=[];if(checked){if(!uiState.liq_ruts_sel.includes(rut))uiState.liq_ruts_sel.push(rut);}else{uiState.liq_ruts_sel=uiState.liq_ruts_sel.filter(r=>r!==rut);}render();}
-function agregarRutLiq(){const input=document.getElementById('liq_rut_nuevo');const rut=input?.value.trim();if(!rut)return;const cl=uiState.liq_cliente_sel||'';if(cl){if(!appData.clientesRut)appData.clientesRut={};if(!appData.clientesRut[cl])appData.clientesRut[cl]=[];if(!appData.clientesRut[cl].includes(rut)){appData.clientesRut[cl].push(rut);saveData();}}if(!uiState.liq_ruts_sel)uiState.liq_ruts_sel=[];if(!uiState.liq_ruts_sel.includes(rut))uiState.liq_ruts_sel.push(rut);input.value='';render();}
+function agregarRutLiq(){const input=document.getElementById('liq_rut_nuevo');const rut=input?.value.trim();if(!rut)return;const sel=uiState.liq_sel||[];const svcs=appData.servicios||[];const clienteFromSel=sel.length?(svcs.find(sv=>sv.id===sel[0])?.cliente||''):'';const cl=clienteFromSel||(uiState.liq_cliente_sel||'');if(cl){if(!appData.clientesRut)appData.clientesRut={};if(!appData.clientesRut[cl])appData.clientesRut[cl]=[];if(!appData.clientesRut[cl].includes(rut))appData.clientesRut[cl].push(rut);}if(!uiState.liq_ruts_sel)uiState.liq_ruts_sel=[];if(!uiState.liq_ruts_sel.includes(rut))uiState.liq_ruts_sel.push(rut);saveData();input.value='';render();}
 function crearLiquidacionV2(){const sel=uiState.liq_sel||[];if(!sel.length)return alert('Selecciona al menos un servicio');const tipo=uiState.liq_tipo_nueva||'oficial';const estadoInicial=tipo==='borrador'?'borrador':'creada';const fecha=document.getElementById('liq_fecha_v2')?.value||new Date().toISOString().split('T')[0];const email=document.getElementById('liq_email_v2')?.value||'';const p=fecha.split('-');const fechaStr=`${p[2]}-${p[1]}-${p[0]}`;const ruts=uiState.liq_ruts_sel||[];const servicios=appData.servicios||[];const total=sel.reduce((a,id)=>{const s=servicios.find(sv=>sv.id===id);return a+(s?s.precio||0:0);},0);const id='LIQ-'+String(appData.liquidaciones.length+1).padStart(3,'0');appData.liquidaciones.push({id,fecha:fechaStr,email,serviciosIds:[...sel],total,estado:estadoInicial,nFactura:'',ruts});sel.forEach(sid=>{const s=servicios.find(sv=>sv.id===sid);if(s){s.liquidacionId=id;upsertServicioSupabase(s);}});uiState.liq_sel=[];uiState.liq_ruts_sel=[];uiState.liq_preview=false;uiState.liq_ui_fecha='';uiState.liq_ui_email=undefined;uiState.liq_tipo_nueva=undefined;saveData();pushLiquidacionesSupabase();render();alert('✅ '+id+' creada — Total: $'+total.toLocaleString('es-CL'));}
 function cambiarEstadoLiq(liqId,estado){const liq=(appData.liquidaciones||[]).find(l=>l.id===liqId);if(!liq)return;liq.estado=estado;saveData();pushLiquidacionesSupabase();render();}
 function guardarObsLiq(liqId) {
@@ -7916,6 +7916,8 @@ function servicioToRow(s) {
     rendimiento: s.rendimiento || 0,
     tag: s.tag || '',
     liquidacion_id: s.liquidacionId || '',
+    num_puntos: s.numPuntos || 1,
+    monto_puntos: s.montoPuntos || 0,
   };
 }
 
@@ -8132,8 +8134,8 @@ function _procesarRemotosServicios(data) {
         estadia: r.estadia||'no', estadiaDias: r.estadia_dias||1,
         cfProrrateado: r.cf_prorrateado||50800,
         comisionConductor: r.comision_conductor||0,
-        montoPuntos: r.monto_puntos || local.montoPuntos || 0,
-        numPuntos:   r.num_puntos   || local.numPuntos   || 1,
+        montoPuntos: r.monto_puntos != null ? r.monto_puntos : (local.montoPuntos || 0),
+        numPuntos:   r.num_puntos   != null ? r.num_puntos   : (local.numPuntos   || 1),
         baseConductor: r.base_conductor||0,
         gastoFinanciero: r.gasto_financiero||0,
         oc: r.oc||'',
