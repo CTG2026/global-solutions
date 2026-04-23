@@ -17,7 +17,7 @@ if ('serviceWorker' in navigator) {
 </script>
 <script>
 (function() {
-  var VERSION = '1776750000';
+  var VERSION = '1776800000';
   var stored = localStorage.getItem('gs_app_version');
   if (stored !== VERSION) {
     var session = localStorage.getItem('gs_session');
@@ -4439,7 +4439,7 @@ function renderLiquidacionesV2() {
     if(!s.liquidacionId) return true;
     return !(appData.liquidaciones||[]).some(l=>l.id===s.liquidacionId);
   });
-  const seleccionados=uiState.liq_sel||[];
+  const seleccionados=(uiState.liq_sel||[]).filter(id=>disponibles.some(s=>s.id===id));
   const hoyISO=(()=>{const h=new Date();return `${h.getFullYear()}-${String(h.getMonth()+1).padStart(2,'0')}-${String(h.getDate()).padStart(2,'0')}`;})();
   const nextNum='LIQ-'+String(appData.liquidaciones.length+1).padStart(3,'0');
 
@@ -4748,7 +4748,7 @@ function toggleSrvLiq(id,checked){if(!uiState.liq_sel)uiState.liq_sel=[];if(chec
 function toggleTodosClienteLiq(cl,checked){if(!uiState.liq_sel)uiState.liq_sel=[];const svcs=(appData.servicios||[]).filter(s=>s.cliente===cl&&(s.cerrado||s.estado==='borrador')&&!s.liquidacionId);svcs.forEach(s=>{if(checked){if(!uiState.liq_sel.includes(s.id))uiState.liq_sel.push(s.id);}else{uiState.liq_sel=uiState.liq_sel.filter(x=>x!==s.id);}});if(checked&&(!uiState.liq_ruts_sel||!uiState.liq_ruts_sel.length)){const _cr=(appData.clientesRut||{})[cl]||[];if(_cr.length){uiState.liq_ruts_sel=[..._cr];saveData();}}render();}
 function toggleRutLiq(rut,checked){if(!uiState.liq_ruts_sel)uiState.liq_ruts_sel=[];if(checked){if(!uiState.liq_ruts_sel.includes(rut))uiState.liq_ruts_sel.push(rut);}else{uiState.liq_ruts_sel=uiState.liq_ruts_sel.filter(r=>r!==rut);}render();}
 function agregarRutLiq(){const input=document.getElementById('liq_rut_nuevo');const rut=input?.value.trim();if(!rut)return;const sel=uiState.liq_sel||[];const svcs=appData.servicios||[];const clienteFromSel=sel.length?(svcs.find(sv=>sv.id===sel[0])?.cliente||''):'';const cl=clienteFromSel||(uiState.liq_cliente_sel||'');if(cl){if(!appData.clientesRut)appData.clientesRut={};if(!appData.clientesRut[cl])appData.clientesRut[cl]=[];if(!appData.clientesRut[cl].includes(rut))appData.clientesRut[cl].push(rut);}if(!uiState.liq_ruts_sel)uiState.liq_ruts_sel=[];if(!uiState.liq_ruts_sel.includes(rut))uiState.liq_ruts_sel.push(rut);saveData();input.value='';render();}
-function crearLiquidacionV2(){const sel=uiState.liq_sel||[];if(!sel.length)return alert('Selecciona al menos un servicio');const tipo=uiState.liq_tipo_nueva||'oficial';const estadoInicial=tipo==='borrador'?'borrador':'creada';const fecha=document.getElementById('liq_fecha_v2')?.value||new Date().toISOString().split('T')[0];const email=document.getElementById('liq_email_v2')?.value||'';const p=fecha.split('-');const fechaStr=`${p[2]}-${p[1]}-${p[0]}`;const ruts=uiState.liq_ruts_sel||[];const servicios=appData.servicios||[];const total=sel.reduce((a,id)=>{const s=servicios.find(sv=>sv.id===id);return a+(s?s.precio||0:0);},0);const id='LIQ-'+String(appData.liquidaciones.length+1).padStart(3,'0');appData.liquidaciones.push({id,fecha:fechaStr,email,serviciosIds:[...sel],total,estado:estadoInicial,nFactura:'',ruts});sel.forEach(sid=>{const s=servicios.find(sv=>sv.id===sid);if(s){s.liquidacionId=id;upsertServicioSupabase(s);}});uiState.liq_sel=[];uiState.liq_ruts_sel=[];uiState.liq_preview=false;uiState.liq_ui_fecha='';uiState.liq_ui_email=undefined;uiState.liq_tipo_nueva=undefined;saveData();pushLiquidacionesSupabase();render();alert('✅ '+id+' creada — Total: $'+total.toLocaleString('es-CL'));}
+function crearLiquidacionV2(){const serviciosDisp=(appData.servicios||[]).filter(s=>(s.cerrado||s.estado==='borrador')&&!s.liquidacionId);const sel=(uiState.liq_sel||[]).filter(id=>serviciosDisp.some(s=>s.id===id));if(!sel.length)return alert('Selecciona al menos un servicio');const tipo=uiState.liq_tipo_nueva||'oficial';const estadoInicial=tipo==='borrador'?'borrador':'creada';const fecha=document.getElementById('liq_fecha_v2')?.value||new Date().toISOString().split('T')[0];const email=document.getElementById('liq_email_v2')?.value||'';const p=fecha.split('-');const fechaStr=`${p[2]}-${p[1]}-${p[0]}`;const ruts=uiState.liq_ruts_sel||[];const servicios=appData.servicios||[];const total=sel.reduce((a,id)=>{const s=servicios.find(sv=>sv.id===id);return a+(s?s.precio||0:0);},0);const id='LIQ-'+String(appData.liquidaciones.length+1).padStart(3,'0');appData.liquidaciones.push({id,fecha:fechaStr,email,serviciosIds:[...sel],total,estado:estadoInicial,nFactura:'',ruts});sel.forEach(sid=>{const s=servicios.find(sv=>sv.id===sid);if(s){s.liquidacionId=id;upsertServicioSupabase(s);}});uiState.liq_sel=[];uiState.liq_ruts_sel=[];uiState.liq_preview=false;uiState.liq_ui_fecha='';uiState.liq_ui_email=undefined;uiState.liq_tipo_nueva=undefined;saveData();pushLiquidacionesSupabase();render();alert('✅ '+id+' creada — Total: $'+total.toLocaleString('es-CL'));}
 function cambiarEstadoLiq(liqId,estado){const liq=(appData.liquidaciones||[]).find(l=>l.id===liqId);if(!liq)return;liq.estado=estado;saveData();pushLiquidacionesSupabase();render();}
 function guardarObsLiq(liqId) {
   const liq = (appData.liquidaciones||[]).find(l=>l.id===liqId);
