@@ -17,7 +17,7 @@ if ('serviceWorker' in navigator) {
 </script>
 <script>
 (function() {
-  var VERSION = '1776800000';
+  var VERSION = '1776850000';
   var stored = localStorage.getItem('gs_app_version');
   if (stored !== VERSION) {
     var session = localStorage.getItem('gs_session');
@@ -3714,11 +3714,17 @@ function _costoTabCartola(mes, anio) {
     return true;
   });
 
-  // progreso
-  var totalTx  = toda.length;
-  var revisadas = toda.filter(function(c){return c.revisado;}).length;
+  // progreso — filtrado por mes/cat/equipo pero sin aplicar "solo no revisadas"
+  var _vistaProg = toda.filter(function(c){
+    if (fMes && (c.anio+'/'+c.mes)!==fMes) return false;
+    if (fCat && c.categoria!==fCat)         return false;
+    if (fEq  && c.equipo!==fEq)             return false;
+    return true;
+  });
+  var totalTx  = _vistaProg.length;
+  var revisadas = _vistaProg.filter(function(c){return c.revisado;}).length;
   var pct = totalTx ? Math.round(revisadas/totalTx*100) : 0;
-  var sinCat = toda.filter(function(t){return !t.categoria||t.categoria==='';}).length;
+  var sinCat = _vistaProg.filter(function(t){return !t.categoria||t.categoria==='';}).length;
 
   // helper monto display
   function _montoDisplay(c) {
