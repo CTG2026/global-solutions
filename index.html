@@ -8164,7 +8164,7 @@ function _procesarRemotosServicios(data) {
 }
 
 async function upsertServicioSupabase(s) {
-  if (!supa || !supaConectado) return;
+  if (!supa) return false;
   // Fila completa con todos los campos extra
   const rowFull = {
     ...servicioToRow(s),
@@ -8180,7 +8180,7 @@ async function upsertServicioSupabase(s) {
   };
   try {
     const { error } = await supa.from('servicios').upsert(rowFull, { onConflict: 'id' });
-    if (!error) return true;
+    if (!error) { supaConectado = true; return true; }
     // Falló con campos extra — intentar solo campos base + cerrado/estado
     console.warn('Upsert completo falló, reintentando con campos base:', error.message);
     const rowBase = { ...servicioToRow(s), cerrado: s.cerrado||false, estado: s.estado||'activo' };
@@ -10653,7 +10653,7 @@ async function togglePagadoServicio(id) {
   render();
 }
 
-function liquidarServicio(id) {
+async function liquidarServicio(id) {
   const idx = (appData.servicios||[]).findIndex(s => s.id === id);
   if (idx === -1) return;
   const precio     = parseInt(document.getElementById(`liq_precio_${id}`)?.value) || 0;
@@ -10679,10 +10679,9 @@ function liquidarServicio(id) {
 
   appData.dashboard.ventas_mes = (appData.servicios||[]).filter(s=>s.liquidado).reduce((a,s)=>a+(s.precio||0),0);
   uiState.liquidando_id = null;
-  upsertServicioSupabase(appData.servicios[idx]);
-
   saveData(); render();
-  mostrarToastServicio(supaConectado);
+  const ok = await upsertServicioSupabase(appData.servicios[idx]);
+  mostrarToastServicio(ok === true);
 }
 
 function mostrarToastServicio(exito) {
