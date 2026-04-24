@@ -3787,7 +3787,10 @@ function _costoTabCartola(mes, anio) {
       </div>
       <div>
         <div style="font-size:9px;font-weight:700;color:#C62828;margin-bottom:3px">🗑️ LIMPIAR</div>
-        <button onclick="limpiarCartolaMes('${fMesStr}','${fAnioStr}')" style="width:100%;padding:8px;background:#FFEBEE;color:#C62828;border:1px solid #FFCDD2;border-radius:7px;font-size:11px;font-weight:700;cursor:pointer">🗑️ Borrar mes</button>
+        ${fMes
+          ? `<button onclick="limpiarCartolaMes('${fMesStr}','${fAnioStr}')" style="width:100%;padding:8px;background:#FFEBEE;color:#C62828;border:1px solid #FFCDD2;border-radius:7px;font-size:11px;font-weight:700;cursor:pointer">🗑️ Borrar ${fMesStr}/${fAnioStr}</button>`
+          : `<button disabled style="width:100%;padding:8px;background:#F5F5F5;color:#aaa;border:1px solid #ddd;border-radius:7px;font-size:11px;font-weight:700;cursor:not-allowed" title="Selecciona un mes específico para borrar">🗑️ Selecciona mes</button>`
+        }
       </div>
     </div>
   </div>
