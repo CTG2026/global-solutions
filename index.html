@@ -11013,9 +11013,24 @@ function iniciarLogin() {
       if (sess && sess.rol && sess.rol.id) {
         const rol = ROLES.find(r => r.id === sess.rol.id);
         if (rol) {
-          sessionRol = rol;
-          sessionConductor = sess.conductor || null;
-          aplicarAcceso();
+          // Siempre pedir PIN — ir directo al paso PIN con el rol pre-seleccionado
+          mostrarLogin();
+          if (rol.id === 'conductor' && sess.conductor) {
+            const conductores = appData.conductores || ['Manuel Madrid','Felipe Vidal','Felipe Madariaga','Sebastián Zúñiga','Pablo Riquelme'];
+            const idx = conductores.indexOf(sess.conductor);
+            if (idx !== -1) {
+              const pin = String(5 + idx).padStart(4, '0');
+              pinTarget = { id: 'conductor', nombre: 'Conductor', pin, acceso: 'conductor' };
+              sessionConductor = sess.conductor;
+              mostrarPasoPin(sess.conductor);
+            } else {
+              mostrarPasoRol();
+            }
+          } else {
+            pinTarget = rol;
+            sessionConductor = null;
+            mostrarPasoPin(rol.nombre);
+          }
           return;
         }
       }
