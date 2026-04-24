@@ -17,7 +17,7 @@ if ('serviceWorker' in navigator) {
 </script>
 <script>
 (function() {
-  var VERSION = '1776850000';
+  var VERSION = '1777000001';
   var stored = localStorage.getItem('gs_app_version');
   if (stored !== VERSION) {
     var session = localStorage.getItem('gs_session');
@@ -26,7 +26,13 @@ if ('serviceWorker' in navigator) {
     localStorage.setItem('gs_app_version', VERSION);
     if (session) localStorage.setItem('gs_session', session);
     if ('caches' in window) caches.keys().then(function(n){n.forEach(function(x){caches.delete(x);});});
-    window.location.reload(true);
+    // reload(true) está deprecado y browsers modernos lo ignoran — usar URL con ?v para forzar fetch nuevo
+    var base = window.location.href.split('?')[0].split('#')[0];
+    window.location.replace(base + '?v=' + VERSION);
+  }
+  // Limpiar el parámetro ?v= de la URL sin recargar
+  if (window.location.search) {
+    window.history.replaceState(null, '', window.location.pathname);
   }
 })();
 </script>
