@@ -17,7 +17,7 @@ if ('serviceWorker' in navigator) {
 </script>
 <script>
 (function() {
-  var VERSION = '1777000001';
+  var VERSION = '1777100001';
   var stored = localStorage.getItem('gs_app_version');
   if (stored !== VERSION) {
     var session = localStorage.getItem('gs_session');
@@ -2524,7 +2524,8 @@ function importarExcelCopec(input) {
       // Buscar hoja 'Registro Completo' o usar la primera
       const sheetName = wb.SheetNames.find(n => n.toLowerCase().includes('registro') || n.toLowerCase().includes('completo')) || wb.SheetNames[0];
       const ws = wb.Sheets[sheetName];
-      const rows = XLSX.utils.sheet_to_json(ws, { header:1, defval:'', raw:false });
+      // raw:true → números vienen como JS numbers (no strings), evita que "128.95" → 12895
+      const rows = XLSX.utils.sheet_to_json(ws, { header:1, defval:'', raw:true, cellDates:true });
 
       // Buscar la fila de encabezado por nombre de columna (no por posición fija)
       const normH = s => String(s||'').toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^A-Z0-9\/]/g,' ').replace(/\s+/g,' ').trim();
@@ -2549,8 +2550,17 @@ function importarExcelCopec(input) {
 
       const dataRows = rows.slice(headerRowIdx + 1);
 
-      const parseNum = v => Math.abs(parseFloat(String(v||'').replace(/\./g,'').replace(',','.').replace(/[^\d.]/g,''))||0);
+      // Con raw:true los números ya vienen como JS numbers — devolverlos directo
+      const parseNum = v => {
+        if (typeof v === 'number') return Math.abs(v);
+        const s = String(v||'').trim();
+        // Formato chileno "1.234,56": quitar puntos de miles, coma→punto decimal
+        if (s.includes(',')) return Math.abs(parseFloat(s.replace(/\./g,'').replace(',','.').replace(/[^\d.]/g,''))||0);
+        // Formato sin coma: quitar todo excepto dígitos y punto
+        return Math.abs(parseFloat(s.replace(/[^\d.]/g,''))||0);
+      };
       const parseFecha = v => {
+        if (v instanceof Date) return String(v.getDate()).padStart(2,'0')+'-'+String(v.getMonth()+1).padStart(2,'0')+'-'+v.getFullYear();
         const s = String(v||'').trim();
         const m = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
         if (m) return m[1].padStart(2,'0')+'-'+m[2].padStart(2,'0')+'-'+m[3];
@@ -2567,12 +2577,13 @@ function importarExcelCopec(input) {
       };
 
       if (!appData.combustible) appData.combustible = [];
-      let importados = 0, duplicados = 0;
+      let importados = 0, duplicados = 0, saltados = 0;
+      const saltadosDetalle = [];
       const porPatente = {};
 
-      dataRows.forEach(row => {
+      dataRows.forEach((row, ri) => {
         if (!row || row.every(c => c==='' || c===null || c===undefined)) return;
-        const n        = iN  >= 0 ? String(row[iN] ||'').trim() : '';
+        const n         = iN  >= 0 ? String(row[iN] ||'').trim() : '';
         const fecha     = parseFecha(row[iF]);
         const patente   = String(row[iP]||'').trim().toUpperCase();
         const tipo      = iTi  >= 0 ? String(row[iTi] ||'').trim() : '';
@@ -2581,12 +2592,19 @@ function importarExcelCopec(input) {
         const monto     = parseNum(row[iM]);
         const precioLt  = iPL  >= 0 ? parseNum(row[iPL]) : 0;
 
-        if (!fecha || !patente || !monto) return;
+        if (!fecha || !patente || !monto) {
+          // Solo registrar si tiene algún dato relevante (ignorar filas vacías o TOTALES)
+          if (monto > 0 || patente) {
+            saltados++;
+            saltadosDetalle.push('Fila '+(ri+1)+': n='+n+' pat='+patente+' fecha='+fecha+' monto='+monto);
+          }
+          return;
+        }
 
-        // Deduplicar: si hay N° usar n+patente+fecha (único por fila);
+        // Deduplicar: si hay N° usar n+patente (único por fila del archivo);
         // si no hay N°, usar fecha+patente+monto+litros+direccion
         const yaExiste = n
-          ? appData.combustible.some(r => r.n===n && r.patente===patente && r.fecha===fecha)
+          ? appData.combustible.some(r => r.n===n && r.patente===patente)
           : appData.combustible.some(r => r.fecha===fecha && r.patente===patente && r.monto===monto && r.litros===litros && r.direccion===direccion);
         if (yaExiste) { duplicados++; return; }
 
@@ -2605,8 +2623,12 @@ function importarExcelCopec(input) {
       });
 
       saveData();
-      uiState.combustible_resumen = { importados, duplicados, porPatente, ts: Date.now() };
-      showToastGeneral('✅ '+importados+' registros importados'+(duplicados?' ('+duplicados+' duplicados omitidos)':''),'#1565C0');
+      uiState.combustible_resumen = { importados, duplicados, saltados, saltadosDetalle, porPatente, ts: Date.now() };
+      let msg = '✅ '+importados+' registros importados';
+      if (duplicados) msg += ' · '+duplicados+' duplicados omitidos';
+      if (saltados)   msg += ' · ⚠️ '+saltados+' filas con datos incompletos';
+      if (saltadosDetalle.length) console.warn('Filas saltadas:', saltadosDetalle);
+      showToastGeneral(msg, saltados ? '#E65100' : '#1565C0');
       render();
     } catch(err) { showToastGeneral('❌ Error leyendo archivo: '+err.message,'#C62828'); }
   };
@@ -7159,9 +7181,19 @@ function pdfInformeCombustible(mes, anio) {
 
   if (!datos.length) { alert('Sin datos de combustible para el período seleccionado.'); return; }
 
+  // Formateador chileno confiable: puntos para miles, coma para decimales
+  const clFmt = (n, dec=0) => {
+    if (!isFinite(n) || n == null) return '0';
+    const fixed = Math.abs(Number(n)).toFixed(dec);
+    const [ip, dp] = fixed.split('.');
+    const intFmt = ip.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+    return dec > 0 ? intFmt+','+dp : intFmt;
+  };
+
   const MNOMS = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
   const periodoTxt = (mes && anio) ? MNOMS[parseInt(mes)-1]+' '+anio : 'Todos los períodos';
-  const hoyFmt = new Date().toLocaleDateString('es-CL');
+  const hoy = new Date();
+  const hoyFmt = String(hoy.getDate()).padStart(2,'0')+'/'+String(hoy.getMonth()+1).padStart(2,'0')+'/'+hoy.getFullYear();
 
   // ── 1. MÉTRICAS RESUMEN ──────────────────────────────────────────
   const totalLitros = datos.reduce((a,c)=>a+(parseFloat(c.litros)||0),0);
@@ -7229,9 +7261,9 @@ function pdfInformeCombustible(mes, anio) {
   // ── HTML SECCIONES ───────────────────────────────────────────────
   const htmlKpis = `
     <div class="kpis">
-      <div class="kpi"><div class="val">${totalLitros.toLocaleString('es-CL',{maximumFractionDigits:0})}L</div><div class="lbl">Total Litros</div></div>
-      <div class="kpi"><div class="val">$${totalMonto.toLocaleString('es-CL')}</div><div class="lbl">Total Monto</div></div>
-      <div class="kpi"><div class="val">$${promPrecio.toLocaleString('es-CL')}/L</div><div class="lbl">Precio Prom. / Lt</div></div>
+      <div class="kpi"><div class="val">${clFmt(totalLitros,2)}L</div><div class="lbl">Total Litros</div></div>
+      <div class="kpi"><div class="val">$${clFmt(totalMonto)}</div><div class="lbl">Total Monto</div></div>
+      <div class="kpi"><div class="val">$${clFmt(promPrecio)}/L</div><div class="lbl">Precio Prom. / Lt</div></div>
       <div class="kpi"><div class="val">${nCargas}</div><div class="lbl">N° Cargas</div></div>
     </div>`;
 
@@ -7241,17 +7273,17 @@ function pdfInformeCombustible(mes, anio) {
       <thead><tr><th>Patente</th><th>Conductor</th><th class="num">N° Cargas</th><th class="num">Litros</th><th class="num">Monto</th><th class="num">% Flota</th></tr></thead>
       <tbody>
         ${unidadesOrden.map(([pat,d])=>{
-          const pct = totalMonto>0 ? (d.monto/totalMonto*100).toFixed(1) : '0.0';
+          const pct = totalMonto>0 ? (d.monto/totalMonto*100).toFixed(1).replace('.',',') : '0,0';
           return `<tr>
             <td class="pat">${pat}</td>
             <td>${d.conductor}</td>
             <td class="num">${d.cargas}</td>
-            <td class="num">${d.litros.toLocaleString('es-CL',{maximumFractionDigits:0})}L</td>
-            <td class="num">$${d.monto.toLocaleString('es-CL')}</td>
+            <td class="num">${clFmt(d.litros,2)}L</td>
+            <td class="num">$${clFmt(d.monto)}</td>
             <td class="num pct">${pct}%</td>
           </tr>`;
         }).join('')}
-        <tr class="total-row"><td colspan="2">TOTAL FLOTA</td><td class="num">${nCargas}</td><td class="num">${totalLitros.toLocaleString('es-CL',{maximumFractionDigits:0})}L</td><td class="num">$${totalMonto.toLocaleString('es-CL')}</td><td class="num">100%</td></tr>
+        <tr class="total-row"><td colspan="2">TOTAL FLOTA</td><td class="num">${nCargas}</td><td class="num">${clFmt(totalLitros,2)}L</td><td class="num">$${clFmt(totalMonto)}</td><td class="num">100%</td></tr>
       </tbody>
     </table>`;
 
@@ -7261,7 +7293,7 @@ function pdfInformeCombustible(mes, anio) {
       <thead><tr><th>Semana</th><th class="num">Litros</th><th class="num">Monto</th><th class="num">Precio Prom./Lt</th></tr></thead>
       <tbody>
         ${Object.entries(semanas).filter(([,d])=>d.mon>0).map(([sem,d])=>`
-          <tr><td>${sem}</td><td class="num">${d.lit.toLocaleString('es-CL',{maximumFractionDigits:0})}L</td><td class="num">$${d.mon.toLocaleString('es-CL')}</td><td class="num">${d.lit>0?'$'+Math.round(d.mon/d.lit).toLocaleString('es-CL'):'—'}/L</td></tr>`).join('')}
+          <tr><td>${sem}</td><td class="num">${clFmt(d.lit,2)}L</td><td class="num">$${clFmt(d.mon)}</td><td class="num">${d.lit>0?'$'+clFmt(Math.round(d.mon/d.lit)):'—'}/L</td></tr>`).join('')}
       </tbody>
     </table>`;
 
@@ -7271,14 +7303,15 @@ function pdfInformeCombustible(mes, anio) {
       <thead><tr><th>Fecha</th><th>Patente</th><th>Conductor</th><th class="num">Litros</th><th class="num">Monto</th><th class="num">Precio/Lt</th></tr></thead>
       <tbody>
         ${detalle.map(c=>{
-          const precioLt = (c.precioLt>0) ? c.precioLt : ((parseFloat(c.litros)||0)>0 ? Math.round(c.monto/(parseFloat(c.litros)||1)) : 0);
+          const lit = parseFloat(c.litros)||0;
+          const precioLt = (c.precioLt>0) ? c.precioLt : (lit>0 ? Math.round(c.monto/lit) : 0);
           return `<tr>
             <td>${c.fecha||'—'}</td>
             <td class="pat">${c.patente||'—'}</td>
             <td>${c.conductor||'—'}</td>
-            <td class="num">${c.litros||'—'}L</td>
-            <td class="num">$${(c.monto||0).toLocaleString('es-CL')}</td>
-            <td class="num">${precioLt>0?'$'+precioLt.toLocaleString('es-CL')+'/L':'—'}</td>
+            <td class="num">${lit>0?clFmt(lit,2)+'L':'—'}</td>
+            <td class="num">$${clFmt(c.monto||0)}</td>
+            <td class="num">${precioLt>0?'$'+clFmt(precioLt)+'/L':'—'}</td>
           </tr>`;
         }).join('')}
       </tbody>
