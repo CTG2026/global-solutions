@@ -17,7 +17,7 @@ if ('serviceWorker' in navigator) {
 </script>
 <script>
 (function() {
-  var VERSION = '1777100001';
+  var VERSION = '1777200001';
   var stored = localStorage.getItem('gs_app_version');
   if (stored !== VERSION) {
     var session = localStorage.getItem('gs_session');
@@ -409,10 +409,11 @@ const DEFAULT_DATA = {
     { id:'EMP-003', nombre:'Felipe Vidal',     cargo:'Conductor',           area:'Operaciones',    activo:true, liquidaciones:[] },
     { id:'EMP-004', nombre:'Sebastián Zúñiga', cargo:'Ayudante Operaciones',area:'Operaciones',    activo:true, liquidaciones:[] },
     { id:'EMP-005', nombre:'Pablo Riquelme',   cargo:'Jefe Operaciones',    area:'Administración', activo:true, liquidaciones:[] },
-    { id:'EMP-006', nombre:'Carlos Torres',    cargo:'Control de Gestión',  area:'Administración', activo:true, liquidaciones:[] }
+    { id:'EMP-006', nombre:'Carlos Torres',    cargo:'Control de Gestión',  area:'Administración', activo:true, liquidaciones:[] },
+    { id:'EMP-007', nombre:'Francisco Mancilla',cargo:'Conductor',          area:'Operaciones',    activo:true, liquidaciones:[] }
   ],
   camionetas: ['BWGH46','KSRC78','JYJV21'],
-  conductores: ['Manuel Madrid','Felipe Vidal','Felipe Madariaga','Sebastián Zúñiga','Pablo Riquelme'],
+  conductores: ['Manuel Madrid','Felipe Vidal','Felipe Madariaga','Francisco Mancilla','Sebastián Zúñiga','Pablo Riquelme'],
   midia_foco: [],
   midia_open: {},
   pipeline: [
@@ -916,7 +917,32 @@ function renderRendimientoComb() {
     <button onclick="imprimirInformeRC()" style="width:100%;padding:10px;background:#1565C0;color:white;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer">🖨️ Generar informe PDF</button>
   </div>`;
 
-  return `<div style="padding:2px">${sec1}${sec2}${sec3}${sec4}</div>`;
+  // ── SECCIÓN 5: IMPORTAR KM FLOTA DESDE EXCEL ──
+  const kmImportados = (appData.kmFlota||[]).slice().reverse().slice(0,10);
+  const sec5 = `<div style="background:#E8F5E9;border-radius:10px;padding:12px;margin-bottom:10px;border:1px solid #C8E6C9">
+    <div style="font-size:10px;font-weight:800;color:#1B5E20;letter-spacing:1px;margin-bottom:10px;padding-bottom:6px;border-bottom:2px solid #A5D6A7">📂 IMPORTAR KM FLOTA — EXCEL</div>
+    <div style="font-size:11px;color:#388E3C;margin-bottom:8px">Sube un Excel con columnas PATENTE y KM (y opcionalmente DESCRIPCIÓN). Los datos quedan disponibles en el módulo Control → Informes.</div>
+    <label style="display:block;width:100%;padding:10px;background:#2E7D32;color:white;border-radius:8px;text-align:center;font-size:12px;font-weight:700;cursor:pointer">
+      📂 Seleccionar archivo Excel
+      <input type="file" accept=".xlsx,.xls" style="display:none" onchange="importarKmFlotaExcel(event)">
+    </label>
+    ${kmImportados.length ? `<div style="margin-top:10px">
+      <div style="font-size:9px;font-weight:700;color:#388E3C;margin-bottom:6px">ÚLTIMOS REGISTROS (${(appData.kmFlota||[]).length} total)</div>
+      ${kmImportados.map(k=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 8px;background:white;border-radius:6px;margin-bottom:4px;border:1px solid #C8E6C9">
+        <div>
+          <span style="font-size:12px;font-weight:700;color:#1B5E20">${k.patente}</span>
+          ${k.label?`<span style="font-size:10px;color:#666;margin-left:6px">${k.label}</span>`:''}
+          <div style="font-size:9px;color:#888">${k.mes}/${k.anio}</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <span style="font-size:13px;font-weight:900;color:#2E7D32">${k.km.toLocaleString('es-CL')} km</span>
+          <button onclick="eliminarKmFlota('${k.id}')" style="background:#FFEBEE;color:#C62828;border:1px solid #EF9A9A;border-radius:5px;font-size:10px;padding:3px 7px;cursor:pointer;font-weight:700">✕</button>
+        </div>
+      </div>`).join('')}
+    </div>` : ''}
+  </div>`;
+
+  return `<div style="padding:2px">${sec1}${sec2}${sec3}${sec4}${sec5}</div>`;
 }
 
 function crearRegistroRC() {
@@ -2652,7 +2678,7 @@ const CATEGORIAS_CARTOLA = [
   'Ingreso servicios','Ingreso factoring','Abono Utilidades Carlos Torres','Otros egresos','Otros ingresos',
   'Sin identificar','Otro (manual)...'
 ];
-const EQUIPOS_CARTOLA = ['GKFD84','WR9192','XR8555','GCFF12','BPBL35','XA1114','DSDV36','Distribución','Flota','Manuel Madrid','Felipe Vidal','Felipe Madariaga','Sebastián Zúñiga','Carlos Torres','Sin identificar','N/A'];
+const EQUIPOS_CARTOLA = ['GKFD84','WR9192','XR8555','GCFF12','BPBL35','XA1114','DSDV36','Distribución','Flota','Manuel Madrid','Felipe Vidal','Felipe Madariaga','Francisco Mancilla','Sebastián Zúñiga','Carlos Torres','Sin identificar','N/A'];
 
 // ─── CARTOLA EXCEL ────────────────────────────────────────────────────────────
 // SQL Supabase (ejecutar una vez en el dashboard):
@@ -5900,7 +5926,7 @@ function renderEditarServicio(id) {
   if (!s) return '';
   const hoyISO=(()=>{const h=new Date();return h.getFullYear()+'-'+String(h.getMonth()+1).padStart(2,'0')+'-'+String(h.getDate()).padStart(2,'0');})();
   const fechaISO = s.fecha?(()=>{const p=s.fecha.split('-');return p.length===3&&p[0].length===2?`${p[2]}-${p[1]}-${p[0]}`:s.fecha;})():hoyISO;
-  const conductoresLista = appData.conductores||['Manuel Madrid','Felipe Vidal','Felipe Madariaga','Sebastián Zúñiga','Pablo Riquelme','Tercero'];
+  const conductoresLista = appData.conductores||['Manuel Madrid','Felipe Vidal','Felipe Madariaga','Francisco Mancilla','Sebastián Zúñiga','Pablo Riquelme','Tercero'];
   const patentesLista = appData.patentes||['WR9192','GKFD84','XR8555','GCFF12','BPBL35','XA1114','DSDV36'];
   const clientesDefault = (window.DEFAULT_DATA||{pipeline:[]}).pipeline.map(c=>c.cliente);
   const clientesLocal = (appData.pipeline||[]).map(c=>c.cliente);
@@ -6324,7 +6350,7 @@ function toggleClienteNuevo(val) {
 function mostrarAgregarConductor() {
   const nombre = prompt('Nombre del conductor nuevo:');
   if (!nombre || !nombre.trim()) return;
-  if (!appData.conductores) appData.conductores = ['Manuel Madrid','Felipe Vidal','Felipe Madariaga','Sebastián Zúñiga','Pablo Riquelme'];
+  if (!appData.conductores) appData.conductores = ['Manuel Madrid','Felipe Vidal','Felipe Madariaga','Francisco Mancilla','Sebastián Zúñiga','Pablo Riquelme'];
   if (!appData.conductores.includes(nombre.trim())) {
     appData.conductores.push(nombre.trim());
     saveData(); render();
@@ -6572,6 +6598,70 @@ function eliminarKmFlota(id) {
   appData.kmFlota = (appData.kmFlota||[]).filter(x=>x.id!==id);
   saveData(); pushCostosSupabase();
   showToastGeneral('🗑️ Registro eliminado','#E65100'); render();
+}
+
+function importarKmFlotaExcel(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      const wb = XLSX.read(e.target.result, { type:'array', cellDates:true });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(ws, { header:1, defval:'', raw:true, cellDates:true });
+      if (!rows.length) return alert('⚠️ El archivo está vacío.');
+
+      // Detectar fila de encabezado
+      let hdrRow = -1, iP = -1, iK = -1, iL = -1, iF = -1;
+      for (let r = 0; r < Math.min(5, rows.length); r++) {
+        const row = rows[r].map(c => String(c||'').toUpperCase().trim());
+        const pIdx = row.findIndex(c => c.includes('PATENTE') || c === 'EQUIPO' || c === 'PLACA');
+        const kIdx = row.findIndex(c => c.includes('KM') || c.includes('KILOMETRO') || c.includes('KILÓMETRO'));
+        if (pIdx !== -1 && kIdx !== -1) {
+          hdrRow = r; iP = pIdx; iK = kIdx;
+          iL = row.findIndex(c => c.includes('DESCRIP') || c.includes('LABEL') || c.includes('DETALLE') || c.includes('OBSERV'));
+          iF = row.findIndex(c => c.includes('FECHA') || c.includes('MES') || c === 'PERIODO' || c === 'PERÍODO');
+          break;
+        }
+      }
+      if (hdrRow === -1) return alert('⚠️ No se encontraron columnas PATENTE y KM en el archivo.');
+
+      const hoy = new Date();
+      const mesDef  = String(hoy.getMonth()+1).padStart(2,'0');
+      const anioDef = String(hoy.getFullYear());
+
+      if (!appData.kmFlota) appData.kmFlota = [];
+      let importados = 0;
+      for (let r = hdrRow + 1; r < rows.length; r++) {
+        const row = rows[r];
+        const patRaw = String(row[iP]||'').trim().toUpperCase();
+        const kmRaw  = row[iK];
+        if (!patRaw || patRaw === 'PATENTE' || patRaw === 'EQUIPO') continue;
+        const km = typeof kmRaw === 'number' ? Math.abs(Math.round(kmRaw)) : Math.abs(parseInt(String(kmRaw||'').replace(/[^\d]/g,''))||0);
+        if (!km) continue;
+        const label = iL !== -1 ? String(row[iL]||'').trim() : '';
+        let mes = mesDef, anio = anioDef;
+        if (iF !== -1 && row[iF]) {
+          const fv = row[iF];
+          if (fv instanceof Date) { mes = String(fv.getMonth()+1).padStart(2,'0'); anio = String(fv.getFullYear()); }
+          else {
+            const s = String(fv).trim();
+            const m = s.match(/(\d{1,2})[\/\-](\d{2,4})/);
+            if (m) { mes = String(parseInt(m[1])).padStart(2,'0'); anio = m[2].length===2?'20'+m[2]:m[2]; }
+          }
+        }
+        appData.kmFlota.push({ id:_genIdKmFlota(), patente:patRaw, km, label, mes, anio });
+        importados++;
+      }
+      if (!importados) return alert('⚠️ No se importaron registros. Verifica el formato del archivo.');
+      saveData(); pushCostosSupabase();
+      showToastGeneral(`✅ ${importados} registro${importados!==1?'s':''} de km importados`,'#2E7D32');
+      render();
+    } catch(err) {
+      alert('⚠️ Error al leer el archivo: ' + err.message);
+    }
+  };
+  reader.readAsArrayBuffer(file);
 }
 
 function guardarInformeRendimiento() {
@@ -8074,7 +8164,7 @@ function renderFase(fase) {
           const clientesDefault=DEFAULT_DATA.pipeline.map(c=>c.cliente);
           const clientesLocal=(appData.pipeline||[]).map(c=>c.cliente);
           const clientesActivos=[...new Set([...clientesDefault,...clientesLocal])].sort();
-          const conductoresDefault=['Manuel Madrid','Felipe Vidal','Felipe Madariaga','Sebastián Zúñiga','Pablo Riquelme','Tercero'];
+          const conductoresDefault=['Manuel Madrid','Felipe Vidal','Felipe Madariaga','Francisco Mancilla','Sebastián Zúñiga','Pablo Riquelme','Tercero'];
           if(!appData.conductores||appData.conductores.length<2){appData.conductores=conductoresDefault;saveData();}
           if(!appData.conductores.includes('Tercero')){appData.conductores.push('Tercero');saveData();}
           const conductoresLista=appData.conductores;
@@ -9702,11 +9792,34 @@ function renderInformes() {
       </div>`
     ).join('');
 
+    // KM importados desde Excel (appData.kmFlota)
+    const kmFlotaData = appData.kmFlota || [];
+    const kmFlotaAgrupado = {};
+    kmFlotaData.forEach(k => {
+      if (!kmFlotaAgrupado[k.patente]) kmFlotaAgrupado[k.patente] = [];
+      kmFlotaAgrupado[k.patente].push(k);
+    });
+    const kmFlotaHTML = Object.keys(kmFlotaAgrupado).length === 0
+      ? '<div style="color:#aaa;font-size:11px;text-align:center;padding:8px">Sin registros importados</div>'
+      : Object.entries(kmFlotaAgrupado).sort((a,b)=>a[0].localeCompare(b[0])).map(([pat, regs]) => {
+          const ultimos = regs.slice().sort((a,b)=>(b.anio+b.mes).localeCompare(a.anio+a.mes));
+          const ultimo = ultimos[0];
+          return `<div style="padding:8px 12px;background:#F8F9FA;border-radius:8px;margin-bottom:5px;border-left:3px solid #2E7D32">
+            <div style="display:flex;justify-content:space-between;align-items:center">
+              <span style="font-size:12px;font-weight:700;color:#333">${pat}</span>
+              <span style="font-size:13px;font-weight:900;color:#2E7D32">${ultimo.km.toLocaleString('es-CL')} km</span>
+            </div>
+            <div style="font-size:9px;color:#888;margin-top:2px">${ultimo.mes}/${ultimo.anio}${ultimo.label?' — '+ultimo.label:''} · ${regs.length} registro${regs.length!==1?'s':''}</div>
+          </div>`;
+        }).join('');
+
     return `
       <div style="font-size:9px;font-weight:700;color:#455A64;letter-spacing:0.5px;margin-bottom:8px">INDICADORES POR EQUIPO</div>
       ${equiposHTML}
       <div style="font-size:9px;font-weight:700;color:#607D8B;letter-spacing:0.5px;margin:12px 0 8px">SERVICIOS POR CONDUCTOR</div>
       ${conductoresHTML||'<div style="color:#aaa;font-size:11px;text-align:center;padding:8px">Sin datos</div>'}
+      <div style="font-size:9px;font-weight:700;color:#2E7D32;letter-spacing:0.5px;margin:12px 0 8px">KILOMETRAJES FLOTA (IMPORTADOS)</div>
+      ${kmFlotaHTML}
     `;
   }
 
@@ -10103,7 +10216,7 @@ function renderCierreLiquidacion() {
 function renderDisponibilidad() {
   if (!appData.disponibilidad) appData.disponibilidad = {};
   const FLOTA = appData.patentes || ['WR9192','GKFD84','XR8555','GCFF12','BPBL35','XA1114','DSDV36'];
-  const conductores = appData.conductores || ['Manuel Madrid','Felipe Vidal','Felipe Madariaga','Sebastián Zúñiga','Pablo Riquelme','Tercero'];
+  const conductores = appData.conductores || ['Manuel Madrid','Felipe Vidal','Felipe Madariaga','Francisco Mancilla','Sebastián Zúñiga','Pablo Riquelme','Tercero'];
   const ESTADOS = ['Disponible','En servicio','Mantención'];
   const TIPOS_MANT = ['Frenos','Caja de cambios','Motor','Suspensión','Eléctrico','Neumáticos','Diferencial','Embrague','Dirección','Preventivo','Puesta en marcha','Otro'];
   const ESTADO_COLOR = {
@@ -11390,7 +11503,7 @@ function iniciarLogin() {
           // Siempre pedir PIN — ir directo al paso PIN con el rol pre-seleccionado
           mostrarLogin();
           if (rol.id === 'conductor' && sess.conductor) {
-            const conductores = appData.conductores || ['Manuel Madrid','Felipe Vidal','Felipe Madariaga','Sebastián Zúñiga','Pablo Riquelme'];
+            const conductores = appData.conductores || ['Manuel Madrid','Felipe Vidal','Felipe Madariaga','Francisco Mancilla','Sebastián Zúñiga','Pablo Riquelme'];
             const idx = conductores.indexOf(sess.conductor);
             if (idx !== -1) {
               const pin = String(5 + idx).padStart(4, '0');
@@ -11443,7 +11556,7 @@ function seleccionarRol(rolId) {
 function mostrarPasoConductor() {
   document.getElementById('login-step-rol').style.display = 'none';
   document.getElementById('login-step-conductor').style.display = 'block';
-  const conductores = appData.conductores || ['Manuel Madrid','Felipe Vidal','Felipe Madariaga','Sebastián Zúñiga','Pablo Riquelme'];
+  const conductores = appData.conductores || ['Manuel Madrid','Felipe Vidal','Felipe Madariaga','Francisco Mancilla','Sebastián Zúñiga','Pablo Riquelme'];
   const lista = document.getElementById('conductores-list-login');
   lista.innerHTML = conductores.map((c,i) => `
     <button class="rol-btn" onclick="seleccionarConductor('${c}', ${i})">${c}</button>
