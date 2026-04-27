@@ -401,6 +401,7 @@ const DEFAULT_DATA = {
   },
   costos: [],
   copec: [],
+  combustible: [],
   cartola: [],
   remuneraciones: [
     { id:'EMP-001', nombre:'Manuel Madrid',    cargo:'Conductor',           area:'Operaciones',    activo:true, liquidaciones:[] },
@@ -2511,6 +2512,92 @@ function editarCopecId(id) {
   if (idx!==-1) { appData.copec[idx].id_manual = nuevo.trim(); saveData(); pushCostosSupabase(); render(); }
 }
 
+// ─── IMPORTAR EXCEL COPEC ────────────────────────────────────────────────────
+function importarExcelCopec(input) {
+  const file = input.files[0]; if (!file) return;
+  input.value = '';
+  if (typeof XLSX === 'undefined') { showToastGeneral('⚠️ Librería Excel no disponible, recarga la página','#E65100'); return; }
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      const wb = XLSX.read(e.target.result, { type:'array', cellDates:true });
+      // Buscar hoja 'Registro Completo' o usar la primera
+      const sheetName = wb.SheetNames.find(n => n.toLowerCase().includes('registro') || n.toLowerCase().includes('completo')) || wb.SheetNames[0];
+      const ws = wb.Sheets[sheetName];
+      // Leer como array de arrays, saltando las 2 primeras filas de encabezado
+      const rows = XLSX.utils.sheet_to_json(ws, { header:1, defval:'', raw:false });
+      const dataRows = rows.slice(2); // saltar 2 filas de encabezado
+
+      const parseNum = v => Math.abs(parseFloat(String(v||'').replace(/\./g,'').replace(',','.').replace(/[^\d.]/g,''))||0);
+      const parseFecha = v => {
+        const s = String(v||'').trim();
+        // DD/MM/YYYY o DD-MM-YYYY → DD-MM-YYYY
+        const m = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+        if (m) return m[1].padStart(2,'0')+'-'+m[2].padStart(2,'0')+'-'+m[3];
+        // YYYY-MM-DD
+        const m2 = s.match(/^(\d{4})[\/\-](\d{2})[\/\-](\d{2})$/);
+        if (m2) return m2[3]+'-'+m2[2]+'-'+m2[1];
+        return s;
+      };
+      const getMesAnio = fecha => {
+        const p = String(fecha||'').split('-');
+        if (p.length===3 && p[2].length===4) return { mes:p[1], anio:p[2] };
+        if (p.length===3 && p[0].length===4) return { mes:p[1], anio:p[0] };
+        const hoy = new Date();
+        return { mes:String(hoy.getMonth()+1).padStart(2,'0'), anio:String(hoy.getFullYear()) };
+      };
+
+      if (!appData.combustible) appData.combustible = [];
+      let importados = 0, duplicados = 0;
+      const porPatente = {};
+
+      dataRows.forEach(row => {
+        if (!row || row.every(c => c==='' || c===null || c===undefined)) return;
+        // Columnas: N°(0), FECHA(1), PATENTE(2), CONDUCTOR(3), LITROS(4), MONTO(5), PRECIO/LT(6,7,8)
+        const fecha    = parseFecha(row[1]);
+        const patente  = String(row[2]||'').trim().toUpperCase();
+        const conductor= String(row[3]||'').trim();
+        const litros   = parseNum(row[4]);
+        const monto    = parseNum(row[5]);
+        const precioLt = parseNum(row[6]) || parseNum(row[7]) || parseNum(row[8]);
+
+        if (!fecha || !patente || !monto) return; // fila inválida
+
+        // Deduplicar por fecha+patente+monto
+        const yaExiste = (appData.combustible).some(r => r.fecha===fecha && r.patente===patente && r.monto===monto);
+        if (yaExiste) { duplicados++; return; }
+
+        const ma = getMesAnio(fecha);
+        appData.combustible.push({
+          id: 'CMB-'+Date.now().toString(36).toUpperCase()+'-'+Math.random().toString(36).substr(2,4).toUpperCase(),
+          fecha, patente, conductor, litros, monto, precioLt,
+          mes: ma.mes, anio: ma.anio
+        });
+
+        if (!porPatente[patente]) porPatente[patente] = { monto:0, litros:0, regs:0 };
+        porPatente[patente].monto  += monto;
+        porPatente[patente].litros += litros;
+        porPatente[patente].regs++;
+        importados++;
+      });
+
+      saveData();
+      uiState.combustible_resumen = { importados, duplicados, porPatente, ts: Date.now() };
+      showToastGeneral('✅ '+importados+' registros importados'+(duplicados?' ('+duplicados+' duplicados omitidos)':''),'#1565C0');
+      render();
+    } catch(err) { showToastGeneral('❌ Error leyendo archivo: '+err.message,'#C62828'); }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function limpiarCombustible() {
+  if (!confirm('¿Eliminar TODOS los registros de combustible importados?')) return;
+  appData.combustible = [];
+  uiState.combustible_resumen = null;
+  saveData(); render();
+  showToastGeneral('🗑️ Combustible limpiado','#555');
+}
+
 // ─── CARTOLA CONSTANTES ───────────────────────────────────────────────────────
 const CATEGORIAS_CARTOLA = [
   'Combustible','Mantención','Repuestos','Remuneraciones','Peajes / TAG',
@@ -3494,7 +3581,44 @@ function _costoTabCopec(mes, anio, flota) {
   </div>`).join('')
     : '<div style="text-align:center;color:#aaa;font-size:11px;padding:12px">Sin registros en el período</div>';
 
+  // Sección importar Excel Copec
+  const combData    = appData.combustible || [];
+  const combResumen = uiState.combustible_resumen || null;
+  const combTotal   = combData.reduce((a,c)=>a+(c.monto||0),0);
+  const combLitros  = combData.reduce((a,c)=>a+(parseFloat(c.litros)||0),0);
+
+  // Desglose por patente de todos los registros importados
+  const combPorPat  = {};
+  combData.forEach(c => {
+    const k = c.patente||'Sin patente';
+    if (!combPorPat[k]) combPorPat[k] = { monto:0, litros:0, regs:0 };
+    combPorPat[k].monto  += c.monto||0;
+    combPorPat[k].litros += parseFloat(c.litros)||0;
+    combPorPat[k].regs++;
+  });
+
+  const combResumenHTML = combData.length ? `
+    <div style="margin-top:8px;background:#E8F5E9;border-radius:7px;padding:8px 10px">
+      <div style="font-size:10px;font-weight:700;color:#2E7D32;margin-bottom:5px">${combData.length} registros · ${combLitros.toFixed(0)}L · $${combTotal.toLocaleString('es-CL')}</div>
+      <div style="display:flex;flex-wrap:wrap;gap:4px">
+        ${Object.entries(combPorPat).sort(([,a],[,b])=>b.monto-a.monto).map(([pat,d])=>`
+          <div style="background:white;border:1px solid #A5D6A7;border-radius:5px;padding:3px 7px;font-size:9px;color:#333">
+            <span style="font-weight:700;color:#2E7D32">${pat}</span> · ${d.regs} cargas · ${d.litros.toFixed(0)}L · $${d.monto.toLocaleString('es-CL')}
+          </div>`).join('')}
+      </div>
+      <button onclick="limpiarCombustible()" style="margin-top:6px;padding:4px 10px;background:#FFEBEE;color:#C62828;border:1px solid #FFCDD2;border-radius:5px;font-size:10px;font-weight:700;cursor:pointer">🗑️ Limpiar datos importados</button>
+    </div>` : '<div style="font-size:10px;color:#888;margin-top:6px">Sin registros importados aún</div>';
+
   return `
+  <!-- IMPORTAR EXCEL COPEC -->
+  <div style="background:#E3F2FD;border:1px solid #90CAF9;border-radius:10px;padding:10px;margin-bottom:10px">
+    <div style="font-size:11px;font-weight:800;color:#1565C0;margin-bottom:6px">📊 COMBUSTIBLE — IMPORTAR EXCEL COPEC</div>
+    <div style="font-size:10px;color:#555;margin-bottom:8px">Hoja "Registro Completo" · Columnas: N°, Fecha, Patente, Conductor, Litros, Monto, Precio/Lt</div>
+    <button onclick="document.getElementById('copec_excel_inp').click()" style="width:100%;padding:10px;background:#1565C0;color:white;border:none;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer">📂 Subir archivo Excel Copec</button>
+    <input type="file" id="copec_excel_inp" accept=".xlsx,.xls,.ods" style="display:none" onchange="importarExcelCopec(this)">
+    ${combResumenHTML}
+  </div>
+
   <div style="background:#FFF8E1;border:1px solid #FFE082;border-radius:10px;padding:10px;margin-bottom:10px">
     ${!apiKey?`<div style="font-size:10px;color:#E65100;font-weight:700;margin-bottom:8px">⚠️ Lectura automática requiere API key — agrégala en Configuración</div>`:''}
     <div style="font-size:11px;font-weight:800;color:#E65100;margin-bottom:8px">📷 LEER IMAGEN COMBUSTIBLE</div>
