@@ -2536,6 +2536,7 @@ function importarExcelCopec(input) {
 
       const headers = rows[headerRowIdx].map(normH);
       // Encontrar cada columna por nombre (MONTO y PRECIO/LT pueden llevar sufijo de moneda)
+      const iN   = headers.findIndex(h => h === 'N' || h === 'N ');
       const iF   = headers.findIndex(h => h === 'FECHA');
       const iP   = headers.findIndex(h => h === 'PATENTE');
       const iTi  = headers.findIndex(h => h === 'TIPO');
@@ -2571,6 +2572,7 @@ function importarExcelCopec(input) {
 
       dataRows.forEach(row => {
         if (!row || row.every(c => c==='' || c===null || c===undefined)) return;
+        const n        = iN  >= 0 ? String(row[iN] ||'').trim() : '';
         const fecha     = parseFecha(row[iF]);
         const patente   = String(row[iP]||'').trim().toUpperCase();
         const tipo      = iTi  >= 0 ? String(row[iTi] ||'').trim() : '';
@@ -2581,13 +2583,17 @@ function importarExcelCopec(input) {
 
         if (!fecha || !patente || !monto) return;
 
-        const yaExiste = (appData.combustible).some(r => r.fecha===fecha && r.patente===patente && r.monto===monto);
+        // Deduplicar: si hay N° usar n+patente+fecha (único por fila);
+        // si no hay N°, usar fecha+patente+monto+litros+direccion
+        const yaExiste = n
+          ? appData.combustible.some(r => r.n===n && r.patente===patente && r.fecha===fecha)
+          : appData.combustible.some(r => r.fecha===fecha && r.patente===patente && r.monto===monto && r.litros===litros && r.direccion===direccion);
         if (yaExiste) { duplicados++; return; }
 
         const ma = getMesAnio(fecha);
         appData.combustible.push({
           id: 'CMB-'+Date.now().toString(36).toUpperCase()+'-'+Math.random().toString(36).substr(2,4).toUpperCase(),
-          fecha, patente, tipo, direccion, litros, monto, precioLt,
+          n, fecha, patente, tipo, direccion, litros, monto, precioLt,
           mes: ma.mes, anio: ma.anio
         });
 
