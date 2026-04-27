@@ -3587,9 +3587,24 @@ function _costoTabCopec(mes, anio, flota) {
   const combTotal   = combData.reduce((a,c)=>a+(c.monto||0),0);
   const combLitros  = combData.reduce((a,c)=>a+(parseFloat(c.litros)||0),0);
 
-  // Desglose por patente de todos los registros importados
-  const combPorPat  = {};
+  // Meses disponibles en los datos importados
+  const combMesesDisp = [];
   combData.forEach(c => {
+    const k = (c.anio||'')+'/'+(c.mes||'');
+    if (k !== '/' && combMesesDisp.indexOf(k) === -1) combMesesDisp.push(k);
+  });
+  combMesesDisp.sort().reverse();
+  const combFiltroMes = uiState.combustibleFiltroMes || (combMesesDisp[0]||'');
+  const [combFAnio, combFMes] = combFiltroMes ? combFiltroMes.split('/') : ['',''];
+  const combDataFiltrada = combFiltroMes
+    ? combData.filter(c => c.anio===combFAnio && c.mes===combFMes)
+    : combData;
+  const combTotalF  = combDataFiltrada.reduce((a,c)=>a+(c.monto||0),0);
+  const combLitrosF = combDataFiltrada.reduce((a,c)=>a+(parseFloat(c.litros)||0),0);
+
+  // Desglose por patente del período filtrado
+  const combPorPat = {};
+  combDataFiltrada.forEach(c => {
     const k = c.patente||'Sin patente';
     if (!combPorPat[k]) combPorPat[k] = { monto:0, litros:0, regs:0 };
     combPorPat[k].monto  += c.monto||0;
@@ -3597,16 +3612,33 @@ function _costoTabCopec(mes, anio, flota) {
     combPorPat[k].regs++;
   });
 
+  const MNOMS = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+  const combPeriodoTxt = combFiltroMes
+    ? MNOMS[parseInt(combFMes)-1]+' '+combFAnio
+    : (combData.length ? 'Todos los períodos' : '—');
+
   const combResumenHTML = combData.length ? `
-    <div style="margin-top:8px;background:#E8F5E9;border-radius:7px;padding:8px 10px">
-      <div style="font-size:10px;font-weight:700;color:#2E7D32;margin-bottom:5px">${combData.length} registros · ${combLitros.toFixed(0)}L · $${combTotal.toLocaleString('es-CL')}</div>
-      <div style="display:flex;flex-wrap:wrap;gap:4px">
-        ${Object.entries(combPorPat).sort(([,a],[,b])=>b.monto-a.monto).map(([pat,d])=>`
-          <div style="background:white;border:1px solid #A5D6A7;border-radius:5px;padding:3px 7px;font-size:9px;color:#333">
-            <span style="font-weight:700;color:#2E7D32">${pat}</span> · ${d.regs} cargas · ${d.litros.toFixed(0)}L · $${d.monto.toLocaleString('es-CL')}
-          </div>`).join('')}
+    <div style="margin-top:8px">
+      ${combMesesDisp.length > 1 ? `
+      <div style="margin-bottom:6px">
+        <select onchange="uiState.combustibleFiltroMes=this.value;render()" style="width:100%;padding:5px 7px;border:1px solid #90CAF9;border-radius:6px;font-size:11px">
+          <option value="">Todos los períodos</option>
+          ${combMesesDisp.map(k=>{const p=k.split('/');return '<option value="'+k+'" '+(combFiltroMes===k?'selected':'')+'>'+MNOMS[parseInt(p[1])-1]+' '+p[0]+'</option>';}).join('')}
+        </select>
+      </div>` : ''}
+      <div style="background:#E8F5E9;border-radius:7px;padding:8px 10px">
+        <div style="font-size:10px;font-weight:700;color:#2E7D32;margin-bottom:5px">${combDataFiltrada.length} registros · ${combLitrosF.toFixed(0)}L · $${combTotalF.toLocaleString('es-CL')}</div>
+        <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:6px">
+          ${Object.entries(combPorPat).sort(([,a],[,b])=>b.monto-a.monto).map(([pat,d])=>`
+            <div style="background:white;border:1px solid #A5D6A7;border-radius:5px;padding:3px 7px;font-size:9px;color:#333">
+              <span style="font-weight:700;color:#2E7D32">${pat}</span> · ${d.regs} · ${d.litros.toFixed(0)}L · $${d.monto.toLocaleString('es-CL')}
+            </div>`).join('')}
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+          <button onclick="pdfInformeCombustible('${combFMes}','${combFAnio}')" style="padding:8px;background:#0B2545;color:white;border:none;border-radius:7px;font-size:11px;font-weight:700;cursor:pointer">🖨️ Ver Informe PDF</button>
+          <button onclick="limpiarCombustible()" style="padding:8px;background:#FFEBEE;color:#C62828;border:1px solid #FFCDD2;border-radius:7px;font-size:11px;font-weight:700;cursor:pointer">🗑️ Limpiar datos</button>
+        </div>
       </div>
-      <button onclick="limpiarCombustible()" style="margin-top:6px;padding:4px 10px;background:#FFEBEE;color:#C62828;border:1px solid #FFCDD2;border-radius:5px;font-size:10px;font-weight:700;cursor:pointer">🗑️ Limpiar datos importados</button>
     </div>` : '<div style="font-size:10px;color:#888;margin-top:6px">Sin registros importados aún</div>';
 
   return `
@@ -7092,6 +7124,168 @@ function pdfCombustible() {
       <span>TOTAL: $${totalCopec.toLocaleString('es-CL')}</span>
     </div>
     <script>setTimeout(function(){window.print();},500);<\/script>
+  </body></html>`);
+  w.document.close();
+}
+
+function pdfInformeCombustible(mes, anio) {
+  const todo = appData.combustible || [];
+  const datos = (mes && anio)
+    ? todo.filter(c => c.mes===mes && c.anio===anio)
+    : todo;
+
+  if (!datos.length) { alert('Sin datos de combustible para el período seleccionado.'); return; }
+
+  const MNOMS = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+  const periodoTxt = (mes && anio) ? MNOMS[parseInt(mes)-1]+' '+anio : 'Todos los períodos';
+  const hoyFmt = new Date().toLocaleDateString('es-CL');
+
+  // ── 1. MÉTRICAS RESUMEN ──────────────────────────────────────────
+  const totalLitros = datos.reduce((a,c)=>a+(parseFloat(c.litros)||0),0);
+  const totalMonto  = datos.reduce((a,c)=>a+(c.monto||0),0);
+  const promPrecio  = totalLitros > 0 ? Math.round(totalMonto / totalLitros) : 0;
+  const nCargas     = datos.length;
+
+  // ── 2. CONSUMO POR UNIDAD ──────────────────────────────────────
+  const porUnidad = {};
+  datos.forEach(c => {
+    const k = c.patente || 'Sin patente';
+    if (!porUnidad[k]) porUnidad[k] = { conductor: c.conductor||'—', cargas:0, litros:0, monto:0 };
+    porUnidad[k].cargas++;
+    porUnidad[k].litros += parseFloat(c.litros)||0;
+    porUnidad[k].monto  += c.monto||0;
+    if (c.conductor && !porUnidad[k].conductor.includes(c.conductor)) porUnidad[k].conductor = c.conductor;
+  });
+  const unidadesOrden = Object.entries(porUnidad).sort(([,a],[,b])=>b.monto-a.monto);
+
+  // ── 3. EVOLUCIÓN SEMANAL ────────────────────────────────────────
+  const semanas = { 'Semana 1 (1-7)':{lit:0,mon:0}, 'Semana 2 (8-14)':{lit:0,mon:0}, 'Semana 3 (15-21)':{lit:0,mon:0}, 'Semana 4 (22-28)':{lit:0,mon:0}, 'Semana 5 (29+)':{lit:0,mon:0} };
+  datos.forEach(c => {
+    const p = String(c.fecha||'').split('-');
+    const dia = parseInt(p[0].length===2 ? p[0] : (p[2]||'1'))||1;
+    const sk = dia<=7?'Semana 1 (1-7)':dia<=14?'Semana 2 (8-14)':dia<=21?'Semana 3 (15-21)':dia<=28?'Semana 4 (22-28)':'Semana 5 (29+)';
+    semanas[sk].lit += parseFloat(c.litros)||0;
+    semanas[sk].mon += c.monto||0;
+  });
+
+  // ── 4. DETALLE TRANSACCIONES (ordenado por fecha asc) ──────────
+  const detalle = datos.slice().sort((a,b)=>{
+    const fa = String(a.fecha||''), fb = String(b.fecha||'');
+    // Convertir DD-MM-YYYY a YYYY-MM-DD para comparar
+    const norm = f => { const p=f.split('-'); return p[2]&&p[2].length===4?p[2]+'-'+p[1]+'-'+p[0]:f; };
+    return norm(fa).localeCompare(norm(fb));
+  });
+
+  // ── CSS ──────────────────────────────────────────────────────────
+  const css = `
+    *{box-sizing:border-box}
+    body{font-family:'Segoe UI',Arial,sans-serif;font-size:10px;margin:0;padding:24px;color:#1a1a1a;background:white}
+    .no-print{margin-bottom:18px}@media print{.no-print{display:none!important}}
+    .header{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #E65100;padding-bottom:12px;margin-bottom:18px}
+    .header-left h1{margin:0 0 2px;font-size:20px;color:#0B2545;font-weight:900}
+    .header-left h2{margin:0;font-size:12px;color:#E65100;font-weight:700;letter-spacing:0.5px}
+    .header-right{text-align:right;font-size:9px;color:#888;line-height:1.6}
+    .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:18px}
+    .kpi{background:#FFF8E1;border:1px solid #FFE082;border-radius:8px;padding:10px;text-align:center}
+    .kpi .val{font-size:16px;font-weight:900;color:#E65100}
+    .kpi .lbl{font-size:8px;color:#888;font-weight:700;text-transform:uppercase;margin-top:2px}
+    h3{font-size:11px;font-weight:800;color:#0B2545;letter-spacing:0.5px;border-left:4px solid #E65100;padding-left:8px;margin:18px 0 8px}
+    table{width:100%;border-collapse:collapse;font-size:9px;margin-bottom:4px}
+    thead tr{background:#0B2545}
+    thead th{color:white;padding:6px 8px;text-align:left;font-weight:700;font-size:8px;text-transform:uppercase;letter-spacing:0.4px}
+    tbody tr:nth-child(even){background:#F8F9FA}
+    tbody tr:hover{background:#FFF8E1}
+    td{padding:5px 8px;border-bottom:1px solid #eee}
+    .num{text-align:right}
+    .pat{font-weight:700;color:#E65100}
+    .pct{color:#888}
+    .total-row td{font-weight:800;background:#FFF3E0!important;color:#E65100;border-top:2px solid #E65100}
+    .footer{margin-top:20px;border-top:1px solid #eee;padding-top:8px;font-size:8px;color:#aaa;display:flex;justify-content:space-between}
+  `;
+
+  // ── HTML SECCIONES ───────────────────────────────────────────────
+  const htmlKpis = `
+    <div class="kpis">
+      <div class="kpi"><div class="val">${totalLitros.toLocaleString('es-CL',{maximumFractionDigits:0})}L</div><div class="lbl">Total Litros</div></div>
+      <div class="kpi"><div class="val">$${totalMonto.toLocaleString('es-CL')}</div><div class="lbl">Total Monto</div></div>
+      <div class="kpi"><div class="val">$${promPrecio.toLocaleString('es-CL')}/L</div><div class="lbl">Precio Prom. / Lt</div></div>
+      <div class="kpi"><div class="val">${nCargas}</div><div class="lbl">N° Cargas</div></div>
+    </div>`;
+
+  const htmlUnidades = `
+    <h3>Consumo por Unidad</h3>
+    <table>
+      <thead><tr><th>Patente</th><th>Conductor</th><th class="num">N° Cargas</th><th class="num">Litros</th><th class="num">Monto</th><th class="num">% Flota</th></tr></thead>
+      <tbody>
+        ${unidadesOrden.map(([pat,d])=>{
+          const pct = totalMonto>0 ? (d.monto/totalMonto*100).toFixed(1) : '0.0';
+          return `<tr>
+            <td class="pat">${pat}</td>
+            <td>${d.conductor}</td>
+            <td class="num">${d.cargas}</td>
+            <td class="num">${d.litros.toLocaleString('es-CL',{maximumFractionDigits:0})}L</td>
+            <td class="num">$${d.monto.toLocaleString('es-CL')}</td>
+            <td class="num pct">${pct}%</td>
+          </tr>`;
+        }).join('')}
+        <tr class="total-row"><td colspan="2">TOTAL FLOTA</td><td class="num">${nCargas}</td><td class="num">${totalLitros.toLocaleString('es-CL',{maximumFractionDigits:0})}L</td><td class="num">$${totalMonto.toLocaleString('es-CL')}</td><td class="num">100%</td></tr>
+      </tbody>
+    </table>`;
+
+  const htmlSemanal = `
+    <h3>Evolución Semanal</h3>
+    <table>
+      <thead><tr><th>Semana</th><th class="num">Litros</th><th class="num">Monto</th><th class="num">Precio Prom./Lt</th></tr></thead>
+      <tbody>
+        ${Object.entries(semanas).filter(([,d])=>d.mon>0).map(([sem,d])=>`
+          <tr><td>${sem}</td><td class="num">${d.lit.toLocaleString('es-CL',{maximumFractionDigits:0})}L</td><td class="num">$${d.mon.toLocaleString('es-CL')}</td><td class="num">${d.lit>0?'$'+Math.round(d.mon/d.lit).toLocaleString('es-CL'):'—'}/L</td></tr>`).join('')}
+      </tbody>
+    </table>`;
+
+  const htmlDetalle = `
+    <h3>Detalle de Transacciones</h3>
+    <table>
+      <thead><tr><th>Fecha</th><th>Patente</th><th>Conductor</th><th class="num">Litros</th><th class="num">Monto</th><th class="num">Precio/Lt</th></tr></thead>
+      <tbody>
+        ${detalle.map(c=>{
+          const precioLt = (c.precioLt>0) ? c.precioLt : ((parseFloat(c.litros)||0)>0 ? Math.round(c.monto/(parseFloat(c.litros)||1)) : 0);
+          return `<tr>
+            <td>${c.fecha||'—'}</td>
+            <td class="pat">${c.patente||'—'}</td>
+            <td>${c.conductor||'—'}</td>
+            <td class="num">${c.litros||'—'}L</td>
+            <td class="num">$${(c.monto||0).toLocaleString('es-CL')}</td>
+            <td class="num">${precioLt>0?'$'+precioLt.toLocaleString('es-CL')+'/L':'—'}</td>
+          </tr>`;
+        }).join('')}
+      </tbody>
+    </table>`;
+
+  const w = window.open('','_blank');
+  w.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Informe Combustible ${periodoTxt}</title><style>${css}</style></head><body>
+    <div class="no-print">
+      <button onclick="window.print()" style="background:#0B2545;color:white;border:none;border-radius:8px;padding:10px 26px;font-size:13px;font-weight:700;cursor:pointer">🖨️ Imprimir / Guardar PDF</button>
+    </div>
+    <div class="header">
+      <div class="header-left">
+        <h1>Global Solutions SpA</h1>
+        <h2>⛽ Informe de Consumo de Combustible</h2>
+      </div>
+      <div class="header-right">
+        <div><strong>Período:</strong> ${periodoTxt}</div>
+        <div><strong>Generado:</strong> ${hoyFmt}</div>
+        <div style="color:#E65100;font-weight:700">CONFIDENCIAL</div>
+      </div>
+    </div>
+    ${htmlKpis}
+    ${htmlUnidades}
+    ${htmlSemanal}
+    ${htmlDetalle}
+    <div class="footer">
+      <span>Global Solutions SpA · Informe de Combustible · ${periodoTxt}</span>
+      <span>Generado el ${hoyFmt}</span>
+    </div>
+    <script>setTimeout(function(){window.print();},600);<\/script>
   </body></html>`);
   w.document.close();
 }
