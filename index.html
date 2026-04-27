@@ -2524,17 +2524,35 @@ function importarExcelCopec(input) {
       // Buscar hoja 'Registro Completo' o usar la primera
       const sheetName = wb.SheetNames.find(n => n.toLowerCase().includes('registro') || n.toLowerCase().includes('completo')) || wb.SheetNames[0];
       const ws = wb.Sheets[sheetName];
-      // Leer como array de arrays, saltando las 2 primeras filas de encabezado
       const rows = XLSX.utils.sheet_to_json(ws, { header:1, defval:'', raw:false });
-      const dataRows = rows.slice(2); // saltar 2 filas de encabezado
+
+      // Buscar la fila de encabezado por nombre de columna (no por posición fija)
+      const normH = s => String(s||'').toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^A-Z0-9\/]/g,' ').replace(/\s+/g,' ').trim();
+      let headerRowIdx = -1;
+      for (let ri = 0; ri < Math.min(6, rows.length); ri++) {
+        if (rows[ri].map(normH).some(h => h==='FECHA' || h==='PATENTE')) { headerRowIdx = ri; break; }
+      }
+      if (headerRowIdx === -1) throw new Error('Encabezado no encontrado — el archivo debe tener columnas FECHA y PATENTE');
+
+      const headers = rows[headerRowIdx].map(normH);
+      // Encontrar cada columna por nombre (MONTO y PRECIO/LT pueden llevar sufijo de moneda)
+      const iF   = headers.findIndex(h => h === 'FECHA');
+      const iP   = headers.findIndex(h => h === 'PATENTE');
+      const iTi  = headers.findIndex(h => h === 'TIPO');
+      const iDir = headers.findIndex(h => h === 'DIRECCION' || h === 'DIRECCION ' || h.startsWith('DIRECC'));
+      const iL   = headers.findIndex(h => h === 'LITROS');
+      const iM   = headers.findIndex(h => h === 'MONTO' || h.startsWith('MONTO '));
+      const iPL  = headers.findIndex(h => h === 'PRECIO LT' || h.startsWith('PRECIO LT') || h.startsWith('PRECIO/LT'));
+
+      if (iF < 0 || iP < 0 || iM < 0) throw new Error('Columnas requeridas no encontradas. Detectadas: ' + rows[headerRowIdx].join(' | '));
+
+      const dataRows = rows.slice(headerRowIdx + 1);
 
       const parseNum = v => Math.abs(parseFloat(String(v||'').replace(/\./g,'').replace(',','.').replace(/[^\d.]/g,''))||0);
       const parseFecha = v => {
         const s = String(v||'').trim();
-        // DD/MM/YYYY o DD-MM-YYYY → DD-MM-YYYY
         const m = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
         if (m) return m[1].padStart(2,'0')+'-'+m[2].padStart(2,'0')+'-'+m[3];
-        // YYYY-MM-DD
         const m2 = s.match(/^(\d{4})[\/\-](\d{2})[\/\-](\d{2})$/);
         if (m2) return m2[3]+'-'+m2[2]+'-'+m2[1];
         return s;
@@ -2553,24 +2571,23 @@ function importarExcelCopec(input) {
 
       dataRows.forEach(row => {
         if (!row || row.every(c => c==='' || c===null || c===undefined)) return;
-        // Columnas: N°(0), FECHA(1), PATENTE(2), CONDUCTOR(3), LITROS(4), MONTO(5), PRECIO/LT(6,7,8)
-        const fecha    = parseFecha(row[1]);
-        const patente  = String(row[2]||'').trim().toUpperCase();
-        const conductor= String(row[3]||'').trim();
-        const litros   = parseNum(row[4]);
-        const monto    = parseNum(row[5]);
-        const precioLt = parseNum(row[6]) || parseNum(row[7]) || parseNum(row[8]);
+        const fecha     = parseFecha(row[iF]);
+        const patente   = String(row[iP]||'').trim().toUpperCase();
+        const tipo      = iTi  >= 0 ? String(row[iTi] ||'').trim() : '';
+        const direccion = iDir >= 0 ? String(row[iDir]||'').trim() : '';
+        const litros    = iL   >= 0 ? parseNum(row[iL])  : 0;
+        const monto     = parseNum(row[iM]);
+        const precioLt  = iPL  >= 0 ? parseNum(row[iPL]) : 0;
 
-        if (!fecha || !patente || !monto) return; // fila inválida
+        if (!fecha || !patente || !monto) return;
 
-        // Deduplicar por fecha+patente+monto
         const yaExiste = (appData.combustible).some(r => r.fecha===fecha && r.patente===patente && r.monto===monto);
         if (yaExiste) { duplicados++; return; }
 
         const ma = getMesAnio(fecha);
         appData.combustible.push({
           id: 'CMB-'+Date.now().toString(36).toUpperCase()+'-'+Math.random().toString(36).substr(2,4).toUpperCase(),
-          fecha, patente, conductor, litros, monto, precioLt,
+          fecha, patente, tipo, direccion, litros, monto, precioLt,
           mes: ma.mes, anio: ma.anio
         });
 
