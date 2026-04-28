@@ -17,7 +17,7 @@ if ('serviceWorker' in navigator) {
 </script>
 <script>
 (function() {
-  var VERSION = '1777200001';
+  var VERSION = '1777200002';
   var stored = localStorage.getItem('gs_app_version');
   if (stored !== VERSION) {
     var session = localStorage.getItem('gs_session');
@@ -6124,6 +6124,13 @@ function loadData() {
     // Eliminar duplicados
     appData.conductores = [...new Set(appData.conductores)];
   }
+  // Migración: insertar Francisco Mancilla en índice 3 (PIN 0008) si no existe
+  if (!appData.conductores) appData.conductores = ['Manuel Madrid','Felipe Vidal','Felipe Madariaga','Francisco Mancilla','Sebastián Zúñiga','Pablo Riquelme'];
+  if (!appData.conductores.includes('Francisco Mancilla')) {
+    const idx = appData.conductores.indexOf('Sebastián Zúñiga');
+    if (idx !== -1) appData.conductores.splice(idx, 0, 'Francisco Mancilla');
+    else appData.conductores.splice(3, 0, 'Francisco Mancilla');
+  }
   if (appData.dashboard.gasto_real === undefined) appData.dashboard.gasto_real = 0;
   // PE siempre calculado desde costos fijos con margen 25%
   appData.dashboard.meta_pe = Math.round(appData.dashboard.gasto_meta / 0.25);
@@ -8166,6 +8173,7 @@ function renderFase(fase) {
           const clientesActivos=[...new Set([...clientesDefault,...clientesLocal])].sort();
           const conductoresDefault=['Manuel Madrid','Felipe Vidal','Felipe Madariaga','Francisco Mancilla','Sebastián Zúñiga','Pablo Riquelme','Tercero'];
           if(!appData.conductores||appData.conductores.length<2){appData.conductores=conductoresDefault;saveData();}
+          if(!appData.conductores.includes('Francisco Mancilla')){const fi=appData.conductores.indexOf('Sebastián Zúñiga');if(fi!==-1)appData.conductores.splice(fi,0,'Francisco Mancilla');else appData.conductores.splice(3,0,'Francisco Mancilla');saveData();}
           if(!appData.conductores.includes('Tercero')){appData.conductores.push('Tercero');saveData();}
           const conductoresLista=appData.conductores;
           const patentesLista=appData.patentes||['WR9192','GKFD84','XR8555','GCFF12','BPBL35','XA1114','DSDV36'];
