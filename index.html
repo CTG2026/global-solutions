@@ -17,7 +17,7 @@ if ('serviceWorker' in navigator) {
 </script>
 <script>
 (function() {
-  var VERSION = '1777200002';
+  var VERSION = '1777200003';
   var stored = localStorage.getItem('gs_app_version');
   if (stored !== VERSION) {
     var session = localStorage.getItem('gs_session');
@@ -6130,6 +6130,13 @@ function loadData() {
     const idx = appData.conductores.indexOf('Sebastián Zúñiga');
     if (idx !== -1) appData.conductores.splice(idx, 0, 'Francisco Mancilla');
     else appData.conductores.splice(3, 0, 'Francisco Mancilla');
+    saveData();
+  }
+  // Migración: agregar Francisco Mancilla a remuneraciones si no existe
+  if (!appData.remuneraciones) appData.remuneraciones = JSON.parse(JSON.stringify(DEFAULT_DATA.remuneraciones));
+  if (!appData.remuneraciones.some(e => e.nombre === 'Francisco Mancilla')) {
+    appData.remuneraciones.push({ id:'EMP-007', nombre:'Francisco Mancilla', cargo:'Conductor', area:'Operaciones', activo:true, liquidaciones:[] });
+    saveData();
   }
   if (appData.dashboard.gasto_real === undefined) appData.dashboard.gasto_real = 0;
   // PE siempre calculado desde costos fijos con margen 25%
