@@ -17,7 +17,7 @@ if ('serviceWorker' in navigator) {
 </script>
 <script>
 (function() {
-  var VERSION = '1777200003';
+  var VERSION = '1777200004';
   var stored = localStorage.getItem('gs_app_version');
   if (stored !== VERSION) {
     var session = localStorage.getItem('gs_session');
@@ -1366,13 +1366,28 @@ function renderCierreServicios() {
     : todosServicios;
   const clientesCierre = [...new Set(serviciosPeriodo.map(s=>(s.cliente||'').trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'es'));
   const filtroCliente  = uiState.cs_filtro_cliente || '';
-  const servicios = filtroCliente ? serviciosPeriodo.filter(s=>(s.cliente||'').trim()===filtroCliente) : serviciosPeriodo;
-  const sinCerrar = servicios.filter(s=>!s.cerrado).length;
+  const filtroEstado   = uiState.cs_filtro_estado  || 'todos';
+  const serviciosFiltCliente = filtroCliente ? serviciosPeriodo.filter(s=>(s.cliente||'').trim()===filtroCliente) : serviciosPeriodo;
+  const servicios = filtroEstado === 'pendiente' ? serviciosFiltCliente.filter(s=>!s.cerrado&&!s.precio)
+                  : filtroEstado === 'borrador'  ? serviciosFiltCliente.filter(s=>!s.cerrado&&s.precio)
+                  : filtroEstado === 'cerrado'   ? serviciosFiltCliente.filter(s=>s.cerrado)
+                  : serviciosFiltCliente;
+  const sinCerrar     = serviciosFiltCliente.filter(s=>!s.cerrado).length;
+  const nPendientes   = serviciosFiltCliente.filter(s=>!s.cerrado&&!s.precio).length;
+  const nBorradores   = serviciosFiltCliente.filter(s=>!s.cerrado&&s.precio).length;
+  const nCerrados     = serviciosFiltCliente.filter(s=>s.cerrado).length;
   const cfPorServ = serviciosPeriodo.length > 0 ? Math.round(CF_MES / serviciosPeriodo.length) : 0;
+  const btnEst = (val, label, count, bg, col) => `<button onclick="uiState.cs_filtro_estado='${val}';render()" style="padding:5px 10px;border-radius:6px;border:2px solid ${filtroEstado===val?col:'#CFD8DC'};background:${filtroEstado===val?bg:'white'};color:${filtroEstado===val?col:'#546E7A'};font-size:10px;font-weight:700;cursor:pointer;flex:1">${label} <span style="font-size:9px;opacity:0.8">(${count})</span></button>`;
   return `<div style="padding:2px">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:wrap;gap:6px">
-      <div style="font-size:9px;font-weight:700;color:#546E7A;letter-spacing:0.5px">${sinCerrar} PENDIENTES · ${servicios.length - sinCerrar} CERRADOS${filtroCliente?' (filtrado)':''}</div>
+      <div style="font-size:9px;font-weight:700;color:#546E7A;letter-spacing:0.5px">${sinCerrar} PENDIENTES · ${nCerrados} CERRADOS${filtroCliente?' (filtrado)':''}</div>
       <div style="font-size:9px;color:#888">CF/servicio: $${cfPorServ.toLocaleString('es-CL')}</div>
+    </div>
+    <div style="display:flex;gap:5px;margin-bottom:8px;flex-wrap:wrap">
+      ${btnEst('todos',    'Todos',     serviciosFiltCliente.length, '#ECEFF1', '#546E7A')}
+      ${btnEst('pendiente','⏳ Pend.',  nPendientes,                 '#FFEBEE', '#C62828')}
+      ${btnEst('borrador', '📝 Borrad.',nBorradores,                 '#FFF3E0', '#E65100')}
+      ${btnEst('cerrado',  '✓ Cerrad.', nCerrados,                   '#E8F5E9', '#2E7D32')}
     </div>
     <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;flex-wrap:wrap">
       <div style="font-size:9px;font-weight:700;color:#546E7A">PERÍODO:</div>
