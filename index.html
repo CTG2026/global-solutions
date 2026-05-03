@@ -17,7 +17,7 @@ if ('serviceWorker' in navigator) {
 </script>
 <script>
 (function() {
-  var VERSION = '1777828637';
+  var VERSION = '1777828638';
   var stored = localStorage.getItem('gs_app_version');
   if (stored !== VERSION) {
     var session = localStorage.getItem('gs_session');
@@ -11089,16 +11089,19 @@ const _IG_RUTAS = {
   km_ruta_fruta:    'Ruta Fruta',
 };
 
+function igNorm(s) {
+  return String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase().trim();
+}
+
 async function igBuscarTarifario(destino) {
   if (!supa || !destino) return null;
-  const term = destino.split('/')[0].trim();
-  const { data, error } = await supa
-    .from('tarifario_sollem')
-    .select('*')
-    .ilike('destino', `%${term}%`)
-    .limit(1);
+  const { data, error } = await supa.from('tarifario_sollem').select('*');
   if (error || !data?.length) return null;
-  return data[0];
+  const term = igNorm(destino.split('/')[0].trim());
+  return data.find(r => {
+    const rd = igNorm(r.destino);
+    return rd.includes(term) || term.includes(rd);
+  }) || null;
 }
 
 async function igConsultarTarifarios(guias) {
