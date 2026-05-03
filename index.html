@@ -17,7 +17,7 @@ if ('serviceWorker' in navigator) {
 </script>
 <script>
 (function() {
-  var VERSION = '1777400004';
+  var VERSION = '1777400005';
   var stored = localStorage.getItem('gs_app_version');
   if (stored !== VERSION) {
     var session = localStorage.getItem('gs_session');
@@ -10862,10 +10862,9 @@ function toggleMidiaAmb(faseId) {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// INGRESO DE GUÍAS — Gemini Vision
+// INGRESO DE GUÍAS — Claude Vision
 // ═══════════════════════════════════════════════════════════════
-const _GEMINI_KEY = 'AIzaSyDo9rqgUIYV8Kjkc0U53a7T0rdbn8Ri8To';
-const _GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${_GEMINI_KEY}`;
+const _CLAUDE_URL = 'https://api.anthropic.com/v1/messages';
 window._igFotos = window._igFotos || []; // [{name, base64, mediaType, previewUrl}]
 
 function renderIngresoGuias() {
@@ -10879,6 +10878,19 @@ function renderIngresoGuias() {
   const labelSt = 'font-size:9px;font-weight:700;color:#888;margin-bottom:3px;display:block;letter-spacing:0.5px';
 
   // ── Zona de subida ──
+  const apiKey = appData.claudeApiKey || '';
+  const zonaKey = `
+    <div style="background:white;border-radius:12px;padding:14px;margin-bottom:12px;border:1px solid ${apiKey?'#C8E6C9':'#FFCDD2'};box-shadow:0 1px 4px rgba(0,0,0,0.06)">
+      <div style="font-size:11px;font-weight:800;color:#455A64;letter-spacing:1px;margin-bottom:10px">🔑 API KEY CLAUDE</div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <input type="password" id="igApiKeyInput" value="${apiKey.replace(/"/g,'&quot;')}" placeholder="sk-ant-api03-..."
+          style="flex:1;border:1px solid #dde;border-radius:7px;padding:8px 10px;font-size:12px;font-family:monospace;outline:none;background:white;box-sizing:border-box">
+        <button onclick="appData.claudeApiKey=document.getElementById('igApiKeyInput').value;saveData();render()"
+          style="padding:8px 14px;background:#0B2545;color:white;border:none;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap">💾 Guardar</button>
+      </div>
+      ${apiKey?'<div style="font-size:9px;color:#2E7D32;margin-top:5px;font-weight:700">✓ Key configurada</div>':'<div style="font-size:9px;color:#C62828;margin-top:5px;font-weight:700">⚠ Ingresa tu API key para usar Claude</div>'}
+    </div>`;
+
   const zonaSubida = `
     <div style="background:white;border-radius:12px;padding:14px;margin-bottom:12px;border:1px solid #e0e0e0;box-shadow:0 1px 4px rgba(0,0,0,0.06)">
       <div style="font-size:11px;font-weight:800;color:#455A64;letter-spacing:1px;margin-bottom:12px;padding-bottom:8px;border-bottom:2px solid #ECEFF1">📷 FOTOS DE GUÍAS</div>
@@ -10960,9 +10972,10 @@ function renderIngresoGuias() {
   return `<div style="padding:10px;max-width:600px;margin:0 auto">
     <div style="font-size:14px;font-weight:900;color:#0B2545;margin-bottom:14px;display:flex;align-items:center;gap:8px">
       📋 Ingreso de Guías
-      <span style="font-size:9px;font-weight:700;background:#FFF9C4;color:#F9A825;padding:2px 8px;border-radius:8px">GEMINI AI</span>
+      <span style="font-size:9px;font-weight:700;background:#FFF9C4;color:#F9A825;padding:2px 8px;border-radius:8px">CLAUDE AI</span>
     </div>
     ${resumen}
+    ${zonaKey}
     ${zonaSubida}
     ${tarjetas}
   </div>`;
@@ -11016,13 +11029,18 @@ function igEliminarFoto(idx) {
 async function igAnalizar() {
   const fotos = window._igFotos || [];
   if (!fotos.length) return;
+  const key = appData.claudeApiKey || '';
+  if (!key) { uiState.igError = 'Configura tu API key de Claude primero.'; render(); return; }
   uiState.igCargando = true;
   uiState.igError = '';
   render();
 
   try {
-    const parts = fotos.map(f => ({ inlineData: { mimeType: f.mediaType, data: f.base64 } }));
-    parts.push({ text: `Analiza ${fotos.length === 1 ? 'esta guía de despacho' : 'estas guías de despacho'}.
+    const imageBlocks = fotos.map(f => ({
+      type: 'image',
+      source: { type: 'base64', media_type: 'image/jpeg', data: f.base64 }
+    }));
+    const prompt = `Analiza ${fotos.length === 1 ? 'esta guía de despacho' : 'estas guías de despacho'}.
 Devuelve ÚNICAMENTE un array JSON válido, sin markdown ni texto adicional.
 Cada objeto representa UNA guía con estos campos:
 - num_guia: número de guía o folio (string)
@@ -11033,12 +11051,21 @@ Cada objeto representa UNA guía con estos campos:
 - patente: patente del vehículo sin guión (ej: "WR9192"), null si no aparece
 - conductor: nombre del conductor o chofer, null si no aparece
 - kg: kilogramos como número entero, null si no aparece
-Si un campo no se puede leer usa null. Responde solo el array JSON.` });
+Si un campo no se puede leer usa null. Responde solo el array JSON.`;
 
-    const resp = await fetch(_GEMINI_URL, {
+    const resp = await fetch(_CLAUDE_URL, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ contents: [{ parts }] })
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': key,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-request-origin': 'true'
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 1024,
+        messages: [{ role: 'user', content: [...imageBlocks, { type: 'text', text: prompt }] }]
+      })
     });
 
     if (!resp.ok) {
@@ -11047,7 +11074,7 @@ Si un campo no se puede leer usa null. Responde solo el array JSON.` });
     }
 
     const data = await resp.json();
-    const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    const text = data.content?.[0]?.text || '';
     const clean = text.trim().replace(/^```(?:json)?\s*/i,'').replace(/\s*```$/,'').trim();
     let parsed = JSON.parse(clean);
     if (!Array.isArray(parsed)) parsed = [parsed];
