@@ -17,7 +17,7 @@ if ('serviceWorker' in navigator) {
 </script>
 <script>
 (function() {
-  var VERSION = '1777400002';
+  var VERSION = '1777400003';
   var stored = localStorage.getItem('gs_app_version');
   if (stored !== VERSION) {
     var session = localStorage.getItem('gs_session');
@@ -10985,6 +10985,28 @@ function igAgregarFotos(event) {
   }));
   Promise.all(promises).then(() => render());
 }
+
+document.addEventListener('paste', function igPaste(ev) {
+  if (vistaActual !== 'guias') return;
+  const items = Array.from(ev.clipboardData?.items || []).filter(it => it.type.startsWith('image/'));
+  if (!items.length) return;
+  ev.preventDefault();
+  const n = (window._igFotos||[]).length;
+  const promises = items.map((item, i) => new Promise(resolve => {
+    const blob = item.getAsFile();
+    if (!blob) return resolve();
+    const ext = item.type.split('/')[1] || 'png';
+    const reader = new FileReader();
+    reader.onload = e => {
+      const dataUrl = e.target.result;
+      window._igFotos = window._igFotos || [];
+      window._igFotos.push({ name: `pegado-${n+i+1}.${ext}`, base64: dataUrl.split(',')[1], mediaType: item.type, previewUrl: dataUrl });
+      resolve();
+    };
+    reader.readAsDataURL(blob);
+  }));
+  Promise.all(promises).then(() => render());
+});
 
 function igEliminarFoto(idx) {
   window._igFotos = (window._igFotos||[]).filter((_,i)=>i!==idx);
