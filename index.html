@@ -17,7 +17,7 @@ if ('serviceWorker' in navigator) {
 </script>
 <script>
 (function() {
-  var VERSION = '1777400006';
+  var VERSION = '1777400007';
   var stored = localStorage.getItem('gs_app_version');
   if (stored !== VERSION) {
     var session = localStorage.getItem('gs_session');
@@ -11026,6 +11026,15 @@ function igEliminarFoto(idx) {
   render();
 }
 
+function igDetectarTipo(base64) {
+  const h = base64.slice(0, 12);
+  if (h.startsWith('/9j/'))   return 'image/jpeg';
+  if (h.startsWith('iVBOR'))  return 'image/png';
+  if (h.startsWith('R0lGO'))  return 'image/gif';
+  if (h.startsWith('UklGR'))  return 'image/webp';
+  return 'image/jpeg';
+}
+
 async function igAnalizar() {
   const fotos = window._igFotos || [];
   if (!fotos.length) return;
@@ -11038,7 +11047,7 @@ async function igAnalizar() {
   try {
     const imageBlocks = fotos.map(f => ({
       type: 'image',
-      source: { type: 'base64', media_type: 'image/jpeg', data: f.base64 }
+      source: { type: 'base64', media_type: igDetectarTipo(f.base64), data: f.base64 }
     }));
     const prompt = `Analiza ${fotos.length === 1 ? 'esta guía de despacho' : 'estas guías de despacho'}.
 Devuelve ÚNICAMENTE un array JSON válido, sin markdown ni texto adicional.
