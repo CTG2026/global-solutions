@@ -17,7 +17,7 @@ if ('serviceWorker' in navigator) {
 </script>
 <script>
 (function() {
-  var VERSION = '1777828638';
+  var VERSION = '1777828639';
   var stored = localStorage.getItem('gs_app_version');
   if (stored !== VERSION) {
     var session = localStorage.getItem('gs_session');
@@ -10918,14 +10918,16 @@ function renderIngresoGuias() {
 
   // ── Campos de cada guía extraída ──
   const CAMPOS_GUIA = [
-    {k:'num_guia',  label:'N° Guía',           required:true},
-    {k:'fecha',     label:'Fecha emisión',      required:true},
-    {k:'cliente',   label:'Cliente',            required:true},
-    {k:'patente',   label:'Patente',            required:true},
-    {k:'conductor', label:'Conductor',          required:false},
-    {k:'origen',    label:'Origen',             required:false},
-    {k:'destino',   label:'Destino(s)',         required:false},
-    {k:'kg',        label:'KG',                 required:false},
+    {k:'num_guia',       label:'N° Guía',              required:true},
+    {k:'fecha',          label:'Fecha emisión',         required:true},
+    {k:'cliente',        label:'Cliente',               required:true},
+    {k:'patente',        label:'Patente',               required:true},
+    {k:'conductor',      label:'Conductor',             required:false},
+    {k:'origen',         label:'Origen',                required:false},
+    {k:'destino',        label:'Destino(s)',            required:false},
+    {k:'kg',             label:'KG',                    required:false},
+    {k:'fecha_despacho', label:'Fecha despacho (Casablanca)', required:false, isFecha:true},
+    {k:'fecha_entrega',  label:'Fecha entrega (manuscrita)',  required:false, isFecha:true},
   ];
 
   const tarjetas = guias.map((g, gi) => {
@@ -10955,10 +10957,14 @@ function renderIngresoGuias() {
           const borderC  = missing ? '#EF9A9A' : confirm ? '#FFB74D' : '#dde';
           const labelC   = missing ? '#C62828'  : confirm ? '#E65100' : '#888';
           const icon     = confirm ? ' ⚠' : (c.required?' *':'');
-          return `<div style="${c.k==='destino'||c.k==='cliente'?'grid-column:1/-1':''}">
+          const fullWidth = c.k==='destino'||c.k==='cliente'||c.isFecha;
+          const evHandler = c.isFecha
+            ? `onblur="igEditarCampo(${gi},'${c.k}',this.value);render()"`
+            : `oninput="igEditarCampo(${gi},'${c.k}',this.value)"`;
+          return `<div style="${fullWidth?'grid-column:1/-1':''}">
             <label style="${labelSt}color:${labelC}">${c.label}${icon}</label>
-            <input type="text" value="${val.replace(/"/g,'&quot;')}"
-              oninput="igEditarCampo(${gi},'${c.k}',this.value)"
+            <input type="text" value="${val.replace(/"/g,'&quot;')}" placeholder="${c.isFecha?'DD-MM-YYYY':''}"
+              ${evHandler}
               style="${inpSt}border-color:${borderC};${confirm?'background:#FFF8E1;':''}">
           </div>`;
         }).join('')}
@@ -11010,6 +11016,28 @@ function renderIngresoGuias() {
               <div style="font-size:8px;color:#888;font-weight:700">KM RUTA SELECCIONADA</div>
               <div style="font-size:13px;font-weight:800;color:#37474F">${kmSel} km</div>
             </div>` : ''}
+          </div>
+        </div>`;
+      })()}
+      ${(() => {
+        const dias = igDiasHabiles(g.fecha_despacho, g.fecha_entrega);
+        if (dias === null) return '';
+        const clp = v => '$' + Math.round(v).toLocaleString('es-CL');
+        const items = [
+          {label:'VIÁTICO',          rate:12000,  val:dias*12000},
+          {label:'SUELDO BASE',       rate:33000,  val:dias*33000},
+          {label:'COSTOS FIJOS',      rate:40800,  val:dias*40800},
+          {label:'MANTENCIÓN',        rate:25000,  val:dias*25000},
+        ];
+        return `<div style="margin:0 12px 10px;background:#EDE7F6;border:1px solid #CE93D8;border-radius:9px;padding:10px">
+          <div style="font-size:9px;font-weight:800;color:#6A1B9A;letter-spacing:0.8px;margin-bottom:6px">📅 DÍAS HÁBILES Y COSTOS</div>
+          <div style="font-size:15px;font-weight:900;color:#4A148C;margin-bottom:8px">Días hábiles: ${dias}</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+            ${items.map(it=>`<div style="background:white;border-radius:6px;padding:6px 8px">
+              <div style="font-size:8px;color:#888;font-weight:700">${it.label}</div>
+              <div style="font-size:13px;font-weight:800;color:#4A148C">${clp(it.val)}</div>
+              <div style="font-size:8px;color:#bbb">${clp(it.rate)}/día</div>
+            </div>`).join('')}
           </div>
         </div>`;
       })()}
@@ -11088,6 +11116,34 @@ const _IG_RUTAS = {
   km_ruta68_5norte: 'Ruta 68 / 5 Norte',
   km_ruta_fruta:    'Ruta Fruta',
 };
+
+const _FERIADOS_2026 = new Set([
+  '2026-01-01','2026-04-03','2026-04-04','2026-05-01',
+  '2026-05-21','2026-06-21','2026-06-29','2026-07-16',
+  '2026-08-15','2026-09-18','2026-09-19','2026-10-12',
+  '2026-10-31','2026-11-01','2026-12-08','2026-12-25',
+]);
+
+function igDiasHabiles(d1, d2) {
+  const parse = s => {
+    if (!s) return null;
+    const p = s.split('-');
+    if (p.length !== 3 || p[0].length !== 2) return null;
+    const d = new Date(+p[2], +p[1]-1, +p[0]);
+    return isNaN(d) ? null : d;
+  };
+  const a = parse(d1), b = parse(d2);
+  if (!a || !b || b < a) return null;
+  let dias = 0;
+  const cur = new Date(a);
+  while (cur <= b) {
+    const dow = cur.getDay();
+    const iso = cur.toISOString().slice(0,10);
+    if (dow !== 0 && dow !== 6 && !_FERIADOS_2026.has(iso)) dias++;
+    cur.setDate(cur.getDate() + 1);
+  }
+  return dias;
+}
 
 function igNorm(s) {
   return String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase().trim();
@@ -11216,8 +11272,10 @@ Si un campo no se puede leer usa null. Responde solo el array JSON.`;
       origen:    String(g.origen    || '').trim(),
       destino:   String(g.destino   || '').trim(),
       patente:   String(g.patente   || '').toUpperCase().replace(/[^A-Z0-9]/g,''),
-      conductor: String(g.conductor || '').trim(),
-      kg:        g.kg != null ? String(g.kg) : '',
+      conductor:      String(g.conductor || '').trim(),
+      kg:             g.kg != null ? String(g.kg) : '',
+      fecha_despacho: String(g.fecha || '').trim(),
+      fecha_entrega:  '',
       _confirm:  Array.isArray(g.requires_confirmation) ? g.requires_confirmation : [],
     }));
 
