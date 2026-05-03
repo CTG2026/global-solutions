@@ -17,7 +17,7 @@ if ('serviceWorker' in navigator) {
 </script>
 <script>
 (function() {
-  var VERSION = '1777828635';
+  var VERSION = '1777828636';
   var stored = localStorage.getItem('gs_app_version');
   if (stored !== VERSION) {
     var session = localStorage.getItem('gs_session');
@@ -10930,14 +10930,17 @@ function renderIngresoGuias() {
 
   const tarjetas = guias.map((g, gi) => {
     const yaGuardado = guardados.includes(gi);
-    const falta = CAMPOS_GUIA.filter(c=>c.required && !(g[c.k]||'').trim()).length;
-    const borderCol = yaGuardado ? '#A5D6A7' : falta ? '#FFCDD2' : '#BBDEFB';
-    const bgHead    = yaGuardado ? '#E8F5E9'  : falta ? '#FFEBEE' : '#E3F2FD';
+    const falta   = CAMPOS_GUIA.filter(c=>c.required && !(g[c.k]||'').trim()).length;
+    const nConfirm = (g._confirm||[]).length;
+    const borderCol = yaGuardado ? '#A5D6A7' : falta ? '#FFCDD2' : nConfirm ? '#FFE0B2' : '#BBDEFB';
+    const bgHead    = yaGuardado ? '#E8F5E9'  : falta ? '#FFEBEE' : nConfirm ? '#FFF3E0' : '#E3F2FD';
     const badge     = yaGuardado
       ? '<span style="font-size:9px;background:#2E7D32;color:white;padding:2px 8px;border-radius:8px;font-weight:700">✓ GUARDADO</span>'
       : falta
         ? `<span style="font-size:9px;background:#FFCDD2;color:#C62828;padding:2px 8px;border-radius:8px;font-weight:700">⚠ ${falta} campo(s)</span>`
-        : '<span style="font-size:9px;background:#BBDEFB;color:#1565C0;padding:2px 8px;border-radius:8px;font-weight:700">✓ Completo</span>';
+        : nConfirm
+          ? `<span style="font-size:9px;background:#FFE0B2;color:#E65100;padding:2px 8px;border-radius:8px;font-weight:700">⚠ ${nConfirm} confirmar</span>`
+          : '<span style="font-size:9px;background:#BBDEFB;color:#1565C0;padding:2px 8px;border-radius:8px;font-weight:700">✓ Completo</span>';
 
     return `<div style="background:white;border:2px solid ${borderCol};border-radius:12px;margin-bottom:12px;overflow:hidden">
       <div style="background:${bgHead};padding:10px 14px;display:flex;justify-content:space-between;align-items:center">
@@ -10947,12 +10950,16 @@ function renderIngresoGuias() {
       <div style="padding:12px;display:grid;grid-template-columns:1fr 1fr;gap:8px">
         ${CAMPOS_GUIA.map(c=>{
           const val = g[c.k]||'';
-          const missing = c.required && !val.trim();
+          const missing  = c.required && !val.trim();
+          const confirm  = !missing && (g._confirm||[]).includes(c.k);
+          const borderC  = missing ? '#EF9A9A' : confirm ? '#FFB74D' : '#dde';
+          const labelC   = missing ? '#C62828'  : confirm ? '#E65100' : '#888';
+          const icon     = confirm ? ' ⚠' : (c.required?' *':'');
           return `<div style="${c.k==='destino'||c.k==='cliente'?'grid-column:1/-1':''}">
-            <label style="${labelSt}color:${missing?'#C62828':'#888'}">${c.label}${c.required?' *':''}</label>
+            <label style="${labelSt}color:${labelC}">${c.label}${icon}</label>
             <input type="text" value="${val.replace(/"/g,'&quot;')}"
               oninput="igEditarCampo(${gi},'${c.k}',this.value)"
-              style="${inpSt}border-color:${missing?'#EF9A9A':'#dde'}">
+              style="${inpSt}border-color:${borderC};${confirm?'background:#FFF8E1;':''}">
           </div>`;
         }).join('')}
       </div>
@@ -11049,17 +11056,20 @@ async function igAnalizar() {
       type: 'image',
       source: { type: 'base64', media_type: igDetectarTipo(f.base64), data: f.base64 }
     }));
-    const prompt = `Analiza ${fotos.length === 1 ? 'esta guía de despacho' : 'estas guías de despacho'}.
+    const prompt = `Analiza ${fotos.length === 1 ? 'esta guía de despacho' : 'estas guías de despacho'} de Sollem.
 Devuelve ÚNICAMENTE un array JSON válido, sin markdown ni texto adicional.
 Cada objeto representa UNA guía con estos campos:
-- num_guia: número de guía o folio (string)
-- fecha: fecha de emisión en formato DD-MM-YYYY
-- cliente: nombre del cliente o empresa destinataria
+
+- num_guia: El folio del recuadro superior derecho. Generalmente tiene 8+ dígitos; toma SOLO los últimos 5 dígitos significativos (sin ceros a la izquierda). Ej: "0000022938" → "22938".
+- fecha: USA la fecha del TIMBRE DE BODEGA CASABLANCA que aparece en el centro del documento (NO la fecha de emisión del encabezado). Formato DD-MM-YYYY.
+- cliente: Si el membrete dice "SOLLEM" (en cualquier variante), el cliente es siempre "Sollem SpA". De lo contrario, usa el nombre de la empresa destinataria.
 - origen: lugar de origen o despacho
-- destino: lugar(es) de destino, si hay varios sepáralos con " / "
+- destino: lugar(es) de destino indicados al final del documento, si hay varios sepáralos con " / "
 - patente: patente del vehículo sin guión (ej: "WR9192"), null si no aparece
 - conductor: nombre del conductor o chofer, null si no aparece
 - kg: kilogramos como número entero, null si no aparece
+- requires_confirmation: array con los nombres de campos que no pudiste leer con certeza (ej: ["fecha","patente"]). Array vacío [] si todo es claro.
+
 Si un campo no se puede leer usa null. Responde solo el array JSON.`;
 
     const resp = await fetch(_CLAUDE_URL, {
@@ -11098,6 +11108,7 @@ Si un campo no se puede leer usa null. Responde solo el array JSON.`;
       patente:   String(g.patente   || '').toUpperCase().replace(/[^A-Z0-9]/g,''),
       conductor: String(g.conductor || '').trim(),
       kg:        g.kg != null ? String(g.kg) : '',
+      _confirm:  Array.isArray(g.requires_confirmation) ? g.requires_confirmation : [],
     }));
 
     uiState.igGuias    = parsed;
