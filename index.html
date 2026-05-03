@@ -17,7 +17,7 @@ if ('serviceWorker' in navigator) {
 </script>
 <script>
 (function() {
-  var VERSION = '1777400003';
+  var VERSION = '1777400004';
   var stored = localStorage.getItem('gs_app_version');
   if (stored !== VERSION) {
     var session = localStorage.getItem('gs_session');
@@ -10865,7 +10865,7 @@ function toggleMidiaAmb(faseId) {
 // INGRESO DE GUÍAS — Gemini Vision
 // ═══════════════════════════════════════════════════════════════
 const _GEMINI_KEY = 'AIzaSyDo9rqgUIYV8Kjkc0U53a7T0rdbn8Ri8To';
-const _GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${_GEMINI_KEY}`;
+const _GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${_GEMINI_KEY}`;
 window._igFotos = window._igFotos || []; // [{name, base64, mediaType, previewUrl}]
 
 function renderIngresoGuias() {
