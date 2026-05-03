@@ -17,7 +17,7 @@ if ('serviceWorker' in navigator) {
 </script>
 <script>
 (function() {
-  var VERSION = '1777400001';
+  var VERSION = '1777400002';
   var stored = localStorage.getItem('gs_app_version');
   if (stored !== VERSION) {
     var session = localStorage.getItem('gs_session');
@@ -318,6 +318,7 @@ if ('serviceWorker' in navigator) {
       <button class="filter-btn" onclick="filtrar('comercial',this)">Comercial</button>
       <button class="filter-btn" onclick="filtrar('operacional',this)">Operacional</button>
       <button class="filter-btn" onclick="filtrar('financiero',this)">Financiero</button>
+      <button class="filter-btn" onclick="filtrar('guias',this)" style="background:rgba(255,193,7,0.25);color:#FFF9C4">📋 Guías</button>
       <button class="filter-btn" onclick="filtrar('rrhh',this)">RRHH</button>
       <button class="filter-btn" onclick="filtrar('control',this)">Control</button>
       <button class="filter-btn" onclick="filtrar('scalingup',this)">Scaling Up</button>
@@ -10860,6 +10861,260 @@ function toggleMidiaAmb(faseId) {
   saveData(); render();
 }
 
+// ═══════════════════════════════════════════════════════════════
+// INGRESO DE GUÍAS — Gemini Vision
+// ═══════════════════════════════════════════════════════════════
+const _GEMINI_KEY = 'AIzaSyDo9rqgUIYV8Kjkc0U53a7T0rdbn8Ri8To';
+const _GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${_GEMINI_KEY}`;
+window._igFotos = window._igFotos || []; // [{name, base64, mediaType, previewUrl}]
+
+function renderIngresoGuias() {
+  const cargando   = uiState.igCargando || false;
+  const guias      = uiState.igGuias    || [];
+  const error      = uiState.igError    || '';
+  const fotos      = window._igFotos    || [];
+  const guardados  = uiState.igGuardados|| [];
+
+  const inpSt = 'width:100%;border:1px solid #dde;border-radius:7px;padding:7px 10px;font-size:12px;font-family:inherit;outline:none;background:white;box-sizing:border-box';
+  const labelSt = 'font-size:9px;font-weight:700;color:#888;margin-bottom:3px;display:block;letter-spacing:0.5px';
+
+  // ── Zona de subida ──
+  const zonaSubida = `
+    <div style="background:white;border-radius:12px;padding:14px;margin-bottom:12px;border:1px solid #e0e0e0;box-shadow:0 1px 4px rgba(0,0,0,0.06)">
+      <div style="font-size:11px;font-weight:800;color:#455A64;letter-spacing:1px;margin-bottom:12px;padding-bottom:8px;border-bottom:2px solid #ECEFF1">📷 FOTOS DE GUÍAS</div>
+      <label style="display:block;border:2px dashed #90A4AE;border-radius:10px;padding:20px;text-align:center;cursor:pointer;background:#FAFAFA;margin-bottom:10px;transition:border-color 0.2s" onclick="">
+        <div style="font-size:28px;margin-bottom:6px">📎</div>
+        <div style="font-size:12px;font-weight:700;color:#455A64">Toca para seleccionar fotos</div>
+        <div style="font-size:10px;color:#90A4AE;margin-top:4px">JPG, PNG — una o varias guías</div>
+        <input type="file" accept="image/*" multiple style="display:none" onchange="igAgregarFotos(event)">
+      </label>
+      ${fotos.length ? `
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:10px">
+          ${fotos.map((f,i)=>`
+            <div style="position:relative">
+              <img src="${f.previewUrl}" style="width:100%;height:80px;object-fit:cover;border-radius:7px;border:1px solid #dde">
+              <div style="position:absolute;bottom:2px;left:2px;right:2px;font-size:8px;color:white;background:rgba(0,0,0,0.55);border-radius:4px;padding:1px 4px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis">${f.name}</div>
+              <button onclick="igEliminarFoto(${i})" style="position:absolute;top:2px;right:2px;background:#E53935;color:white;border:none;border-radius:50%;width:18px;height:18px;font-size:10px;cursor:pointer;line-height:18px;text-align:center;padding:0">✕</button>
+            </div>`).join('')}
+        </div>
+        <button onclick="igAnalizar()" ${cargando?'disabled':''} style="width:100%;padding:11px;background:${cargando?'#90A4AE':'#1565C0'};color:white;border:none;border-radius:8px;font-size:13px;font-weight:800;cursor:${cargando?'not-allowed':'pointer'};letter-spacing:0.5px">
+          ${cargando?'⏳ Analizando con Gemini...':'✨ Analizar con IA'}
+        </button>
+      ` : ''}
+      ${error?`<div style="margin-top:8px;background:#FFEBEE;border:1px solid #FFCDD2;border-radius:7px;padding:10px;font-size:11px;color:#C62828">⚠ ${error}</div>`:''}
+    </div>`;
+
+  // ── Campos de cada guía extraída ──
+  const CAMPOS_GUIA = [
+    {k:'num_guia',  label:'N° Guía',           required:true},
+    {k:'fecha',     label:'Fecha emisión',      required:true},
+    {k:'cliente',   label:'Cliente',            required:true},
+    {k:'patente',   label:'Patente',            required:true},
+    {k:'conductor', label:'Conductor',          required:false},
+    {k:'origen',    label:'Origen',             required:false},
+    {k:'destino',   label:'Destino(s)',         required:false},
+    {k:'kg',        label:'KG',                 required:false},
+  ];
+
+  const tarjetas = guias.map((g, gi) => {
+    const yaGuardado = guardados.includes(gi);
+    const falta = CAMPOS_GUIA.filter(c=>c.required && !(g[c.k]||'').trim()).length;
+    const borderCol = yaGuardado ? '#A5D6A7' : falta ? '#FFCDD2' : '#BBDEFB';
+    const bgHead    = yaGuardado ? '#E8F5E9'  : falta ? '#FFEBEE' : '#E3F2FD';
+    const badge     = yaGuardado
+      ? '<span style="font-size:9px;background:#2E7D32;color:white;padding:2px 8px;border-radius:8px;font-weight:700">✓ GUARDADO</span>'
+      : falta
+        ? `<span style="font-size:9px;background:#FFCDD2;color:#C62828;padding:2px 8px;border-radius:8px;font-weight:700">⚠ ${falta} campo(s)</span>`
+        : '<span style="font-size:9px;background:#BBDEFB;color:#1565C0;padding:2px 8px;border-radius:8px;font-weight:700">✓ Completo</span>';
+
+    return `<div style="background:white;border:2px solid ${borderCol};border-radius:12px;margin-bottom:12px;overflow:hidden">
+      <div style="background:${bgHead};padding:10px 14px;display:flex;justify-content:space-between;align-items:center">
+        <div style="font-size:11px;font-weight:800;color:#333">Guía ${gi+1}${g.num_guia?' — N°'+g.num_guia:''}</div>
+        ${badge}
+      </div>
+      <div style="padding:12px;display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        ${CAMPOS_GUIA.map(c=>{
+          const val = g[c.k]||'';
+          const missing = c.required && !val.trim();
+          return `<div style="${c.k==='destino'||c.k==='cliente'?'grid-column:1/-1':''}">
+            <label style="${labelSt}color:${missing?'#C62828':'#888'}">${c.label}${c.required?' *':''}</label>
+            <input type="text" value="${val.replace(/"/g,'&quot;')}"
+              oninput="igEditarCampo(${gi},'${c.k}',this.value)"
+              style="${inpSt}border-color:${missing?'#EF9A9A':'#dde'}">
+          </div>`;
+        }).join('')}
+      </div>
+      ${!yaGuardado?`<div style="padding:0 12px 12px;display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <button onclick="igGuardarServicio(${gi})" style="padding:10px;background:#0B2545;color:white;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer">💾 Guardar servicio</button>
+        <button onclick="igEliminarGuia(${gi})" style="padding:10px;background:#FFEBEE;color:#C62828;border:1px solid #FFCDD2;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer">✕ Descartar</button>
+      </div>`:''}
+    </div>`;
+  }).join('');
+
+  const resumen = guardados.length
+    ? `<div style="background:#E8F5E9;border:1px solid #A5D6A7;border-radius:10px;padding:12px;margin-bottom:12px;font-size:12px;color:#2E7D32;font-weight:700;text-align:center">
+        ✓ ${guardados.length} servicio(s) guardado(s) en esta sesión
+        <button onclick="igNuevaSesion()" style="display:block;margin:8px auto 0;padding:6px 16px;background:#2E7D32;color:white;border:none;border-radius:7px;font-size:11px;cursor:pointer;font-weight:700">+ Nueva sesión</button>
+      </div>` : '';
+
+  return `<div style="padding:10px;max-width:600px;margin:0 auto">
+    <div style="font-size:14px;font-weight:900;color:#0B2545;margin-bottom:14px;display:flex;align-items:center;gap:8px">
+      📋 Ingreso de Guías
+      <span style="font-size:9px;font-weight:700;background:#FFF9C4;color:#F9A825;padding:2px 8px;border-radius:8px">GEMINI AI</span>
+    </div>
+    ${resumen}
+    ${zonaSubida}
+    ${tarjetas}
+  </div>`;
+}
+
+function igAgregarFotos(event) {
+  const files = Array.from(event.target.files);
+  if (!files.length) return;
+  const promises = files.map(file => new Promise(resolve => {
+    const reader = new FileReader();
+    reader.onload = e => {
+      const dataUrl = e.target.result;
+      const base64  = dataUrl.split(',')[1];
+      const mediaType = file.type || 'image/jpeg';
+      window._igFotos = window._igFotos || [];
+      window._igFotos.push({ name: file.name, base64, mediaType, previewUrl: dataUrl });
+      resolve();
+    };
+    reader.readAsDataURL(file);
+  }));
+  Promise.all(promises).then(() => render());
+}
+
+function igEliminarFoto(idx) {
+  window._igFotos = (window._igFotos||[]).filter((_,i)=>i!==idx);
+  render();
+}
+
+async function igAnalizar() {
+  const fotos = window._igFotos || [];
+  if (!fotos.length) return;
+  uiState.igCargando = true;
+  uiState.igError = '';
+  render();
+
+  try {
+    const parts = fotos.map(f => ({ inlineData: { mimeType: f.mediaType, data: f.base64 } }));
+    parts.push({ text: `Analiza ${fotos.length === 1 ? 'esta guía de despacho' : 'estas guías de despacho'}.
+Devuelve ÚNICAMENTE un array JSON válido, sin markdown ni texto adicional.
+Cada objeto representa UNA guía con estos campos:
+- num_guia: número de guía o folio (string)
+- fecha: fecha de emisión en formato DD-MM-YYYY
+- cliente: nombre del cliente o empresa destinataria
+- origen: lugar de origen o despacho
+- destino: lugar(es) de destino, si hay varios sepáralos con " / "
+- patente: patente del vehículo sin guión (ej: "WR9192"), null si no aparece
+- conductor: nombre del conductor o chofer, null si no aparece
+- kg: kilogramos como número entero, null si no aparece
+Si un campo no se puede leer usa null. Responde solo el array JSON.` });
+
+    const resp = await fetch(_GEMINI_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ contents: [{ parts }] })
+    });
+
+    if (!resp.ok) {
+      const errData = await resp.json().catch(()=>({}));
+      throw new Error(errData.error?.message || `HTTP ${resp.status}`);
+    }
+
+    const data = await resp.json();
+    const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    const clean = text.trim().replace(/^```(?:json)?\s*/i,'').replace(/\s*```$/,'').trim();
+    let parsed = JSON.parse(clean);
+    if (!Array.isArray(parsed)) parsed = [parsed];
+
+    // Normalizar campos
+    parsed = parsed.map(g => ({
+      num_guia:  String(g.num_guia  || '').trim(),
+      fecha:     String(g.fecha     || '').trim(),
+      cliente:   String(g.cliente   || '').trim(),
+      origen:    String(g.origen    || '').trim(),
+      destino:   String(g.destino   || '').trim(),
+      patente:   String(g.patente   || '').toUpperCase().replace(/[^A-Z0-9]/g,''),
+      conductor: String(g.conductor || '').trim(),
+      kg:        g.kg != null ? String(g.kg) : '',
+    }));
+
+    uiState.igGuias    = parsed;
+    uiState.igGuardados= [];
+    uiState.igCargando = false;
+    render();
+  } catch(e) {
+    uiState.igCargando = false;
+    uiState.igError    = 'Error al analizar: ' + e.message;
+    render();
+  }
+}
+
+function igEditarCampo(gi, campo, valor) {
+  if (!uiState.igGuias) return;
+  uiState.igGuias[gi][campo] = valor;
+  // No render() para no perder el foco
+}
+
+function igEliminarGuia(gi) {
+  uiState.igGuias = (uiState.igGuias||[]).filter((_,i)=>i!==gi);
+  uiState.igGuardados = (uiState.igGuardados||[]).map(g=>g>gi?g-1:g).filter(g=>g!==gi);
+  render();
+}
+
+function igGuardarServicio(gi) {
+  const g = (uiState.igGuias||[])[gi];
+  if (!g) return;
+  if (!g.num_guia && !g.cliente) { alert('Completa al menos N° Guía o Cliente antes de guardar.'); return; }
+
+  const hoy   = new Date();
+  const mes   = String(hoy.getMonth()+1).padStart(2,'0');
+  const anio  = String(hoy.getFullYear());
+  const MESES = ['ENE','FEB','MAR','ABR','MAY','JUN','JUL','AGO','SEP','OCT','NOV','DIC'];
+  const seq   = String(Math.floor(Math.random()*89)+10);
+  const id    = `${seq}${anio.slice(2)}${MESES[hoy.getMonth()]}`;
+
+  // Fecha del servicio: intentar parsear desde la guía, si no usar hoy
+  let fechaSrv = g.fecha || `${String(hoy.getDate()).padStart(2,'0')}-${mes}-${anio}`;
+  let mesSrv = mes, anioSrv = anio;
+  const fp = fechaSrv.split('-');
+  if (fp.length===3 && fp[0].length===2) { mesSrv=fp[1]; anioSrv=fp[2]; }
+
+  if (!appData.servicios) appData.servicios = [];
+  appData.servicios.push({
+    id, fecha: fechaSrv, mes: mesSrv, anio: anioSrv,
+    patente: g.patente || '', conductor: g.conductor || '',
+    cliente: g.cliente || '', origen: g.origen || '',
+    precio: 0, km: 0, litros: 0, petroleo: 0, peajes: 0,
+    viaticos: 0, adicional: 0, cerrado: false, cobro: 'pendiente',
+    tag: '', liquidacionId: '', estado: 'borrador',
+    guias: [{
+      num: g.num_guia, guia: g.num_guia,
+      destino: g.destino, origen: g.origen,
+      fecha_guia: g.fecha, kg: g.kg||'', imagen_url: ''
+    }]
+  });
+
+  if (!uiState.igGuardados) uiState.igGuardados = [];
+  uiState.igGuardados.push(gi);
+  saveData();
+  showToastGeneral(`✓ Servicio ${id} guardado`, '#2E7D32');
+  upsertServicioSupabase(appData.servicios[appData.servicios.length-1]);
+  render();
+}
+
+function igNuevaSesion() {
+  window._igFotos     = [];
+  uiState.igGuias     = [];
+  uiState.igGuardados = [];
+  uiState.igCargando  = false;
+  uiState.igError     = '';
+  render();
+}
+
 function renderScalingUp() {
   const su = appData.scalingup;
   const subTab = uiState['plan_subtab'] || 'estabilizacion';
@@ -11501,6 +11756,10 @@ function render() {
   const container = document.getElementById('fases');
   if (vistaActual === 'scalingup') {
     container.innerHTML = renderScalingUp();
+    return;
+  }
+  if (vistaActual === 'guias') {
+    container.innerHTML = renderIngresoGuias();
     return;
   }
   const filtered = vistaActual==='todas' ? appData.fases : appData.fases.filter(f=>f.id===vistaActual);
