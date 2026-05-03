@@ -17,7 +17,7 @@ if ('serviceWorker' in navigator) {
 </script>
 <script>
 (function() {
-  var VERSION = '1777828636';
+  var VERSION = '1777828637';
   var stored = localStorage.getItem('gs_app_version');
   if (stored !== VERSION) {
     var session = localStorage.getItem('gs_session');
@@ -10963,6 +10963,56 @@ function renderIngresoGuias() {
           </div>`;
         }).join('')}
       </div>
+      ${(() => {
+        const t = g._tarifa;
+        if (!t) return '';
+        if (t.cargando) return `<div style="padding:0 12px 10px;font-size:11px;color:#78909C">🔄 Consultando tarifario...</div>`;
+        if (t.noEncontrado) return `<div style="padding:0 12px 10px;display:flex;align-items:center;gap:8px">
+          <span style="font-size:10px;color:#B71C1C;background:#FFEBEE;border-radius:6px;padding:4px 8px">Sin coincidencia en tarifario</span>
+          <button onclick="igRefrescarTarifa(${gi})" style="font-size:10px;padding:4px 8px;background:#ECEFF1;border:none;border-radius:6px;cursor:pointer;color:#455A64">🔄 Reintentar</button>
+        </div>`;
+        const clp = v => '$' + Math.round(v).toLocaleString('es-CL');
+        const comision = t.tarifa_original * 0.10;
+        const costoFin = t.tarifa_nueva * 1.19 * 0.03;
+        const kmSel = t.ruta_sel ? t[t.ruta_sel] : null;
+        const rutaSelector = t.rutas.length > 1
+          ? `<select onchange="igSeleccionarRuta(${gi},this.value)" style="width:100%;border:1px solid #FFB74D;border-radius:7px;padding:6px 8px;font-size:11px;background:white;margin-bottom:6px">
+              <option value="">— Seleccionar ruta —</option>
+              ${t.rutas.map(r=>`<option value="${r}" ${r===t.ruta_sel?'selected':''}>${_IG_RUTAS[r]}: ${t[r]} km</option>`).join('')}
+             </select>`
+          : t.rutas.length === 1
+            ? `<div style="font-size:11px;color:#455A64;margin-bottom:6px">📍 ${_IG_RUTAS[t.rutas[0]]}: <b>${t[t.rutas[0]]} km</b></div>`
+            : '';
+        return `<div style="margin:0 12px 10px;background:#E8F5E9;border:1px solid #A5D6A7;border-radius:9px;padding:10px">
+          <div style="font-size:9px;font-weight:800;color:#2E7D32;letter-spacing:0.8px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center">
+            📊 TARIFARIO SOLLEM
+            <button onclick="igRefrescarTarifa(${gi})" style="font-size:9px;padding:2px 6px;background:transparent;border:1px solid #A5D6A7;border-radius:5px;cursor:pointer;color:#388E3C">🔄</button>
+          </div>
+          ${rutaSelector}
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+            <div style="background:white;border-radius:6px;padding:6px 8px">
+              <div style="font-size:8px;color:#888;font-weight:700">TARIFA ORIGINAL</div>
+              <div style="font-size:13px;font-weight:800;color:#1B5E20">${clp(t.tarifa_original)}</div>
+            </div>
+            <div style="background:white;border-radius:6px;padding:6px 8px">
+              <div style="font-size:8px;color:#888;font-weight:700">TARIFA NUEVA</div>
+              <div style="font-size:13px;font-weight:800;color:#1B5E20">${clp(t.tarifa_nueva)}</div>
+            </div>
+            <div style="background:white;border-radius:6px;padding:6px 8px">
+              <div style="font-size:8px;color:#888;font-weight:700">COMISIÓN COND. (10%)</div>
+              <div style="font-size:13px;font-weight:800;color:#0D47A1">${clp(comision)}</div>
+            </div>
+            <div style="background:white;border-radius:6px;padding:6px 8px">
+              <div style="font-size:8px;color:#888;font-weight:700">COSTO FINANCIERO (3%)</div>
+              <div style="font-size:13px;font-weight:800;color:#E65100">${clp(costoFin)}</div>
+            </div>
+            ${kmSel ? `<div style="background:white;border-radius:6px;padding:6px 8px;grid-column:1/-1">
+              <div style="font-size:8px;color:#888;font-weight:700">KM RUTA SELECCIONADA</div>
+              <div style="font-size:13px;font-weight:800;color:#37474F">${kmSel} km</div>
+            </div>` : ''}
+          </div>
+        </div>`;
+      })()}
       ${!yaGuardado?`<div style="padding:0 12px 12px;display:grid;grid-template-columns:1fr 1fr;gap:8px">
         <button onclick="igGuardarServicio(${gi})" style="padding:10px;background:#0B2545;color:white;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer">💾 Guardar servicio</button>
         <button onclick="igEliminarGuia(${gi})" style="padding:10px;background:#FFEBEE;color:#C62828;border:1px solid #FFCDD2;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer">✕ Descartar</button>
@@ -11031,6 +11081,63 @@ document.addEventListener('paste', function igPaste(ev) {
 function igEliminarFoto(idx) {
   window._igFotos = (window._igFotos||[]).filter((_,i)=>i!==idx);
   render();
+}
+
+const _IG_RUTAS = {
+  km_ruta68_5sur:   'Ruta 68 / 5 Sur',
+  km_ruta68_5norte: 'Ruta 68 / 5 Norte',
+  km_ruta_fruta:    'Ruta Fruta',
+};
+
+async function igBuscarTarifario(destino) {
+  if (!supa || !destino) return null;
+  const term = destino.split('/')[0].trim();
+  const { data, error } = await supa
+    .from('tarifario_sollem')
+    .select('*')
+    .ilike('destino', `%${term}%`)
+    .limit(1);
+  if (error || !data?.length) return null;
+  return data[0];
+}
+
+async function igConsultarTarifarios(guias) {
+  for (let i = 0; i < guias.length; i++) {
+    const g = guias[i];
+    if (!g.destino) continue;
+    g._tarifa = { cargando: true };
+    render();
+    const row = await igBuscarTarifario(g.destino);
+    if (!row) {
+      g._tarifa = { cargando: false, noEncontrado: true };
+    } else {
+      const rutas = Object.keys(_IG_RUTAS).filter(k => row[k] > 0);
+      g._tarifa = {
+        cargando: false,
+        tarifa_original: row.tarifa_original || 0,
+        tarifa_nueva:    row.tarifa_nueva    || 0,
+        km_ruta68_5sur:   row.km_ruta68_5sur  || 0,
+        km_ruta68_5norte: row.km_ruta68_5norte|| 0,
+        km_ruta_fruta:    row.km_ruta_fruta   || 0,
+        rutas,
+        ruta_sel: rutas.length === 1 ? rutas[0] : '',
+      };
+    }
+    render();
+  }
+}
+
+function igSeleccionarRuta(gi, ruta) {
+  if (uiState.igGuias?.[gi]?._tarifa) {
+    uiState.igGuias[gi]._tarifa.ruta_sel = ruta;
+    render();
+  }
+}
+
+function igRefrescarTarifa(gi) {
+  const g = uiState.igGuias?.[gi];
+  if (!g) return;
+  igConsultarTarifarios([g]);
 }
 
 function igDetectarTipo(base64) {
@@ -11115,6 +11222,7 @@ Si un campo no se puede leer usa null. Responde solo el array JSON.`;
     uiState.igGuardados= [];
     uiState.igCargando = false;
     render();
+    igConsultarTarifarios(parsed);
   } catch(e) {
     uiState.igCargando = false;
     uiState.igError    = 'Error al analizar: ' + e.message;
