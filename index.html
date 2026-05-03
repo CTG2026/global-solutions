@@ -17,7 +17,7 @@ if ('serviceWorker' in navigator) {
 </script>
 <script>
 (function() {
-  var VERSION = '1777828639';
+  var VERSION = '1777828640';
   var stored = localStorage.getItem('gs_app_version');
   if (stored !== VERSION) {
     var session = localStorage.getItem('gs_session');
@@ -10926,12 +10926,15 @@ function renderIngresoGuias() {
     {k:'origen',         label:'Origen',                required:false},
     {k:'destino',        label:'Destino(s)',            required:false},
     {k:'kg',             label:'KG',                    required:false},
-    {k:'fecha_despacho', label:'Fecha despacho (Casablanca)', required:false, isFecha:true},
-    {k:'fecha_entrega',  label:'Fecha entrega (manuscrita)',  required:false, isFecha:true},
+    {k:'fecha_despacho', label:'Fecha despacho (Casablanca)', required:false, isFecha:true, onlyFinal:true},
+    {k:'fecha_entrega',  label:'Fecha entrega (manuscrita)',  required:false, isFecha:true, onlyFinal:true},
   ];
+
+  const multiGuia = guias.length > 1;
 
   const tarjetas = guias.map((g, gi) => {
     const yaGuardado = guardados.includes(gi);
+    const tipo = g.tipo_destino || (gi === 0 ? 'final' : 'adicional');
     const falta   = CAMPOS_GUIA.filter(c=>c.required && !(g[c.k]||'').trim()).length;
     const nConfirm = (g._confirm||[]).length;
     const borderCol = yaGuardado ? '#A5D6A7' : falta ? '#FFCDD2' : nConfirm ? '#FFE0B2' : '#BBDEFB';
@@ -10944,13 +10947,23 @@ function renderIngresoGuias() {
           ? `<span style="font-size:9px;background:#FFE0B2;color:#E65100;padding:2px 8px;border-radius:8px;font-weight:700">⚠ ${nConfirm} confirmar</span>`
           : '<span style="font-size:9px;background:#BBDEFB;color:#1565C0;padding:2px 8px;border-radius:8px;font-weight:700">✓ Completo</span>';
 
+    const tipoSelector = multiGuia ? `
+      <div style="padding:6px 14px;border-bottom:1px solid #eee;background:#F5F5F5">
+        <select onchange="igSetTipoDestino(${gi},this.value)"
+          style="width:100%;border:1px solid #ccc;border-radius:6px;padding:5px 8px;font-size:11px;font-weight:700;background:white">
+          <option value="final"    ${tipo==='final'   ?'selected':''}>🎯 Destino Final</option>
+          <option value="adicional"${tipo==='adicional'?'selected':''}>📍 Punto Adicional (+$40.000)</option>
+        </select>
+      </div>` : '';
+
     return `<div style="background:white;border:2px solid ${borderCol};border-radius:12px;margin-bottom:12px;overflow:hidden">
       <div style="background:${bgHead};padding:10px 14px;display:flex;justify-content:space-between;align-items:center">
         <div style="font-size:11px;font-weight:800;color:#333">Guía ${gi+1}${g.num_guia?' — N°'+g.num_guia:''}</div>
         ${badge}
       </div>
+      ${tipoSelector}
       <div style="padding:12px;display:grid;grid-template-columns:1fr 1fr;gap:8px">
-        ${CAMPOS_GUIA.map(c=>{
+        ${CAMPOS_GUIA.filter(c => !(c.onlyFinal && multiGuia && tipo !== 'final')).map(c=>{
           const val = g[c.k]||'';
           const missing  = c.required && !val.trim();
           const confirm  = !missing && (g._confirm||[]).includes(c.k);
@@ -10970,6 +10983,12 @@ function renderIngresoGuias() {
         }).join('')}
       </div>
       ${(() => {
+        if (multiGuia && tipo === 'adicional') {
+          return `<div style="margin:0 12px 10px;background:#FFF3E0;border:1px solid #FFB74D;border-radius:9px;padding:10px;display:flex;align-items:center;justify-content:space-between">
+            <span style="font-size:11px;font-weight:700;color:#E65100">📍 Punto adicional</span>
+            <span style="font-size:14px;font-weight:900;color:#E65100">+$40.000</span>
+          </div>`;
+        }
         const t = g._tarifa;
         if (!t) return '';
         if (t.cargando) return `<div style="padding:0 12px 10px;font-size:11px;color:#78909C">🔄 Consultando tarifario...</div>`;
@@ -10978,8 +10997,6 @@ function renderIngresoGuias() {
           <button onclick="igRefrescarTarifa(${gi})" style="font-size:10px;padding:4px 8px;background:#ECEFF1;border:none;border-radius:6px;cursor:pointer;color:#455A64">🔄 Reintentar</button>
         </div>`;
         const clp = v => '$' + Math.round(v).toLocaleString('es-CL');
-        const comision = t.tarifa_original * 0.10;
-        const costoFin = t.tarifa_nueva * 1.19 * 0.03;
         const kmSel = t.ruta_sel ? t[t.ruta_sel] : null;
         const rutaSelector = t.rutas.length > 1
           ? `<select onchange="igSeleccionarRuta(${gi},this.value)" style="width:100%;border:1px solid #FFB74D;border-radius:7px;padding:6px 8px;font-size:11px;background:white;margin-bottom:6px">
@@ -11004,40 +11021,10 @@ function renderIngresoGuias() {
               <div style="font-size:8px;color:#888;font-weight:700">TARIFA NUEVA</div>
               <div style="font-size:13px;font-weight:800;color:#1B5E20">${clp(t.tarifa_nueva)}</div>
             </div>
-            <div style="background:white;border-radius:6px;padding:6px 8px">
-              <div style="font-size:8px;color:#888;font-weight:700">COMISIÓN COND. (10%)</div>
-              <div style="font-size:13px;font-weight:800;color:#0D47A1">${clp(comision)}</div>
-            </div>
-            <div style="background:white;border-radius:6px;padding:6px 8px">
-              <div style="font-size:8px;color:#888;font-weight:700">COSTO FINANCIERO (3%)</div>
-              <div style="font-size:13px;font-weight:800;color:#E65100">${clp(costoFin)}</div>
-            </div>
             ${kmSel ? `<div style="background:white;border-radius:6px;padding:6px 8px;grid-column:1/-1">
               <div style="font-size:8px;color:#888;font-weight:700">KM RUTA SELECCIONADA</div>
               <div style="font-size:13px;font-weight:800;color:#37474F">${kmSel} km</div>
             </div>` : ''}
-          </div>
-        </div>`;
-      })()}
-      ${(() => {
-        const dias = igDiasHabiles(g.fecha_despacho, g.fecha_entrega);
-        if (dias === null) return '';
-        const clp = v => '$' + Math.round(v).toLocaleString('es-CL');
-        const items = [
-          {label:'VIÁTICO',          rate:12000,  val:dias*12000},
-          {label:'SUELDO BASE',       rate:33000,  val:dias*33000},
-          {label:'COSTOS FIJOS',      rate:40800,  val:dias*40800},
-          {label:'MANTENCIÓN',        rate:25000,  val:dias*25000},
-        ];
-        return `<div style="margin:0 12px 10px;background:#EDE7F6;border:1px solid #CE93D8;border-radius:9px;padding:10px">
-          <div style="font-size:9px;font-weight:800;color:#6A1B9A;letter-spacing:0.8px;margin-bottom:6px">📅 DÍAS HÁBILES Y COSTOS</div>
-          <div style="font-size:15px;font-weight:900;color:#4A148C;margin-bottom:8px">Días hábiles: ${dias}</div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
-            ${items.map(it=>`<div style="background:white;border-radius:6px;padding:6px 8px">
-              <div style="font-size:8px;color:#888;font-weight:700">${it.label}</div>
-              <div style="font-size:13px;font-weight:800;color:#4A148C">${clp(it.val)}</div>
-              <div style="font-size:8px;color:#bbb">${clp(it.rate)}/día</div>
-            </div>`).join('')}
           </div>
         </div>`;
       })()}
@@ -11063,6 +11050,7 @@ function renderIngresoGuias() {
     ${zonaKey}
     ${zonaSubida}
     ${tarjetas}
+    ${guias.length > 0 ? igRenderResumenServicio(guias) : ''}
   </div>`;
 }
 
@@ -11199,6 +11187,71 @@ function igRefrescarTarifa(gi) {
   igConsultarTarifarios([g]);
 }
 
+function igSetTipoDestino(gi, tipo) {
+  const guias = uiState.igGuias || [];
+  if (tipo === 'final') {
+    guias.forEach((g, i) => { g.tipo_destino = i === gi ? 'final' : 'adicional'; });
+    if (!guias[gi]._tarifa && guias[gi].destino) igConsultarTarifarios([guias[gi]]);
+  } else {
+    guias[gi].tipo_destino = 'adicional';
+  }
+  render();
+}
+
+function igRenderResumenServicio(guias) {
+  const final = guias.find(g => (g.tipo_destino||'final') === 'final') || guias[0];
+  const adicionales = guias.filter(g => (g.tipo_destino||'final') === 'adicional');
+  const t = final?._tarifa;
+  if (!t || t.cargando || t.noEncontrado) return '';
+
+  const clp = v => '$' + Math.round(v).toLocaleString('es-CL');
+  const adicionalMonto = adicionales.length * 40000;
+  const total = t.tarifa_nueva + adicionalMonto;
+  const comision = t.tarifa_original * 0.10;
+  const costoFin = total * 1.19 * 0.03;
+
+  const dias = igDiasHabiles(final.fecha_despacho, final.fecha_entrega);
+  const viatico    = dias ? dias * 12000 : 0;
+  const sueldoBase = dias ? dias * 33000 : 0;
+  const costosFijos= dias ? dias * 40800 : 0;
+  const mantencion = dias ? dias * 25000 : 0;
+  const totalDias  = viatico + sueldoBase + costosFijos + mantencion;
+  const margen = total - comision - costoFin - totalDias;
+
+  const rowCosto = (label, val, sub) => `
+    <div style="display:flex;justify-content:space-between;align-items:baseline;padding:5px 0;border-bottom:1px solid #f0f0f0">
+      <span style="font-size:11px;color:#555">${label}</span>
+      <span style="font-size:12px;font-weight:700;color:#333">${clp(val)}${sub?`<span style="font-size:9px;font-weight:400;color:#aaa;margin-left:4px">${sub}</span>`:''}</span>
+    </div>`;
+
+  return `<div style="background:white;border:2px solid #0B2545;border-radius:12px;margin-bottom:12px;overflow:hidden">
+    <div style="background:#0B2545;padding:10px 14px">
+      <div style="font-size:12px;font-weight:900;color:white;letter-spacing:0.5px">📊 RESUMEN DEL SERVICIO</div>
+      ${adicionales.length ? `<div style="font-size:9px;color:#90CAF9;margin-top:2px">${guias.length} guías: 1 destino final + ${adicionales.length} adicional(es)</div>` : ''}
+    </div>
+    <div style="padding:12px">
+      <div style="background:#E3F2FD;border-radius:8px;padding:10px;margin-bottom:10px">
+        <div style="font-size:9px;font-weight:700;color:#1565C0;margin-bottom:4px">TOTAL FACTURA</div>
+        <div style="font-size:20px;font-weight:900;color:#0D47A1">${clp(total)}</div>
+        ${adicionales.length ? `<div style="font-size:9px;color:#888;margin-top:2px">Tarifa ruta: ${clp(t.tarifa_nueva)} + ${adicionales.length}×$40.000 adicionales</div>` : ''}
+      </div>
+      <div style="margin-bottom:8px">
+        ${rowCosto('Comisión conductor (10%)', comision)}
+        ${rowCosto('Costo financiero (×1.19×0.03)', costoFin)}
+        ${dias !== null ? `
+        ${rowCosto(`Viático (${dias} días)`, viatico, '$12.000/día')}
+        ${rowCosto(`Sueldo base (${dias} días)`, sueldoBase, '$33.000/día')}
+        ${rowCosto(`Costos fijos (${dias} días)`, costosFijos, '$40.800/día')}
+        ${rowCosto(`Mantención (${dias} días)`, mantencion, '$25.000/día')}` : `<div style="font-size:10px;color:#aaa;padding:6px 0">Ingresa fechas de despacho y entrega para calcular costos por días</div>`}
+      </div>
+      <div style="background:${margen >= 0 ? '#E8F5E9' : '#FFEBEE'};border-radius:8px;padding:10px;display:flex;justify-content:space-between;align-items:center">
+        <span style="font-size:11px;font-weight:800;color:${margen >= 0 ? '#2E7D32' : '#C62828'}">MARGEN ESTIMADO</span>
+        <span style="font-size:18px;font-weight:900;color:${margen >= 0 ? '#2E7D32' : '#C62828'}">${clp(margen)}</span>
+      </div>
+    </div>
+  </div>`;
+}
+
 function igDetectarTipo(base64) {
   const h = base64.slice(0, 12);
   if (h.startsWith('/9j/'))   return 'image/jpeg';
@@ -11265,7 +11318,7 @@ Si un campo no se puede leer usa null. Responde solo el array JSON.`;
     if (!Array.isArray(parsed)) parsed = [parsed];
 
     // Normalizar campos
-    parsed = parsed.map(g => ({
+    parsed = parsed.map((g, i) => ({
       num_guia:  String(g.num_guia  || '').trim(),
       fecha:     String(g.fecha     || '').trim(),
       cliente:   String(g.cliente   || '').trim(),
@@ -11276,6 +11329,7 @@ Si un campo no se puede leer usa null. Responde solo el array JSON.`;
       kg:             g.kg != null ? String(g.kg) : '',
       fecha_despacho: String(g.fecha || '').trim(),
       fecha_entrega:  '',
+      tipo_destino:   i === 0 ? 'final' : 'adicional',
       _confirm:  Array.isArray(g.requires_confirmation) ? g.requires_confirmation : [],
     }));
 
