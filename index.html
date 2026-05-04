@@ -17,7 +17,7 @@ if ('serviceWorker' in navigator) {
 </script>
 <script>
 (function() {
-  var VERSION = '1777854265';
+  var VERSION = '1777854266';
   var stored = localStorage.getItem('gs_app_version');
   if (stored !== VERSION) {
     var session = localStorage.getItem('gs_session');
@@ -11001,7 +11001,7 @@ function renderIngresoGuias() {
             : `oninput="igEditarCampo(${gi},'${c.k}',this.value)"`;
           return `<div style="${fullWidth?'grid-column:1/-1':''}">
             <label style="${labelSt}color:${labelC}">${c.label}${icon}</label>
-            <input type="text" value="${val.replace(/"/g,'&quot;')}" placeholder="${c.isFecha?'DD-MM-YYYY':''}"
+            <input type="${c.isFecha?'date':'text'}" value="${val.replace(/"/g,'&quot;')}" ${c.isFecha?'':'placeholder=""'}
               ${evHandler}
               style="${inpSt}border-color:${borderC};${confirm?'background:#FFF8E1;':''}">
           </div>`;
@@ -11140,13 +11140,35 @@ const _FERIADOS_2026 = new Set([
   '2026-10-31','2026-11-01','2026-12-08','2026-12-25',
 ]);
 
+function igFechaToInput(s) {
+  if (!s) return '';
+  s = String(s).trim();
+  // Already YYYY-MM-DD
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
+    const y = +s.slice(0,4);
+    return (y < 2026 ? '2026' + s.slice(4) : s);
+  }
+  // DD-MM-YYYY from Claude
+  const p = s.split('-');
+  if (p.length === 3 && p[0].length === 2) {
+    let y = +p[2]; if (y < 2026) y = 2026;
+    return `${y}-${p[1].padStart(2,'0')}-${p[0].padStart(2,'0')}`;
+  }
+  return '';
+}
+
 function igDiasHabiles(d1, d2) {
   const parse = s => {
     if (!s) return null;
+    // Accept YYYY-MM-DD (date input) and DD-MM-YYYY (legacy)
+    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
+      const d = new Date(s + 'T00:00:00'); return isNaN(d) ? null : d;
+    }
     const p = s.split('-');
-    if (p.length !== 3 || p[0].length !== 2) return null;
-    const d = new Date(+p[2], +p[1]-1, +p[0]);
-    return isNaN(d) ? null : d;
+    if (p.length === 3 && p[0].length === 2) {
+      const d = new Date(+p[2], +p[1]-1, +p[0]); return isNaN(d) ? null : d;
+    }
+    return null;
   };
   const a = parse(d1), b = parse(d2);
   if (!a || !b || b < a) return null;
@@ -11324,11 +11346,12 @@ async function igAnalizar() {
       source: { type: 'base64', media_type: igDetectarTipo(f.base64), data: f.base64 }
     }));
     const prompt = `Analiza ${fotos.length === 1 ? 'esta guía de despacho' : 'estas guías de despacho'} de Sollem SpA.
+TODAS las fechas de estos documentos son del año 2026. Si ves un año distinto, corrígelo a 2026.
 Devuelve ÚNICAMENTE un array JSON válido, sin markdown ni texto adicional.
 Cada objeto representa UNA guía con estos campos:
 - num_guia: folio recuadro superior derecho, solo los últimos 5 dígitos sin ceros. Ej: "0000022938" → "22938".
-- fecha_despacho: fecha del TIMBRE RECTANGULAR "SOLLEM SPA / BODEGA CASABLANCA" en el CENTRO del documento. Formato DD-MM-YYYY. null si no legible.
-- fecha_entrega: fecha manuscrita a mano abajo a la IZQUIERDA junto a firma de recepción. Formato DD-MM-YYYY. null si no aparece.
+- fecha_despacho: fecha del TIMBRE RECTANGULAR "SOLLEM SPA / BODEGA CASABLANCA" — es el sello rectangular en el CENTRO del documento. Formato DD-MM-YYYY. IGNORA COMPLETAMENTE la fecha de emisión del encabezado. null si no legible.
+- fecha_entrega: fecha manuscrita abajo a la IZQUIERDA junto a la firma de recepción. Formato DD-MM-YYYY. null si no aparece.
 - cliente: si el membrete dice SOLLEM en cualquier forma, siempre "Sollem SpA".
 - origen: para guías Sollem siempre "Casablanca".
 - destino: ciudad o ciudades de destino al FINAL del documento abajo. Si hay varias sepáralas con " / ". NO usar dirección del encabezado.
@@ -11376,8 +11399,8 @@ Si un campo no se puede leer usa null. Responde solo el array JSON.`
       patente:   String(g.patente   || '').toUpperCase().replace(/[^A-Z0-9]/g,''),
       conductor:      String(g.conductor || '').trim(),
       kg:             g.kg != null ? String(g.kg) : '',
-      fecha_despacho: String(g.fecha_despacho || g.fecha || '').trim(),
-      fecha_entrega:  String(g.fecha_entrega || '').trim(),
+      fecha_despacho: igFechaToInput(g.fecha_despacho || g.fecha || ''),
+      fecha_entrega:  igFechaToInput(g.fecha_entrega || ''),
       tipo_destino:   (!hasFinal && i === 0) ? 'final' : 'adicional',
       _confirm:  Array.isArray(g.requires_confirmation) ? g.requires_confirmation : [],
     }));
