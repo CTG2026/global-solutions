@@ -17,7 +17,7 @@ if ('serviceWorker' in navigator) {
 </script>
 <script>
 (function() {
-  var VERSION = '1777854261';
+  var VERSION = '1777854262';
   var stored = localStorage.getItem('gs_app_version');
   if (stored !== VERSION) {
     var session = localStorage.getItem('gs_session');
@@ -11028,18 +11028,20 @@ function renderIngresoGuias() {
           </div>
         </div>`;
       })()}
-      ${!yaGuardado?`<div style="padding:0 12px 12px;display:grid;grid-template-columns:1fr 1fr;gap:8px">
-        <button onclick="igGuardarServicio(${gi})" style="padding:10px;background:#0B2545;color:white;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer">💾 Guardar servicio</button>
-        <button onclick="igEliminarGuia(${gi})" style="padding:10px;background:#FFEBEE;color:#C62828;border:1px solid #FFCDD2;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer">✕ Descartar</button>
-      </div>`:''}
+      <div style="padding:0 12px 10px">
+        <button onclick="igEliminarGuia(${gi})" style="width:100%;padding:7px;background:#FFEBEE;color:#C62828;border:1px solid #FFCDD2;border-radius:8px;font-size:11px;font-weight:700;cursor:pointer">✕ Quitar guía</button>
+      </div>
     </div>`;
   }).join('');
 
-  const resumen = guardados.length
+  const igServGuardados = uiState.igServGuardados || 0;
+  const resumen = igServGuardados > 0
     ? `<div style="background:#E8F5E9;border:1px solid #A5D6A7;border-radius:10px;padding:12px;margin-bottom:12px;font-size:12px;color:#2E7D32;font-weight:700;text-align:center">
-        ✓ ${guardados.length} servicio(s) guardado(s) en esta sesión
-        <button onclick="igNuevaSesion()" style="display:block;margin:8px auto 0;padding:6px 16px;background:#2E7D32;color:white;border:none;border-radius:7px;font-size:11px;cursor:pointer;font-weight:700">+ Nueva sesión</button>
+        ✓ ${igServGuardados} servicio(s) creado(s) en esta sesión
       </div>` : '';
+  const btnLimpiar = guias.length > 0
+    ? `<button onclick="igLimpiarTodo()" style="width:100%;padding:8px;background:#FFEBEE;color:#C62828;border:1px solid #FFCDD2;border-radius:8px;font-size:11px;font-weight:700;cursor:pointer;margin-bottom:10px">🗑 Limpiar todo</button>`
+    : '';
 
   return `<div style="padding:10px;max-width:600px;margin:0 auto">
     <div style="font-size:14px;font-weight:900;color:#0B2545;margin-bottom:14px;display:flex;align-items:center;gap:8px">
@@ -11049,6 +11051,7 @@ function renderIngresoGuias() {
     ${resumen}
     ${zonaKey}
     ${zonaSubida}
+    ${btnLimpiar}
     ${tarjetas}
     ${guias.length > 0 ? igRenderResumenServicio(guias) : ''}
   </div>`;
@@ -11199,16 +11202,16 @@ function igSetTipoDestino(gi, tipo) {
 }
 
 function igRenderResumenServicio(guias) {
-  const final = guias.find(g => (g.tipo_destino||'final') === 'final') || guias[0];
+  const final = guias.find(g => (g.tipo_destino||'final') === 'final');
+  if (!final) return '';
   const adicionales = guias.filter(g => (g.tipo_destino||'final') === 'adicional');
-  const t = final?._tarifa;
-  if (!t || t.cargando || t.noEncontrado) return '';
+  const t = (final._tarifa && !final._tarifa.cargando && !final._tarifa.noEncontrado) ? final._tarifa : null;
 
   const clp = v => '$' + Math.round(v).toLocaleString('es-CL');
   const adicionalMonto = adicionales.length * 40000;
-  const total = t.tarifa_nueva + adicionalMonto;
-  const comision = t.tarifa_original * 0.10;
-  const costoFin = total * 1.19 * 0.03;
+  const total    = t ? (t.tarifa_nueva + adicionalMonto) : adicionalMonto;
+  const comision = t ? t.tarifa_original * 0.10 : 0;
+  const costoFin = t ? total * 1.19 * 0.03 : 0;
 
   const dias = igDiasHabiles(final.fecha_despacho, final.fecha_entrega);
   const viatico    = dias ? dias * 12000 : 0;
@@ -11232,22 +11235,27 @@ function igRenderResumenServicio(guias) {
     <div style="padding:12px">
       <div style="background:#E3F2FD;border-radius:8px;padding:10px;margin-bottom:10px">
         <div style="font-size:9px;font-weight:700;color:#1565C0;margin-bottom:4px">TOTAL FACTURA</div>
-        <div style="font-size:20px;font-weight:900;color:#0D47A1">${clp(total)}</div>
-        ${adicionales.length ? `<div style="font-size:9px;color:#888;margin-top:2px">Tarifa ruta: ${clp(t.tarifa_nueva)} + ${adicionales.length}×$40.000 adicionales</div>` : ''}
+        <div style="font-size:20px;font-weight:900;color:#0D47A1">${t ? clp(total) : '—'}</div>
+        ${t && adicionales.length ? `<div style="font-size:9px;color:#888;margin-top:2px">Tarifa ruta: ${clp(t.tarifa_nueva)} + ${adicionales.length}×$40.000 adicionales</div>` : ''}
+        ${!t ? `<div style="font-size:9px;color:#F57F17;margin-top:2px">⏳ Esperando datos del tarifario...</div>` : ''}
       </div>
       <div style="margin-bottom:8px">
-        ${rowCosto('Comisión conductor (10%)', comision)}
-        ${rowCosto('Costo financiero (×1.19×0.03)', costoFin)}
+        ${t ? rowCosto('Comisión conductor (10%)', comision) : ''}
+        ${t ? rowCosto('Costo financiero (×1.19×0.03)', costoFin) : ''}
         ${dias !== null ? `
         ${rowCosto(`Viático (${dias} días)`, viatico, '$12.000/día')}
         ${rowCosto(`Sueldo base (${dias} días)`, sueldoBase, '$33.000/día')}
         ${rowCosto(`Costos fijos (${dias} días)`, costosFijos, '$40.800/día')}
         ${rowCosto(`Mantención (${dias} días)`, mantencion, '$25.000/día')}` : `<div style="font-size:10px;color:#aaa;padding:6px 0">Ingresa fechas de despacho y entrega para calcular costos por días</div>`}
       </div>
-      <div style="background:${margen >= 0 ? '#E8F5E9' : '#FFEBEE'};border-radius:8px;padding:10px;display:flex;justify-content:space-between;align-items:center">
+      <div style="background:${margen >= 0 ? '#E8F5E9' : '#FFEBEE'};border-radius:8px;padding:10px;display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
         <span style="font-size:11px;font-weight:800;color:${margen >= 0 ? '#2E7D32' : '#C62828'}">MARGEN ESTIMADO</span>
         <span style="font-size:18px;font-weight:900;color:${margen >= 0 ? '#2E7D32' : '#C62828'}">${clp(margen)}</span>
       </div>
+      <button onclick="igGuardarTodoElServicio()"
+        style="width:100%;padding:13px;background:#0B2545;color:white;border:none;border-radius:9px;font-size:14px;font-weight:900;cursor:pointer;letter-spacing:0.5px">
+        💾 Guardar servicio (${guias.length} guía${guias.length>1?'s':''})
+      </button>
     </div>
   </div>`;
 }
@@ -11317,6 +11325,8 @@ Si un campo no se puede leer usa null. Responde solo el array JSON.`
     if (!Array.isArray(parsed)) parsed = [parsed];
 
     // Normalizar campos
+    const existentes = uiState.igGuias || [];
+    const hasFinal = existentes.some(g => g.tipo_destino === 'final');
     parsed = parsed.map((g, i) => ({
       num_guia:  String(g.num_guia  || '').trim(),
       fecha:     String(g.fecha     || '').trim(),
@@ -11328,13 +11338,16 @@ Si un campo no se puede leer usa null. Responde solo el array JSON.`
       kg:             g.kg != null ? String(g.kg) : '',
       fecha_despacho: String(g.fecha_despacho || g.fecha || '').trim(),
       fecha_entrega:  String(g.fecha_entrega || '').trim(),
-      tipo_destino:   i === 0 ? 'final' : 'adicional',
+      tipo_destino:   (!hasFinal && i === 0) ? 'final' : 'adicional',
       _confirm:  Array.isArray(g.requires_confirmation) ? g.requires_confirmation : [],
     }));
 
-    uiState.igGuias    = parsed;
-    uiState.igGuardados= [];
+    const todasGuias = [...existentes, ...parsed];
+    igPropagarDatos(parsed, todasGuias);
+
+    uiState.igGuias    = todasGuias;
     uiState.igCargando = false;
+    window._igFotos    = [];
     render();
     igConsultarTarifarios(parsed);
   } catch(e) {
@@ -11352,57 +11365,74 @@ function igEditarCampo(gi, campo, valor) {
 
 function igEliminarGuia(gi) {
   uiState.igGuias = (uiState.igGuias||[]).filter((_,i)=>i!==gi);
-  uiState.igGuardados = (uiState.igGuardados||[]).map(g=>g>gi?g-1:g).filter(g=>g!==gi);
   render();
 }
 
-function igGuardarServicio(gi) {
-  const g = (uiState.igGuias||[])[gi];
-  if (!g) return;
-  if (!g.num_guia && !g.cliente) { alert('Completa al menos N° Guía o Cliente antes de guardar.'); return; }
+function igPropagarDatos(nuevas, todas) {
+  const conductor = nuevas.find(g => g.conductor)?.conductor || '';
+  const patente   = nuevas.find(g => g.patente)?.patente   || '';
+  if (!conductor && !patente) return;
+  todas.forEach(g => {
+    if (conductor && !g.conductor) g.conductor = conductor;
+    if (patente   && !g.patente)   g.patente   = patente;
+  });
+}
+
+function igGuardarTodoElServicio() {
+  const guias = uiState.igGuias || [];
+  const finalGuia = guias.find(g => g.tipo_destino === 'final');
+  if (!finalGuia) return;
 
   const hoy   = new Date();
   const mes   = String(hoy.getMonth()+1).padStart(2,'0');
   const anio  = String(hoy.getFullYear());
   const MESES = ['ENE','FEB','MAR','ABR','MAY','JUN','JUL','AGO','SEP','OCT','NOV','DIC'];
-  const seq   = String(Math.floor(Math.random()*89)+10);
-  const id    = `${seq}${anio.slice(2)}${MESES[hoy.getMonth()]}`;
+  const id    = `${String(Math.floor(Math.random()*89)+10)}${anio.slice(2)}${MESES[hoy.getMonth()]}`;
 
-  // Fecha del servicio: intentar parsear desde la guía, si no usar hoy
-  let fechaSrv = g.fecha || `${String(hoy.getDate()).padStart(2,'0')}-${mes}-${anio}`;
+  let fechaSrv = finalGuia.fecha || `${String(hoy.getDate()).padStart(2,'0')}-${mes}-${anio}`;
   let mesSrv = mes, anioSrv = anio;
   const fp = fechaSrv.split('-');
   if (fp.length===3 && fp[0].length===2) { mesSrv=fp[1]; anioSrv=fp[2]; }
 
+  const t = finalGuia._tarifa;
+  const adicionales = guias.filter(g => g.tipo_destino === 'adicional');
+  const precio = t ? (t.tarifa_nueva + adicionales.length * 40000) : 0;
+  const kmRuta = (t?.ruta_sel && t[t.ruta_sel]) ? t[t.ruta_sel] : 0;
+
   if (!appData.servicios) appData.servicios = [];
   appData.servicios.push({
     id, fecha: fechaSrv, mes: mesSrv, anio: anioSrv,
-    patente: g.patente || '', conductor: g.conductor || '',
-    cliente: g.cliente || '', origen: g.origen || '',
-    precio: 0, km: 0, litros: 0, petroleo: 0, peajes: 0,
+    patente: finalGuia.patente || '', conductor: finalGuia.conductor || '',
+    cliente: finalGuia.cliente || '', origen: finalGuia.origen || '',
+    precio, km: kmRuta, litros: 0, petroleo: 0, peajes: 0,
     viaticos: 0, adicional: 0, cerrado: false, cobro: 'pendiente',
     tag: '', liquidacionId: '', estado: 'borrador',
-    guias: [{
+    guias: guias.map(g => ({
       num: g.num_guia, guia: g.num_guia,
       destino: g.destino, origen: g.origen,
-      fecha_guia: g.fecha, kg: g.kg||'', imagen_url: ''
-    }]
+      fecha_guia: g.fecha, kg: g.kg||'',
+      tipo_destino: g.tipo_destino, imagen_url: ''
+    }))
   });
 
-  if (!uiState.igGuardados) uiState.igGuardados = [];
-  uiState.igGuardados.push(gi);
   saveData();
-  showToastGeneral(`✓ Servicio ${id} guardado`, '#2E7D32');
+  showToastGeneral(`✓ Servicio ${id} guardado (${guias.length} guía${guias.length>1?'s':''})`, '#2E7D32');
   upsertServicioSupabase(appData.servicios[appData.servicios.length-1]);
+
+  uiState.igGuias    = [];
+  uiState.igCargando = false;
+  uiState.igError    = '';
+  uiState.igServGuardados = (uiState.igServGuardados || 0) + 1;
+  window._igFotos = [];
   render();
 }
 
-function igNuevaSesion() {
-  window._igFotos     = [];
-  uiState.igGuias     = [];
-  uiState.igGuardados = [];
-  uiState.igCargando  = false;
-  uiState.igError     = '';
+function igLimpiarTodo() {
+  window._igFotos       = [];
+  uiState.igGuias       = [];
+  uiState.igCargando    = false;
+  uiState.igError       = '';
+  uiState.igServGuardados = 0;
   render();
 }
 
