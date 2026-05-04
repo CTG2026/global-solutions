@@ -17,7 +17,7 @@ if ('serviceWorker' in navigator) {
 </script>
 <script>
 (function() {
-  var VERSION = '1777828640';
+  var VERSION = '1777854261';
   var stored = localStorage.getItem('gs_app_version');
   if (stored !== VERSION) {
     var session = localStorage.getItem('gs_session');
@@ -11275,21 +11275,20 @@ async function igAnalizar() {
       type: 'image',
       source: { type: 'base64', media_type: igDetectarTipo(f.base64), data: f.base64 }
     }));
-    const prompt = `Analiza ${fotos.length === 1 ? 'esta guía de despacho' : 'estas guías de despacho'} de Sollem.
+    const prompt = `Analiza ${fotos.length === 1 ? 'esta guía de despacho' : 'estas guías de despacho'} de Sollem SpA.
 Devuelve ÚNICAMENTE un array JSON válido, sin markdown ni texto adicional.
 Cada objeto representa UNA guía con estos campos:
-
-- num_guia: El folio del recuadro superior derecho. Generalmente tiene 8+ dígitos; toma SOLO los últimos 5 dígitos significativos (sin ceros a la izquierda). Ej: "0000022938" → "22938".
-- fecha: USA la fecha del TIMBRE DE BODEGA CASABLANCA que aparece en el centro del documento (NO la fecha de emisión del encabezado). Formato DD-MM-YYYY.
-- cliente: Si el membrete dice "SOLLEM" (en cualquier variante), el cliente es siempre "Sollem SpA". De lo contrario, usa el nombre de la empresa destinataria.
-- origen: lugar de origen o despacho
-- destino: lugar(es) de destino indicados al final del documento, si hay varios sepáralos con " / "
-- patente: patente del vehículo sin guión (ej: "WR9192"), null si no aparece
-- conductor: nombre del conductor o chofer, null si no aparece
-- kg: kilogramos como número entero, null si no aparece
-- requires_confirmation: array con los nombres de campos que no pudiste leer con certeza (ej: ["fecha","patente"]). Array vacío [] si todo es claro.
-
-Si un campo no se puede leer usa null. Responde solo el array JSON.`;
+- num_guia: folio recuadro superior derecho, solo los últimos 5 dígitos sin ceros. Ej: "0000022938" → "22938".
+- fecha_despacho: fecha del TIMBRE RECTANGULAR "SOLLEM SPA / BODEGA CASABLANCA" en el CENTRO del documento. Formato DD-MM-YYYY. null si no legible.
+- fecha_entrega: fecha manuscrita a mano abajo a la IZQUIERDA junto a firma de recepción. Formato DD-MM-YYYY. null si no aparece.
+- cliente: si el membrete dice SOLLEM en cualquier forma, siempre "Sollem SpA".
+- origen: para guías Sollem siempre "Casablanca".
+- destino: ciudad o ciudades de destino al FINAL del documento abajo. Si hay varias sepáralas con " / ". NO usar dirección del encabezado.
+- patente: sin guión (ej: "WR9192"), null si no aparece.
+- conductor: nombre del conductor, null si no aparece.
+- kg: kilogramos netos como entero, null si no aparece.
+- requires_confirmation: array con campos no legibles con certeza. [] si todo claro.
+Si un campo no se puede leer usa null. Responde solo el array JSON.`
 
     const resp = await fetch(_CLAUDE_URL, {
       method: 'POST',
@@ -11327,8 +11326,8 @@ Si un campo no se puede leer usa null. Responde solo el array JSON.`;
       patente:   String(g.patente   || '').toUpperCase().replace(/[^A-Z0-9]/g,''),
       conductor:      String(g.conductor || '').trim(),
       kg:             g.kg != null ? String(g.kg) : '',
-      fecha_despacho: String(g.fecha || '').trim(),
-      fecha_entrega:  '',
+      fecha_despacho: String(g.fecha_despacho || g.fecha || '').trim(),
+      fecha_entrega:  String(g.fecha_entrega || '').trim(),
       tipo_destino:   i === 0 ? 'final' : 'adicional',
       _confirm:  Array.isArray(g.requires_confirmation) ? g.requires_confirmation : [],
     }));
