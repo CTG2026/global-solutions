@@ -17,7 +17,7 @@ if ('serviceWorker' in navigator) {
 </script>
 <script>
 (function() {
-  var VERSION = '1777902793';
+  var VERSION = '1777907892';
   var stored = localStorage.getItem('gs_app_version');
   if (stored !== VERSION) {
     var session = localStorage.getItem('gs_session');
@@ -10892,7 +10892,7 @@ function renderIngresoGuias() {
     </div>`;
 
   const conductoresList = appData.conductores || [];
-  const patentesList    = appData.patentes    || [];
+  const patentesList    = ['GKFD84','WR9192','XR8555','GCFF12','BPBL35','XA1114','DSDV36'];
   const selSt = `width:100%;border:1px solid #dde;border-radius:7px;padding:7px 8px;font-size:12px;background:white;font-family:inherit;outline:none`;
 
   const zonaSubida = `
@@ -10919,6 +10919,21 @@ function renderIngresoGuias() {
         <input type="text" value="${(uiState.igDestinoSel||'').replace(/"/g,'&quot;')}" placeholder="Ej: Curicó (prioridad sobre lo que lea Claude)"
           oninput="uiState.igDestinoSel=this.value"
           style="${inpSt}">
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px">
+        <div>
+          <label style="${labelSt}">DÍAS DEL SERVICIO</label>
+          <select onchange="uiState.igDiasSel=parseFloat(this.value)" style="${selSt}">
+            <option value="">— Seleccionar —</option>
+            ${[0.5,1,1.5,2,2.5,3].map(d=>`<option value="${d}" ${d===(uiState.igDiasSel||'')?'selected':''}>${d} día${d!==1?'s':''}</option>`).join('')}
+          </select>
+        </div>
+        <div>
+          <label style="${labelSt}">KM RETORNO A COLTAUCO</label>
+          <input type="number" value="${uiState.igKmRetorno||''}" placeholder="Ej: 98"
+            oninput="uiState.igKmRetorno=parseFloat(this.value)||0"
+            style="${inpSt}">
+        </div>
       </div> #90A4AE;border-radius:10px;padding:20px;text-align:center;cursor:pointer;background:#FAFAFA;margin-bottom:10px;transition:border-color 0.2s" onclick="">
         <div style="font-size:28px;margin-bottom:6px">📎</div>
         <div style="font-size:12px;font-weight:700;color:#455A64">Toca para seleccionar fotos</div>
@@ -11300,7 +11315,9 @@ function igRenderResumenServicio(guias) {
   const comision = t ? t.tarifa_original * 0.10 : 0;
   const costoFin = t ? total * 1.19 * 0.03 : 0;
 
-  const dias = igDiasHabiles(final.fecha_despacho, final.fecha_entrega);
+  // Días: priorizar selección manual del usuario sobre cálculo automático
+  const diasAuto = igDiasHabiles(final.fecha_despacho, final.fecha_entrega);
+  const dias = (uiState.igDiasSel && uiState.igDiasSel > 0) ? uiState.igDiasSel : (diasAuto || 0);
   const viatico    = dias ? dias * 12000 : 0;
   const sueldoBase = dias ? dias * 33000 : 0;
   const costosFijos= dias ? dias * 40800 : 0;
@@ -11309,7 +11326,10 @@ function igRenderResumenServicio(guias) {
 
   const KM_COLTAUCO_CASABLANCA = 188;
   const kmRutaSel       = t ? (t.ruta_sel ? (t[t.ruta_sel] || 0) : 0) : 0;
-  const kmRegreso       = t ? (t.km_regreso_coltauco || 0) : 0;
+  // km regreso: priorizar ingreso manual sobre Supabase
+  const kmRegreso = (uiState.igKmRetorno && uiState.igKmRetorno > 0) 
+    ? uiState.igKmRetorno 
+    : (t ? (t.km_regreso_coltauco || 0) : 0);
   const kmTotal         = t ? (KM_COLTAUCO_CASABLANCA + kmRutaSel + kmRegreso) : 0;
   const costoCombustible= t ? Math.round((kmTotal / 2.5) * 1300) : 0;
 
