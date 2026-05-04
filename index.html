@@ -17,7 +17,7 @@ if ('serviceWorker' in navigator) {
 </script>
 <script>
 (function() {
-  var VERSION = '1777854262';
+  var VERSION = '1777854263';
   var stored = localStorage.getItem('gs_app_version');
   if (stored !== VERSION) {
     var session = localStorage.getItem('gs_session');
@@ -10891,9 +10891,29 @@ function renderIngresoGuias() {
       ${apiKey?'<div style="font-size:9px;color:#2E7D32;margin-top:5px;font-weight:700">✓ Key configurada</div>':'<div style="font-size:9px;color:#C62828;margin-top:5px;font-weight:700">⚠ Ingresa tu API key para usar Claude</div>'}
     </div>`;
 
+  const conductoresList = appData.conductores || [];
+  const patentesList    = appData.patentes    || [];
+  const selSt = `width:100%;border:1px solid #dde;border-radius:7px;padding:7px 8px;font-size:12px;background:white;font-family:inherit;outline:none`;
+
   const zonaSubida = `
     <div style="background:white;border-radius:12px;padding:14px;margin-bottom:12px;border:1px solid #e0e0e0;box-shadow:0 1px 4px rgba(0,0,0,0.06)">
       <div style="font-size:11px;font-weight:800;color:#455A64;letter-spacing:1px;margin-bottom:12px;padding-bottom:8px;border-bottom:2px solid #ECEFF1">📷 FOTOS DE GUÍAS</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px">
+        <div>
+          <label style="${labelSt}">CONDUCTOR</label>
+          <select onchange="uiState.igConductorSel=this.value" style="${selSt}">
+            <option value="">— Auto —</option>
+            ${conductoresList.map(c=>`<option value="${c}" ${c===(uiState.igConductorSel||'')?'selected':''}>${c}</option>`).join('')}
+          </select>
+        </div>
+        <div>
+          <label style="${labelSt}">PATENTE</label>
+          <select onchange="uiState.igPatenteSel=this.value" style="${selSt}">
+            <option value="">— Auto —</option>
+            ${patentesList.map(p=>`<option value="${p}" ${p===(uiState.igPatenteSel||'')?'selected':''}>${p}</option>`).join('')}
+          </select>
+        </div>
+      </div>
       <label style="display:block;border:2px dashed #90A4AE;border-radius:10px;padding:20px;text-align:center;cursor:pointer;background:#FAFAFA;margin-bottom:10px;transition:border-color 0.2s" onclick="">
         <div style="font-size:28px;margin-bottom:6px">📎</div>
         <div style="font-size:12px;font-weight:700;color:#455A64">Toca para seleccionar fotos</div>
@@ -10910,7 +10930,7 @@ function renderIngresoGuias() {
             </div>`).join('')}
         </div>
         <button onclick="igAnalizar()" ${cargando?'disabled':''} style="width:100%;padding:11px;background:${cargando?'#90A4AE':'#1565C0'};color:white;border:none;border-radius:8px;font-size:13px;font-weight:800;cursor:${cargando?'not-allowed':'pointer'};letter-spacing:0.5px">
-          ${cargando?'⏳ Analizando con Gemini...':'✨ Analizar con IA'}
+          ${cargando?'⏳ Analizando con Claude...':'✨ Analizar con IA'}
         </button>
       ` : ''}
       ${error?`<div style="margin-top:8px;background:#FFEBEE;border:1px solid #FFCDD2;border-radius:7px;padding:10px;font-size:11px;color:#C62828">⚠ ${error}</div>`:''}
@@ -11341,6 +11361,20 @@ Si un campo no se puede leer usa null. Responde solo el array JSON.`
       tipo_destino:   (!hasFinal && i === 0) ? 'final' : 'adicional',
       _confirm:  Array.isArray(g.requires_confirmation) ? g.requires_confirmation : [],
     }));
+
+    // Aplicar conductor/patente: prioridad a Claude si coincide con el sistema,
+    // de lo contrario usar lo seleccionado manualmente.
+    const condSel  = uiState.igConductorSel || '';
+    const patSel   = uiState.igPatenteSel   || '';
+    const condsSys = appData.conductores || [];
+    const patsSys  = appData.patentes    || [];
+    parsed.forEach(g => {
+      const condMatch = condsSys.find(c => igNorm(c) === igNorm(g.conductor));
+      g.conductor = condMatch || (condSel ? condSel : g.conductor);
+      const patNorm = g.patente.toUpperCase().replace(/[^A-Z0-9]/g,'');
+      const patMatch = patsSys.find(p => p.toUpperCase().replace(/[^A-Z0-9]/g,'') === patNorm);
+      g.patente = patMatch ? patMatch.toUpperCase().replace(/[^A-Z0-9]/g,'') : (patSel ? patSel.toUpperCase().replace(/[^A-Z0-9]/g,'') : g.patente);
+    });
 
     const todasGuias = [...existentes, ...parsed];
     igPropagarDatos(parsed, todasGuias);
