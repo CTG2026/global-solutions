@@ -17,7 +17,7 @@ if ('serviceWorker' in navigator) {
 </script>
 <script>
 (function() {
-  var VERSION = '1777907892';
+  var VERSION = '1777911637';
   var stored = localStorage.getItem('gs_app_version');
   if (stored !== VERSION) {
     var session = localStorage.getItem('gs_session');
@@ -10987,14 +10987,15 @@ function renderIngresoGuias() {
           ? `<span style="font-size:9px;background:#FFE0B2;color:#E65100;padding:2px 8px;border-radius:8px;font-weight:700">⚠ ${nConfirm} confirmar</span>`
           : '<span style="font-size:9px;background:#BBDEFB;color:#1565C0;padding:2px 8px;border-radius:8px;font-weight:700">✓ Completo</span>';
 
-    const tipoSelector = multiGuia ? `
+    const tipoSelector = `
       <div style="padding:6px 14px;border-bottom:1px solid #eee;background:#F5F5F5">
         <select onchange="igSetTipoDestino(${gi},this.value)"
           style="width:100%;border:1px solid #ccc;border-radius:6px;padding:5px 8px;font-size:11px;font-weight:700;background:white">
-          <option value="final"    ${tipo==='final'   ?'selected':''}>🎯 Destino Final</option>
-          <option value="adicional"${tipo==='adicional'?'selected':''}>📍 Punto Adicional (+$40.000)</option>
+          <option value="final"     ${tipo==='final'    ?'selected':''}>🎯 Destino Final</option>
+          <option value="adicional" ${tipo==='adicional'?'selected':''}>📍 Punto (+$40.000)</option>
+          <option value="sin_punto" ${tipo==='sin_punto'?'selected':''}>➖ Sin punto adicional</option>
         </select>
-      </div>` : '';
+      </div>`;
 
     return `<div style="background:white;border:2px solid ${borderCol};border-radius:12px;margin-bottom:12px;overflow:hidden">
       <div style="background:${bgHead};padding:10px 14px;display:flex;justify-content:space-between;align-items:center">
