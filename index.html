@@ -17,7 +17,7 @@ if ('serviceWorker' in navigator) {
 </script>
 <script>
 (function() {
-  var VERSION = '1777854264';
+  var VERSION = '1777854265';
   var stored = localStorage.getItem('gs_app_version');
   if (stored !== VERSION) {
     var session = localStorage.getItem('gs_session');
@@ -11189,11 +11189,12 @@ async function igConsultarTarifarios(guias) {
       const rutas = Object.keys(_IG_RUTAS).filter(k => row[k] > 0);
       g._tarifa = {
         cargando: false,
-        tarifa_original: row.tarifa_original || 0,
-        tarifa_nueva:    row.tarifa_nueva    || 0,
-        km_ruta68_5sur:   row.km_ruta68_5sur  || 0,
-        km_ruta68_5norte: row.km_ruta68_5norte|| 0,
-        km_ruta_fruta:    row.km_ruta_fruta   || 0,
+        tarifa_original:   row.tarifa_original    || 0,
+        tarifa_nueva:      row.tarifa_nueva        || 0,
+        km_ruta68_5sur:    row.km_ruta68_5sur      || 0,
+        km_ruta68_5norte:  row.km_ruta68_5norte    || 0,
+        km_ruta_fruta:     row.km_ruta_fruta       || 0,
+        km_regreso_coltauco: row.km_regreso_coltauco || 0,
         rutas,
         ruta_sel: rutas.length === 1 ? rutas[0] : '',
       };
@@ -11244,7 +11245,14 @@ function igRenderResumenServicio(guias) {
   const costosFijos= dias ? dias * 40800 : 0;
   const mantencion = dias ? dias * 25000 : 0;
   const totalDias  = viatico + sueldoBase + costosFijos + mantencion;
-  const margen = total - comision - costoFin - totalDias;
+
+  const KM_COLTAUCO_CASABLANCA = 188;
+  const kmRutaSel       = t ? (t.ruta_sel ? (t[t.ruta_sel] || 0) : 0) : 0;
+  const kmRegreso       = t ? (t.km_regreso_coltauco || 0) : 0;
+  const kmTotal         = t ? (KM_COLTAUCO_CASABLANCA + kmRutaSel + kmRegreso) : 0;
+  const costoCombustible= t ? Math.round((kmTotal / 2.5) * 1300) : 0;
+
+  const margen = total - comision - costoFin - totalDias - costoCombustible;
 
   const rowCosto = (label, val, sub) => `
     <div style="display:flex;justify-content:space-between;align-items:baseline;padding:5px 0;border-bottom:1px solid #f0f0f0">
@@ -11264,9 +11272,16 @@ function igRenderResumenServicio(guias) {
         ${t && adicionales.length ? `<div style="font-size:9px;color:#888;margin-top:2px">Tarifa ruta: ${clp(t.tarifa_nueva)} + ${adicionales.length}×$40.000 adicionales</div>` : ''}
         ${!t ? `<div style="font-size:9px;color:#F57F17;margin-top:2px">⏳ Esperando datos del tarifario...</div>` : ''}
       </div>
+      ${t && kmTotal > 0 ? `<div style="background:#ECEFF1;border-radius:8px;padding:8px 10px;margin-bottom:10px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;text-align:center">
+        <div><div style="font-size:8px;color:#78909C;font-weight:700">COLTAUCO→CSB</div><div style="font-size:12px;font-weight:800;color:#37474F">${KM_COLTAUCO_CASABLANCA} km</div></div>
+        <div><div style="font-size:8px;color:#78909C;font-weight:700">RUTA ${t.ruta_sel ? _IG_RUTAS[t.ruta_sel] : '—'}</div><div style="font-size:12px;font-weight:800;color:#37474F">${kmRutaSel} km</div></div>
+        <div><div style="font-size:8px;color:#78909C;font-weight:700">REGRESO</div><div style="font-size:12px;font-weight:800;color:#37474F">${kmRegreso} km</div></div>
+        <div style="grid-column:1/-1;border-top:1px solid #CFD8DC;margin-top:4px;padding-top:4px"><div style="font-size:8px;color:#455A64;font-weight:700">KM TOTAL</div><div style="font-size:14px;font-weight:900;color:#263238">${kmTotal} km</div></div>
+      </div>` : ''}
       <div style="margin-bottom:8px">
         ${t ? rowCosto('Comisión conductor (10%)', comision) : ''}
         ${t ? rowCosto('Costo financiero (×1.19×0.03)', costoFin) : ''}
+        ${t && kmTotal > 0 ? rowCosto(`Combustible (${kmTotal} km ÷ 2.5 × $1.300)`, costoCombustible) : ''}
         ${dias !== null ? `
         ${rowCosto(`Viático (${dias} días)`, viatico, '$12.000/día')}
         ${rowCosto(`Sueldo base (${dias} días)`, sueldoBase, '$33.000/día')}
