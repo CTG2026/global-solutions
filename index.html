@@ -17,7 +17,7 @@ if ('serviceWorker' in navigator) {
 </script>
 <script>
 (function() {
-  var VERSION = '1777911637';
+  var VERSION = '1777931171';
   var stored = localStorage.getItem('gs_app_version');
   if (stored !== VERSION) {
     var session = localStorage.getItem('gs_session');
@@ -11296,10 +11296,13 @@ function igRefrescarTarifa(gi) {
 function igSetTipoDestino(gi, tipo) {
   const guias = uiState.igGuias || [];
   if (tipo === 'final') {
-    guias.forEach((g, i) => { g.tipo_destino = i === gi ? 'final' : 'adicional'; });
+    guias.forEach((g, i) => { 
+      if (i !== gi && g.tipo_destino === 'final') g.tipo_destino = 'adicional';
+    });
+    guias[gi].tipo_destino = 'final';
     if (!guias[gi]._tarifa && guias[gi].destino) igConsultarTarifarios([guias[gi]]);
   } else {
-    guias[gi].tipo_destino = 'adicional';
+    guias[gi].tipo_destino = tipo; // 'adicional' o 'sin_punto'
   }
   render();
 }
@@ -11307,7 +11310,7 @@ function igSetTipoDestino(gi, tipo) {
 function igRenderResumenServicio(guias) {
   const final = guias.find(g => (g.tipo_destino||'final') === 'final');
   if (!final) return '';
-  const adicionales = guias.filter(g => (g.tipo_destino||'final') === 'adicional');
+  const adicionales = guias.filter(g => g.tipo_destino === 'adicional');
   const t = (final._tarifa && !final._tarifa.cargando && !final._tarifa.noEncontrado) ? final._tarifa : null;
 
   const clp = v => '$' + Math.round(v).toLocaleString('es-CL');
