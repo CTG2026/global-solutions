@@ -17,7 +17,7 @@ if ('serviceWorker' in navigator) {
 </script>
 <script>
 (function() {
-  var VERSION = '1777854266';
+  var VERSION = '1777898600';
   var stored = localStorage.getItem('gs_app_version');
   if (stored !== VERSION) {
     var session = localStorage.getItem('gs_session');
@@ -11350,7 +11350,7 @@ TODAS las fechas de estos documentos son del año 2026. Si ves un año distinto,
 Devuelve ÚNICAMENTE un array JSON válido, sin markdown ni texto adicional.
 Cada objeto representa UNA guía con estos campos:
 - num_guia: folio recuadro superior derecho, solo los últimos 5 dígitos sin ceros. Ej: "0000022938" → "22938".
-- fecha_despacho: fecha del TIMBRE RECTANGULAR "SOLLEM SPA / BODEGA CASABLANCA" — es el sello rectangular en el CENTRO del documento. Formato DD-MM-YYYY. IGNORA COMPLETAMENTE la fecha de emisión del encabezado. null si no legible.
+- fecha_despacho: fecha del TIMBRE RECTANGULAR "SOLLEM SPA / BODEGA CASABLANCA" — es el sello rectangular en el CENTRO del documento. El timbre tiene el día, abreviatura del mes en español (ENE=01, FEB=02, MAR=03, ABR=04, MAY=05, JUN=06, JUL=07, AGO=08, SEP=09, OCT=10, NOV=11, DIC=12) y el año. Formato DD-MM-YYYY. El año es 2026. IGNORA COMPLETAMENTE la fecha de emisión del encabezado. null si no legible.
 - fecha_entrega: fecha manuscrita abajo a la IZQUIERDA junto a la firma de recepción. Formato DD-MM-YYYY. null si no aparece.
 - cliente: si el membrete dice SOLLEM en cualquier forma, siempre "Sollem SpA".
 - origen: para guías Sollem siempre "Casablanca".
