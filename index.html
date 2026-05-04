@@ -17,7 +17,7 @@ if ('serviceWorker' in navigator) {
 </script>
 <script>
 (function() {
-  var VERSION = '1777901156';
+  var VERSION = '1777902793';
   var stored = localStorage.getItem('gs_app_version');
   if (stored !== VERSION) {
     var session = localStorage.getItem('gs_session');
@@ -11227,10 +11227,14 @@ async function igBuscarTarifario(destino) {
   const { data, error } = await supa.from('tarifario_sollem').select('*');
   if (error || !data?.length) return null;
   const term = igNorm(destino.split('/')[0].trim());
-  return data.find(r => {
-    const rd = igNorm(r.destino);
-    return rd.includes(term) || term.includes(rd);
-  }) || null;
+  // Primero buscar coincidencia EXACTA
+  const exacto = data.find(r => igNorm(r.destino) === term);
+  if (exacto) return exacto;
+  // Solo si no hay exacto, buscar parcial pero solo si term es suficientemente específico (5+ chars)
+  if (term.length >= 5) {
+    return data.find(r => igNorm(r.destino) === term) || null;
+  }
+  return null;
 }
 
 async function igConsultarTarifarios(guias) {
