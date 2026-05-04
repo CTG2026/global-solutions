@@ -17,7 +17,7 @@ if ('serviceWorker' in navigator) {
 </script>
 <script>
 (function() {
-  var VERSION = '1777898600';
+  var VERSION = '1777901156';
   var stored = localStorage.getItem('gs_app_version');
   if (stored !== VERSION) {
     var session = localStorage.getItem('gs_session');
@@ -10996,13 +10996,48 @@ function renderIngresoGuias() {
           const labelC   = missing ? '#C62828'  : confirm ? '#E65100' : '#888';
           const icon     = confirm ? ' ⚠' : (c.required?' *':'');
           const fullWidth = c.k==='destino'||c.k==='cliente'||c.isFecha;
-          const evHandler = c.isFecha
-            ? `onblur="igEditarCampo(${gi},'${c.k}',this.value);render()"`
-            : `oninput="igEditarCampo(${gi},'${c.k}',this.value)"`;
+
+          // PATENTE: desplegable
+          if (c.k === 'patente') {
+            const pats = ['GKFD84','WR9192','XR8555','GCFF12','BPBL35','XA1114','DSDV36'];
+            return `<div>
+              <label style="${labelSt}color:${labelC}">${c.label}${icon}</label>
+              <select onchange="igEditarCampo(${gi},'patente',this.value)"
+                style="${inpSt}border-color:${borderC};background:white">
+                <option value="">-- Seleccionar --</option>
+                ${pats.map(p=>`<option value="${p}" ${val===p?'selected':''}>${p}</option>`).join('')}
+              </select>
+            </div>`;
+          }
+
+          // CONDUCTOR: desplegable
+          if (c.k === 'conductor') {
+            const conds = ['Manuel Madrid','Felipe Vidal','Felipe Madariaga','Francisco Mancilla','Sebastián Zúñiga','Pablo Riquelme'];
+            return `<div>
+              <label style="${labelSt}color:${labelC}">${c.label}${icon}</label>
+              <select onchange="igEditarCampo(${gi},'conductor',this.value)"
+                style="${inpSt}border-color:${borderC};background:white">
+                <option value="">-- Seleccionar --</option>
+                ${conds.map(cn=>`<option value="${cn}" ${val===cn?'selected':''}>${cn}</option>`).join('')}
+              </select>
+            </div>`;
+          }
+
+          // FECHAS: calendario
+          if (c.isFecha || c.k === 'fecha') {
+            return `<div style="${fullWidth?'grid-column:1/-1':''}">
+              <label style="${labelSt}color:${labelC}">${c.label}${icon}</label>
+              <input type="date" value="${val}"
+                onchange="igEditarCampo(${gi},'${c.k}',this.value);render()"
+                style="${inpSt}border-color:${borderC};${confirm?'background:#FFF8E1;':''}">
+            </div>`;
+          }
+
+          // RESTO: texto normal
           return `<div style="${fullWidth?'grid-column:1/-1':''}">
             <label style="${labelSt}color:${labelC}">${c.label}${icon}</label>
-            <input type="${c.isFecha?'date':'text'}" value="${val.replace(/"/g,'&quot;')}" ${c.isFecha?'':'placeholder=""'}
-              ${evHandler}
+            <input type="text" value="${val.replace(/"/g,'&quot;')}" placeholder=""
+              oninput="igEditarCampo(${gi},'${c.k}',this.value)"
               style="${inpSt}border-color:${borderC};${confirm?'background:#FFF8E1;':''}">
           </div>`;
         }).join('')}
