@@ -17,7 +17,7 @@ if ('serviceWorker' in navigator) {
 </script>
 <script>
 (function() {
-  var VERSION = '1777854263';
+  var VERSION = '1777854264';
   var stored = localStorage.getItem('gs_app_version');
   if (stored !== VERSION) {
     var session = localStorage.getItem('gs_session');
@@ -10914,7 +10914,12 @@ function renderIngresoGuias() {
           </select>
         </div>
       </div>
-      <label style="display:block;border:2px dashed #90A4AE;border-radius:10px;padding:20px;text-align:center;cursor:pointer;background:#FAFAFA;margin-bottom:10px;transition:border-color 0.2s" onclick="">
+      <div style="margin-bottom:12px">
+        <label style="${labelSt}">DESTINO FINAL</label>
+        <input type="text" value="${(uiState.igDestinoSel||'').replace(/"/g,'&quot;')}" placeholder="Ej: Curicó (prioridad sobre lo que lea Claude)"
+          oninput="uiState.igDestinoSel=this.value"
+          style="${inpSt}">
+      </div> #90A4AE;border-radius:10px;padding:20px;text-align:center;cursor:pointer;background:#FAFAFA;margin-bottom:10px;transition:border-color 0.2s" onclick="">
         <div style="font-size:28px;margin-bottom:6px">📎</div>
         <div style="font-size:12px;font-weight:700;color:#455A64">Toca para seleccionar fotos</div>
         <div style="font-size:10px;color:#90A4AE;margin-top:4px">JPG, PNG — una o varias guías</div>
@@ -11364,16 +11369,18 @@ Si un campo no se puede leer usa null. Responde solo el array JSON.`
 
     // Aplicar conductor/patente: prioridad a Claude si coincide con el sistema,
     // de lo contrario usar lo seleccionado manualmente.
-    const condSel  = uiState.igConductorSel || '';
-    const patSel   = uiState.igPatenteSel   || '';
-    const condsSys = appData.conductores || [];
-    const patsSys  = appData.patentes    || [];
+    const condSel    = uiState.igConductorSel || '';
+    const patSel     = uiState.igPatenteSel   || '';
+    const destinoSel = (uiState.igDestinoSel  || '').trim();
+    const condsSys   = appData.conductores || [];
+    const patsSys    = appData.patentes    || [];
     parsed.forEach(g => {
       const condMatch = condsSys.find(c => igNorm(c) === igNorm(g.conductor));
       g.conductor = condMatch || (condSel ? condSel : g.conductor);
       const patNorm = g.patente.toUpperCase().replace(/[^A-Z0-9]/g,'');
       const patMatch = patsSys.find(p => p.toUpperCase().replace(/[^A-Z0-9]/g,'') === patNorm);
       g.patente = patMatch ? patMatch.toUpperCase().replace(/[^A-Z0-9]/g,'') : (patSel ? patSel.toUpperCase().replace(/[^A-Z0-9]/g,'') : g.patente);
+      if (destinoSel && g.tipo_destino === 'final') g.destino = destinoSel;
     });
 
     const todasGuias = [...existentes, ...parsed];
