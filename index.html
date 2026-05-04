@@ -17,7 +17,7 @@ if ('serviceWorker' in navigator) {
 </script>
 <script>
 (function() {
-  var VERSION = '1777931171';
+  var VERSION = '1777931834';
   var stored = localStorage.getItem('gs_app_version');
   if (stored !== VERSION) {
     var session = localStorage.getItem('gs_session');
@@ -11412,7 +11412,7 @@ async function igAnalizar() {
 TODAS las fechas de estos documentos son del año 2026. Si ves un año distinto, corrígelo a 2026.
 Devuelve ÚNICAMENTE un array JSON válido, sin markdown ni texto adicional.
 Cada objeto representa UNA guía con estos campos:
-- num_guia: folio recuadro superior derecho, solo los últimos 5 dígitos sin ceros. Ej: "0000022938" → "22938".
+- num_guia: El número de folio que aparece en el recuadro superior derecho del documento, junto al texto "N°" o "Nº". Este número tiene exactamente entre 4 y 8 dígitos. Si el número tiene ceros a la izquierda como "0000022938", toma SOLO los dígitos significativos sin ceros: "22938". Si el número no tiene ceros a la izquierda como "5366", déjalo tal cual: "5366". NUNCA inventes ni combines números. Si no puedes leerlo con certeza, devuelve null y agrégalo a requires_confirmation.
 - fecha_despacho: fecha del TIMBRE RECTANGULAR "SOLLEM SPA / BODEGA CASABLANCA" — es el sello rectangular en el CENTRO del documento. El timbre tiene el día, abreviatura del mes en español (ENE=01, FEB=02, MAR=03, ABR=04, MAY=05, JUN=06, JUL=07, AGO=08, SEP=09, OCT=10, NOV=11, DIC=12) y el año. Formato DD-MM-YYYY. El año es 2026. IGNORA COMPLETAMENTE la fecha de emisión del encabezado. null si no legible.
 - fecha_entrega: fecha manuscrita abajo a la IZQUIERDA junto a la firma de recepción. Formato DD-MM-YYYY. null si no aparece.
 - cliente: si el membrete dice SOLLEM en cualquier forma, siempre "Sollem SpA".
