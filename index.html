@@ -109,64 +109,17 @@ body{font-family:'Barlow',sans-serif;background:var(--g50);color:var(--g800);min
 </style>
 </head>
 <body>
-
-<!-- ═══ LOGIN PIN ═══ -->
-<div id="login-screen" style="display:none;position:fixed;inset:0;background:linear-gradient(160deg,#051525,#0B2545,#163A6B);z-index:9999;overflow-y:auto">
-  <div style="max-width:400px;margin:0 auto;padding:40px 20px">
-    <div style="text-align:center;margin-bottom:32px">
-      <div style="color:rgba(255,255,255,0.7);font-size:11px;letter-spacing:3px;font-weight:700">KAPTURA</div>
-      <div style="color:white;font-size:26px;font-weight:800;margin-top:4px">Sistema de Gestión</div>
-    </div>
-    <div id="login-step-pin">
-      <div id="login-quien" style="color:white;font-size:16px;font-weight:700;text-align:center;margin-bottom:6px"></div>
-      <div style="color:rgba(255,255,255,0.6);font-size:11px;letter-spacing:2px;margin-bottom:20px;text-align:center">INGRESA TU PIN</div>
-      <div id="pin-dots" style="display:flex;justify-content:center;gap:16px;margin-bottom:24px">
-        <div class="pin-dot"></div><div class="pin-dot"></div><div class="pin-dot"></div><div class="pin-dot"></div>
-      </div>
-      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;max-width:280px;margin:0 auto">
-        <button onclick="pinPress(1)" class="pin-btn">1</button>
-        <button onclick="pinPress(2)" class="pin-btn">2</button>
-        <button onclick="pinPress(3)" class="pin-btn">3</button>
-        <button onclick="pinPress(4)" class="pin-btn">4</button>
-        <button onclick="pinPress(5)" class="pin-btn">5</button>
-        <button onclick="pinPress(6)" class="pin-btn">6</button>
-        <button onclick="pinPress(7)" class="pin-btn">7</button>
-        <button onclick="pinPress(8)" class="pin-btn">8</button>
-        <button onclick="pinPress(9)" class="pin-btn">9</button>
-        <button onclick="pinBorrar()" class="pin-btn pin-btn-del">←</button>
-        <button onclick="pinPress(0)" class="pin-btn">0</button>
-        <div></div>
-      </div>
-      <div id="pin-error" style="color:#EF9A9A;font-size:12px;text-align:center;margin-top:16px;min-height:18px"></div>
-    </div>
-  </div>
-</div>
-
-<style>
-.pin-dot { width:16px;height:16px;border-radius:50%;border:2px solid rgba(255,255,255,0.5);background:transparent;transition:background 0.15s; }
-.pin-dot.filled { background:white;border-color:white; }
-.pin-btn { background:rgba(255,255,255,0.12);color:white;border:1px solid rgba(255,255,255,0.2);border-radius:12px;padding:18px;font-size:22px;font-weight:600;cursor:pointer;transition:all 0.15s; }
-.pin-btn:active { background:rgba(255,255,255,0.25); }
-.pin-btn-del { background:rgba(255,255,255,0.08);color:rgba(255,255,255,0.7);font-size:18px; }
-</style>
-
 <div class="loading" id="loading">
   <div class="spin"></div>
   <div style="font-size:12px;font-weight:700;color:var(--g600);letter-spacing:0.1em">CARGANDO KAPTURA...</div>
 </div>
 
 <header class="hdr">
-  <div style="display:flex;flex-direction:column">
-    <div class="logo">KAPTURA</div>
-    <div id="hdr-empresa" style="font-size:11px;font-weight:800;color:var(--blue);letter-spacing:0.05em;margin-top:1px"></div>
-  </div>
-  <div style="display:flex;align-items:center;gap:12px">
-    <div class="hdr-info" id="hdr-info"></div>
-    <button id="btn-cerrar-sesion" onclick="cerrarSesionKaptura()" style="display:none;background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.3);color:white;border-radius:6px;padding:6px 14px;font-size:12px;cursor:pointer;font-weight:700">⏏ Salir</button>
-  </div>
+  <div class="logo">KAPTURA</div>
+  <div class="hdr-info" id="hdr-info"></div>
 </header>
 
-<nav class="nav" id="nav" style="display:none">
+<nav class="nav">
   <button class="ntab active" onclick="setTab('servicios',this)">Servicios</button>
   <button class="ntab" onclick="setTab('flota',this)">Flota</button>
   <button class="ntab" onclick="setTab('clientes',this)">Clientes</button>
@@ -177,48 +130,7 @@ body{font-family:'Barlow',sans-serif;background:var(--g50);color:var(--g800);min
   <button class="ntab" onclick="setTab('config',this)">Config</button>
 </nav>
 
-<!-- ═══ PANTALLA MÓDULOS ═══ -->
-<div id="pantalla-modulos" style="display:none;max-width:480px;margin:0 auto;padding:24px 16px">
-  <div style="text-align:center;margin-bottom:24px">
-    <div style="font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;color:var(--g400);letter-spacing:0.15em" id="mod-empresa-label">—</div>
-    <div style="font-family:'Barlow Condensed',sans-serif;font-size:24px;font-weight:900;color:var(--navy)">SELECCIONA TU MÓDULO</div>
-  </div>
-
-  <!-- KAPTURA GO -->
-  <div id="mod-go" onclick="entrarModulo('go')" style="background:#fff;border:2px solid #059669;border-radius:14px;padding:18px;margin-bottom:12px;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,0.08)">
-    <div style="display:flex;align-items:center;justify-content:space-between">
-      <div>
-        <div style="font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:900;color:#059669">📡 KAPTURA GO</div>
-        <div style="font-size:12px;color:#6B7280;margin-top:4px">Inicia · GPS registra todo · Ver margen</div>
-      </div>
-      <div style="background:#059669;color:#fff;font-size:10px;font-weight:800;padding:4px 10px;border-radius:20px">BÁSICO</div>
-    </div>
-  </div>
-
-  <!-- KAPTURA PRO -->
-  <div id="mod-pro" onclick="entrarModulo('pro')" style="background:#fff;border:2px solid #D97706;border-radius:14px;padding:18px;margin-bottom:12px;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,0.08)">
-    <div style="display:flex;align-items:center;justify-content:space-between">
-      <div>
-        <div style="font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:900;color:#D97706">📱 KAPTURA PRO</div>
-        <div style="font-size:12px;color:#6B7280;margin-top:4px">Guías · Etapas · KPIs · $/km · Ranking clientes</div>
-      </div>
-      <div style="background:#D97706;color:#fff;font-size:10px;font-weight:800;padding:4px 10px;border-radius:20px">PRO</div>
-    </div>
-  </div>
-
-  <!-- KAPTURA FLOTA -->
-  <div id="mod-flota" onclick="entrarModulo('flota')" style="background:#fff;border:2px solid #1E3A5F;border-radius:14px;padding:18px;margin-bottom:12px;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,0.08)">
-    <div style="display:flex;align-items:center;justify-content:space-between">
-      <div>
-        <div style="font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:900;color:#1E3A5F">🖥 KAPTURA FLOTA</div>
-        <div style="font-size:12px;color:#6B7280;margin-top:4px">Asignación · Flota · Coordinador · Gestión completa</div>
-      </div>
-      <div id="mod-flota-badge" style="background:#1E3A5F;color:#fff;font-size:10px;font-weight:800;padding:4px 10px;border-radius:20px">PREMIUM</div>
-    </div>
-  </div>
-</div>
-
-<main class="main" id="main" style="display:none">
+<main class="main">
   <!-- TAB SERVICIOS -->
   <div id="tab-servicios">
     <div style="display:flex;align-items:center;justify-content:flex-end;padding:8px 12px 0">
@@ -617,13 +529,6 @@ body{font-family:'Barlow',sans-serif;background:var(--g50);color:var(--g800);min
         <div class="fld"><label class="lbl">Fecha del Servicio</label><input class="inp" id="asig-fecha" type="date"></div>
       </div>
       <div class="fld" id="wrap-origen-custom" style="display:none"><label class="lbl">Especifica el origen</label><input class="inp" id="asig-origen-custom" placeholder="Ciudad de origen"></div>
-      <div class="fld">
-        <label class="lbl">Tipo de Operación</label>
-        <select class="inp" id="asig-tipo-operacion">
-          <option value="con_carro">🚛 Con carro (rendimiento según flota)</option>
-          <option value="sin_carro">🚚 Sin carro (3.5 km/lt)</option>
-        </select>
-      </div>
       <div class="fld">
         <label class="lbl">Punto de Inicio del Equipo</label>
         <select class="inp" id="asig-punto-inicio">
@@ -1632,52 +1537,40 @@ let DB_tarifario = [];
 // ══ INIT ══
 async function init() {
   document.getElementById('filtro-fecha').value = '';
-  const empLabel = (DB._empresa||'global_solutions') === 'transportes_madrid' ? 'MADRID' : 'GLOBAL';
   document.getElementById('hdr-info').innerHTML =
-    `${hoy.getDate()} ${MESES[hoy.getMonth()]} ${hoy.getFullYear()} · v${KAPTURA_VERSION} · ${empLabel}`;
+    `${hoy.getDate()} ${MESES[hoy.getMonth()]} ${hoy.getFullYear()} · v${KAPTURA_VERSION}`;
   // Seleccionar mes en curso automáticamente
   const dashMes = document.getElementById('dash-mes');
   if(dashMes) dashMes.value = String(hoy.getMonth());
 
   try {
-    const emp = DB._empresa || 'global_solutions';
     const [f,c,cl,t,cfg,s] = await Promise.all([
-      supa.from('kaptura_flota').select('*').eq('empresa',emp).order('patente'),
-      supa.from('kaptura_conductores').select('*').eq('activo',true).eq('empresa',emp).order('nombre'),
-      supa.from('kaptura_clientes').select('*').eq('empresa',emp).order('nombre'),
+      supa.from('kaptura_flota').select('*').order('patente'),
+      supa.from('kaptura_conductores').select('*').eq('activo',true).order('nombre'),
+      supa.from('kaptura_clientes').select('*').order('nombre'),
       supa.from('kaptura_tarifarios').select('*'),
       supa.from('kaptura_config').select('*'),
-      supa.from('servicios_piloto').select('*').eq('empresa',emp).order('created_at',{ascending:false}).limit(500)
+      supa.from('servicios_piloto').select('*').order('created_at',{ascending:false}).limit(500)
     ]);
     DB.flota       = f.data  || [];
     DB.conductores = c.data  || [];
     DB.clientes    = cl.data || [];
     DB.tarifarios  = t.data  || [];
     DB.servicios = (s.data || []).map(svc => {
-      const notas = svc.notas || '';
-      const marker = notas.includes('|_PUNTOS:') ? '|_PUNTOS:' : notas.includes('_PUNTOS:') ? '_PUNTOS:' : null;
-      if(marker) {
-        try {
-          const parsed = JSON.parse(notas.split(marker)[1].split('|_PORTICOS:')[0]);
-          if(parsed && parsed.length > 0) svc._puntos = parsed;
-        } catch(e) {}
+      if(!svc._puntos || svc._puntos.length === 0) {
+        const notas = svc.notas || '';
+        const marker = notas.includes('|_PUNTOS:') ? '|_PUNTOS:' : notas.includes('_PUNTOS:') ? '_PUNTOS:' : null;
+        if(marker) { try { svc._puntos = JSON.parse(notas.split(marker)[1].split('|_PORTICOS:')[0]); } catch(e) {} }
+        if(notas.includes('|_PORTICOS:')) {
+          try { svc._porticos = JSON.parse(notas.split('|_PORTICOS:')[1].split('|_CORREDOR:')[0]); } catch(e) {}
+        }
+        if(notas.includes('|_CORREDOR:')) {
+          try { svc._corredor = notas.split('|_CORREDOR:')[1].split('|_HORAS:')[0].trim(); } catch(e) {}
+        }
+        if(notas.includes('|_HORAS:')) {
+          try { svc._horasSvc = JSON.parse(notas.split('|_HORAS:')[1]); } catch(e) {}
+        }
       }
-      if(!svc._puntos) svc._puntos = [];
-      if(notas.includes('|_PORTICOS:')) {
-        try { svc._porticos = JSON.parse(notas.split('|_PORTICOS:')[1].split('|_CORREDOR:')[0]); } catch(e) {}
-      }
-      if(notas.includes('|_CORREDOR:')) {
-        try { svc._corredor = notas.split('|_CORREDOR:')[1].split('|_HORAS:')[0].trim(); } catch(e) {}
-      }
-      if(notas.includes('|_HORAS:')) {
-        try { svc._horasSvc = JSON.parse(notas.split('|_HORAS:')[1]); } catch(e) {}
-      }
-      // Derivar fecha_termino si no existe en BD
-      if(!svc.fecha_termino && svc._horasSvc) {
-        const llegada = svc._horasSvc.llegada_base || svc._horasSvc.salida_destino || null;
-        if(llegada) svc.fecha_termino = llegada.substring(0,10);
-      }
-      if(!svc.fecha_termino) svc.fecha_termino = svc.fecha;
       return svc;
     });
     (cfg.data||[]).forEach(r => { DB.config[r.clave||r.nombre] = r.valor||r.value; });
@@ -2013,10 +1906,9 @@ async function guardarAsignacion() {
     await supa.from('kaptura_clientes').insert({nombre:clienteNew, condicion_pago:'30 días'});
     DB.clientes.push({nombre:clienteNew});
   }
-  const puntoInicio   = document.getElementById('asig-punto-inicio').value;
-  const tipoOperacion = document.getElementById('asig-tipo-operacion').value;
+  const puntoInicio = document.getElementById('asig-punto-inicio').value;
   const svId = await siguienteId();
-  const nuevo = { servicio_id:svId, patente, conductor, cliente, origen, fecha, estado:'asignado', margen_servicio:0, puntos_entrega:0, punto_inicio:puntoInicio, tipo_operacion:tipoOperacion, empresa: DB._empresa||'global_solutions' };
+  const nuevo = { servicio_id:svId, patente, conductor, cliente, origen, fecha, estado:'asignado', margen_servicio:0, puntos_entrega:0, punto_inicio:puntoInicio };
   const {data:inserted, error} = await supa.from('servicios_piloto').insert(nuevo).select();
   if(error) { toast('Error: '+error.message); return; }
   let svcInsertado = inserted?.[0];
@@ -2477,18 +2369,13 @@ function abrirCierre(i) {
   irACostos();
 }
 
-let _integrando = false;
 async function calcCostos() {
-  if(_integrando) return;
   const c    = DB.config;
   const dias = parseFloat(document.getElementById('cos-dias').value)||1;
   const km   = parseFloat(document.getElementById('cos-km').value)||0;
   // Usar rendimiento específico del equipo si existe, sino el global
-  // Si tipo_operacion = sin_carro, usar 3.5 km/lt fijo
   const flotaEquipo = DB.flota.find(f => f.patente === svcPatenteActiva);
-  const svcActivo = DB.servicios[svcActivoIdx];
-  const rend = (svcActivo?.tipo_operacion === 'sin_carro') ? 3.5
-    : parseFloat(flotaEquipo?.rendimiento_km_lt || c.rendimiento||c.rendimiento_km_lt||2.5);
+  const rend = parseFloat(flotaEquipo?.rendimiento_km_lt || c.rendimiento||c.rendimiento_km_lt||2.5);
   // Precio combustible: manual o automático (Copec día servicio - 20% IVA)
   let prec = parseFloat(c.precio_litro||c.precio_combustible||1300);
   const lts = km ? Math.round(km/rend*10)/10 : 0;
@@ -2534,11 +2421,8 @@ async function calcCostos() {
       const diaSemana = d.getDay();
       if(diaSemana === 0 || diaSemana === 6) continue; // fin de semana: $0
       const fechaStr = d.toISOString().substring(0,10);
-      const empActual = DB._empresa || 'global_solutions';
       const equiposDia = DB.servicios.filter(sv => {
         if(!estadosValidos.includes(sv.estado)) return false;
-        const svEmp = sv.empresa || 'global_solutions';
-        if(svEmp !== empActual) { console.log('CF excluye', sv.servicio_id, 'empresa:', svEmp, 'vs', empActual); return false; }
         const svIni  = sv.fecha || '';
         const svTerm = sv._fecha_termino || sv.fecha_termino || sv.fecha || '';
         return svIni <= fechaStr && svTerm >= fechaStr;
@@ -2614,11 +2498,7 @@ function calcRetorno() {
   }
 }
 
-let _cargandoGPS = false;
 async function cargarGPS() {
-  if(_cargandoGPS) return;
-  _cargandoGPS = true;
-  try {
   const s = DB.servicios[svcActivoIdx];
   const patente     = s?.patente;
   const fechaInicio = document.getElementById('cos-fecha-inicio').value;
@@ -2659,8 +2539,7 @@ async function cargarGPS() {
                         notasStr.includes('Retorno: nueva_asignacion') ? 'nueva_asignacion' : 'base';
 
     let inicioViaje = null;
-    const esSalidaDesdeDestAnt = puntoInicioSvc === 'destino_anterior';
-    if(!esPrimerServicio && (retornoTipo !== 'nueva_asignacion' || esSalidaDesdeDestAnt)) {
+    if(!esPrimerServicio && retornoTipo !== 'nueva_asignacion') {
       // Buscar servicio anterior del mismo equipo
       const svcsEquipo = DB.servicios
         .filter(sv => sv.patente === patente && sv.estado === 'cerrado' && sv.fecha < fechaInicio)
@@ -2668,10 +2547,11 @@ async function cargarGPS() {
       const svcAnterior = svcsEquipo[0];
       if(svcAnterior) {
         const notasAnt = svcAnterior.notas || '';
-        const destinoAnt = svcAnterior.destino || '';
-        // Buscar inicio desde destino anterior si punto_inicio = destino_anterior
-        // O si el anterior terminó en nueva_asignacion/pernocta
-        if(esSalidaDesdeDestAnt || notasAnt.includes('Retorno: nueva_asignacion') || notasAnt.includes('Retorno: pernocta')) {
+        if(notasAnt.includes('Retorno: nueva_asignacion') || notasAnt.includes('Retorno: pernocta')) {
+          // El anterior terminó en nueva asignación — el origen real de este servicio
+          // es el destino del anterior, no la base
+          // Buscar primer evento desde el destino del servicio anterior
+          const destinoAnt = svcAnterior.destino || '';
           if(destinoAnt) {
             const destKws = destinoAnt.toLowerCase().split(/[\s,]+/).filter(w=>w.length>3);
             const primerEvtDestAnt = eventos.find(e => {
@@ -2681,10 +2561,6 @@ async function cargarGPS() {
             if(primerEvtDestAnt) {
               inicioViaje = primerEvtDestAnt.datetime_evento;
               console.log('Inicio desde destino anterior:', destinoAnt, '->', inicioViaje);
-            } else {
-              // Si no encuentra evento en destino anterior, tomar primer trip del día
-              inicioViaje = tripsRaw[0]?.datetime_evento || null;
-              console.log('Inicio desde primer trip (destino ant no encontrado):', inicioViaje);
             }
           }
         }
@@ -2772,7 +2648,7 @@ async function cargarGPS() {
     // Si es primer servicio → usar todos los trips (sin filtro firstLongTrip)
     // Si no → filtrar por firstLongTrip para ignorar movimientos locales pre-viaje
     let firstLongTrip = null;
-    if(!esPrimerServicio && !esSalidaDesdeDestAnt) {
+    if(!esPrimerServicio) {
       // Buscar primer trip largo desde la BASE (Coltauco) primero
       const baseKws = ['coltauco','quillaiquén','quillayquén','ruta h-30'];
       const firstTripBase = tripsRaw.find(t => t.km_tramo > 10 && baseKws.some(k=>t.address.toLowerCase().includes(k)));
@@ -2804,15 +2680,10 @@ async function cargarGPS() {
     document.getElementById('lbl-km').style.color = '#065F46';
     document.getElementById('cos-dias').value = diasActivos;
 
-    // evtOrigen = primer stop en ORIGEN después del inicio del viaje = donde empieza km cargado
-    // Si el origen ES la base (Coltauco), no buscar evtOrigen — el tramo cargado empieza desde inicioViaje
-    const baseKwsOrigen = ['coltauco','quillaiquén','quillaiquen','quillayquén'];
-    const origenEsBase = origenKws.some(k => baseKwsOrigen.includes(k.toLowerCase()));
-    const evtOrigen = origenEsBase ? null : allEvtsSorted.find(e => 
-      e.datetime_evento > (inicioViaje||'') && 
-      matchAddr(e.address, origenKws) && 
-      (e.evento==='stop'||e.evento==='geofence_in')
-    );
+    // inicioViaje = primer evento en ORIGEN del servicio (donde carga) = inicio tramo cargado
+    const evtOrigen = firstLongTrip
+      ? allEvtsSorted.filter(e => e.datetime_evento <= firstLongTrip.datetime_evento && matchAddr(e.address, origenKws) && (e.evento==='stop'||e.evento==='geofence_in')).pop()
+      : allEvtsSorted.find(e => matchAddr(e.address, origenKws) && (e.evento==='stop'||e.evento==='geofence_in'));
 
     // Find FIRST STOP matching DESTINO after inicioViaje = end of cargado (primera llegada, no la de vuelta)
     const evtDestino = allEvtsSorted.find(e => e.datetime_evento > (inicioViaje||'') && matchAddr(e.address, destinoKws) && e.evento==='stop');
@@ -2820,12 +2691,17 @@ async function cargarGPS() {
     console.log('Origen kws:', origenKws[0], '→ inicio viaje:', inicioViaje||evtOrigen?.datetime_evento||'null');
     console.log('Destino kws:', destinoKws[0], '→ evento:', evtDestino?.datetime_evento||'null');
 
-    // Calculate km cargados = trips desde evtOrigen (o inicioViaje si no hay origen) hasta evtDestino
+    // Calculate km cargados = trips desde inicioViaje hasta evtDestino
     let kmCargado = 0;
-    const inicioTramoCargado = evtOrigen?.datetime_evento || inicioViaje;
-    if(inicioTramoCargado && evtDestino) {
+    if(inicioViaje && evtDestino) {
       for(const t of trips) {
-        if(t.datetime_evento >= inicioTramoCargado && t.datetime_evento <= evtDestino.datetime_evento) {
+        if(t.datetime_evento >= inicioViaje && t.datetime_evento <= evtDestino.datetime_evento) {
+          kmCargado += t.km_tramo;
+        }
+      }
+    } else if(evtOrigen && evtDestino && evtOrigen.datetime_evento < evtDestino.datetime_evento) {
+      for(const t of trips) {
+        if(t.datetime_evento >= evtOrigen.datetime_evento && t.datetime_evento <= evtDestino.datetime_evento) {
           kmCargado += t.km_tramo;
         }
       }
@@ -2849,7 +2725,6 @@ async function cargarGPS() {
     document.getElementById('cos-km-cargado').value   = Math.round(kmCargado);
     document.getElementById('cos-km-vacio-ida').value = kmVacioIda;
     document.getElementById('cos-km-retorno').value   = '';
-    _integrando = true;
     calcRetorno();
 
     // Detección TAG por corredor
@@ -2880,32 +2755,6 @@ async function cargarGPS() {
       } else {
         console.log('Destino no encontrado en tabla:', destinoSvc, '— sin corredores');
       }
-
-      // Corredor tramo vacío: desde punto de inicio hacia origen del servicio
-      // No aplicar si el origen ES la base (equipo sale cargado desde Coltauco)
-      if(kmVacioIda > 0 && origenSvc && origenSvc !== destinoSvc && !origenEsBase) {
-        // Determinar desde dónde viene el equipo
-        const puntoInicioVacio = (puntoInicioSvc === 'destino_anterior' && s._corredor_anterior)
-          ? (DB.servicios.filter(sv => sv.patente===patente && sv.estado==='cerrado' && sv.fecha<fechaInicio).sort((a,b)=>b.fecha>a.fecha?1:-1)[0]?.destino||'COLTAUCO').toUpperCase()
-          : 'COLTAUCO';
-        const origenConfig = DB_tarifario.find(d => d.origen === puntoInicioVacio && d.destino === origenSvc)
-          || DB_tarifario.find(d => d.destino === origenSvc && d.origen === 'COLTAUCO')
-          || DB_tarifario.find(d => d.destino === origenSvc);
-        if(origenConfig) {
-          const idsCorredoresVacio = origenConfig.corredores.split(',').map(c=>c.trim());
-          for(const cid of idsCorredoresVacio) {
-            // No duplicar corredores ya detectados
-            if(corredoresDetectados.find(cd=>cd.corr.id===cid)) continue;
-            const corr = DB_corredores.find(c=>c.id===cid);
-            if(!corr) continue;
-            corredoresDetectados.push({corr, score:5});
-            if(corr.total_tag > 0) detectadosTag.push({nombre:'TAG '+corr.id+' (vacío)', valor:corr.total_tag, tipo:'tag'});
-            if(corr.total_peajes > 0) detectadosTag.push({nombre:'PEAJES '+corr.id+' (vacío)', valor:corr.total_peajes, tipo:'peaje'});
-          }
-          console.log('Corredor vacío:', origenSvc, '→', destinoSvc, '→ corredores:', idsCorredoresVacio.join('+'));
-        }
-      }
-
       _lastDetectadosTag = detectadosTag;
       _lastCorredorNombre = corredoresDetectados.length > 0 ? corredoresDetectados[0].corr?.nombre||'' : '';
     } else {
@@ -2938,7 +2787,6 @@ async function cargarGPS() {
       document.getElementById('lbl-peajes').style.background = (hayKmGPS && totalPeajes>0) ? '#D1FAE5' : '#FEF3C7';
       document.getElementById('lbl-peajes').style.color = (hayKmGPS && totalPeajes>0) ? '#065F46' : '#92400E';
     }
-    _integrando = false;
     calcCostos();
     toast(`✓ GPS: ${Math.round(kmTotal)} km · ${diasActivos} días · TAG: ${fmt(hayKmGPS ? totalTag : 0)} · Peajes: ${fmt(hayKmGPS ? totalPeajes : 0)}`);
     } // fin bloque hayGPS
@@ -2987,7 +2835,6 @@ async function cargarGPS() {
       if(el) delete el.dataset.manual;
     });
   } catch(e) { toast('Error GPS: '+e.message); console.error(e); }
-  } finally { _cargandoGPS = false; }
 }
 
 async function guardarCostosBorrador() {
@@ -3057,11 +2904,8 @@ async function guardarCostosBorrador() {
   if(corredorActual) notasFinales += '|_CORREDOR:' + corredorActual;
   if(horasSvcActual) notasFinales += '|_HORAS:' + JSON.stringify(horasSvcActual);
 
-  const destinoFinal = final?.destino || null;
   const {error} = await supa.from('servicios_piloto').update({
     estado:'borrador', km_total:km, costo_peajes:peajes, peajes_tag:tag,
-    fecha_termino: fechaTerm||null,
-    destino: destinoFinal,
     tarifa_neta:tarifa||null, ingreso_total:ingreso||null, dias_servicio:dias, costo_combustible:comb,
     costo_conductor:condVal, costo_viaticos:viat, costo_fijo_dia:cf,
     costo_mantencion:mant, factoring:fact, total_costos:costos,
@@ -3072,7 +2916,6 @@ async function guardarCostosBorrador() {
   if(error) { toast('Error: '+error.message); return; }
   DB.servicios[svcActivoIdx] = {...s, estado:'borrador', km_total:km, tarifa_neta:tarifa,
     ingreso_total:ingreso, total_costos:costos, costo_combustible:comb,
-    fecha_termino: fechaTerm||null,
     peajes_tag:tag, costo_peajes:peajes, dias_servicio:dias,
     costo_conductor:condVal, costo_viaticos:viat, costo_fijo_dia:cf,
     costo_mantencion:mant, factoring:fact,
@@ -3705,133 +3548,7 @@ document.querySelectorAll('.overlay').forEach(el => {
   el.addEventListener('click', e => { if(e.target===el) el.style.display='none'; });
 });
 
-// ═══ LOGIN PIN ═══
-let _sessionUsuario = null;
-let _pinIngresado = '';
-
-async function iniciarLogin() {
-  // Mostrar PIN inmediatamente — no esperar Supabase
-  document.getElementById('login-screen').style.display = 'block';
-  document.getElementById('loading').style.display = 'none';
-  document.getElementById('main').style.display = 'none';
-  document.getElementById('pantalla-modulos').style.display = 'none';
-}
-
-function pinPress(val) {
-  if(_pinIngresado.length < 4) _pinIngresado += String(val);
-  actualizarDotsPIN();
-  if(_pinIngresado.length === 4) setTimeout(validarPinKaptura, 150);
-}
-
-function pinBorrar() {
-  _pinIngresado = _pinIngresado.slice(0,-1);
-  actualizarDotsPIN();
-  document.getElementById('pin-error').textContent = '';
-}
-
-function actualizarDotsPIN() {
-  document.querySelectorAll('.pin-dot').forEach((d,i) => {
-    d.classList.toggle('filled', i < _pinIngresado.length);
-  });
-}
-
-async function validarPinKaptura() {
-  // PIN demo → redirige a conductor.html
-  if(_pinIngresado === '0000') {
-    localStorage.setItem('kaptura_session', JSON.stringify({pin:'0000', empresa:'demo', rol:'conductor', nombre:'Carlos Torres'}));
-    window.location.href = 'conductor.html';
-    return;
-  }
-  const {data:usr, error} = await supa.from('kaptura_usuarios')
-    .select('*').eq('pin',_pinIngresado).eq('activo',true).single();
-  if(usr) {
-    _sessionUsuario = usr;
-    localStorage.setItem('kaptura_session', JSON.stringify({pin: _pinIngresado, empresa: usr.empresa, rol: usr.rol, nombre: usr.nombre}));
-    // Conductor → redirigir a conductor.html
-    if(usr.rol === 'conductor') {
-      window.location.href = 'conductor.html?empresa='+usr.empresa+'&conductor='+encodeURIComponent(usr.conductor_nombre||'');
-      return;
-    }
-    // GO → redirigir a conductor.html módulo go
-    if(usr.rol === 'go') {
-      window.location.href = 'conductor.html?modulo=go';
-      return;
-    }
-    // Admin KAPTURA → redirigir a conductor.html módulo admin
-    if(usr.rol === 'admin_kaptura') {
-      window.location.href = 'conductor.html?modulo=admin';
-      return;
-    }
-    document.getElementById('login-screen').style.display = 'none';
-    aplicarAccesoKaptura();
-  } else {
-    document.getElementById('pin-error').textContent = 'PIN incorrecto. Intenta de nuevo.';
-    _pinIngresado = '';
-    actualizarDotsPIN();
-  }
-}
-
-function aplicarAccesoKaptura() {
-  if(!_sessionUsuario) { iniciarLogin(); return; }
-  // Ocultar login
-  document.getElementById('login-screen').style.display = 'none';
-  document.getElementById('btn-cerrar-sesion').style.display = 'block';
-  // Nombre empresa en header
-  const empNombre = (_sessionUsuario?.empresa||'') === 'transportes_madrid' ? 'TRANSPORTES MADRID' : 'GLOBAL SOLUTIONS';
-  document.getElementById('hdr-empresa').textContent = empNombre;
-  document.getElementById('mod-empresa-label').textContent = empNombre;
-  // Aplicar bloqueo según rol
-  const esConductor = _sessionUsuario.rol === 'conductor';
-  const modFlota = document.getElementById('mod-flota');
-  const modFlotaBadge = document.getElementById('mod-flota-badge');
-  if(esConductor) {
-    modFlota.style.opacity = '0.5';
-    modFlota.style.cursor = 'not-allowed';
-    modFlotaBadge.textContent = '🔒 BLOQUEADO';
-    modFlotaBadge.style.background = '#9CA3AF';
-  } else {
-    modFlota.style.opacity = '1';
-    modFlota.style.cursor = 'pointer';
-    modFlotaBadge.textContent = 'PREMIUM';
-    modFlotaBadge.style.background = '#1E3A5F';
-  }
-  // Mostrar pantalla módulos
-  document.getElementById('pantalla-modulos').style.display = 'block';
-  document.getElementById('loading').style.display = 'none';
-}
-
-function entrarModulo(modulo) {
-  const esConductor = _sessionUsuario?.rol === 'conductor';
-  if(modulo === 'flota' && esConductor) {
-    alert('🔒 Este módulo requiere plan KAPTURA FLOTA');
-    return;
-  }
-  if(modulo === 'go' || modulo === 'pro') {
-    window.location.href = 'conductor.html?modulo=' + modulo;
-    return;
-  }
-  if(modulo === 'flota') {
-    document.getElementById('pantalla-modulos').style.display = 'none';
-    document.getElementById('loading').style.display = 'flex';
-    document.getElementById('main').style.display = '';
-    document.getElementById('nav').style.display = '';
-    DB._empresa = _sessionUsuario.empresa;
-    init();
-  }
-}
-
-function cerrarSesionKaptura() {
-  if(!confirm('¿Cerrar sesión?')) return;
-  localStorage.removeItem('kaptura_session');
-  _sessionUsuario = null;
-  _pinIngresado = '';
-  actualizarDotsPIN();
-  document.getElementById('pin-error').textContent = '';
-  document.getElementById('login-screen').style.display = 'block';
-  document.getElementById('main').style.display = 'none';
-}
-
-iniciarLogin();
+init();
 </script>
 </body>
 </html>
