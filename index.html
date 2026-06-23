@@ -10293,6 +10293,15 @@ function renderDisponibilidad() {
           <option value="">Seleccionar...</option>
           ${conductorOpts}
         </select>
+      </div>
+      <div>
+        <div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">CLIENTE</div>
+        <select id="disp_cliente" onchange="(function(sel){uiState.disp_form=uiState.disp_form||{};uiState.disp_form.cliente=sel.value;if(sel.value==='__otro__'){uiState.disp_form.clienteManual=''}else{uiState.disp_form.clienteManual=undefined};render();})(this)" style="width:100%;border:1px solid #dde;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit;background:white;-webkit-appearance:auto">
+          <option value="">Seleccionar...</option>
+          ${(appData.clientes||[]).map(c=>`<option value="${c.nombre||c}" ${(fd.cliente===(c.nombre||c))?'selected':''}>${c.nombre||c}</option>`).join('')}
+          <option value="__otro__" ${fd.cliente==='__otro__'?'selected':''}>+ Otro cliente...</option>
+        </select>
+        ${fd.cliente==='__otro__' ? `<input id="disp_cliente_manual" value="${fd.clienteManual||''}" onchange="uiState.disp_form=uiState.disp_form||{};uiState.disp_form.clienteManual=this.value" placeholder="Nombre del cliente..." style="margin-top:4px;width:100%;border:1px solid #FFA726;border-radius:6px;padding:7px 9px;font-size:12px;outline:none;font-family:inherit">` : ''}
       </div>` : ''}
       ${fd.estado==='Mantención' ? `<div>
         <div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">TIPO MANTENCIÓN</div>
@@ -10522,6 +10531,9 @@ function guardarDisponibilidad() {
   const conductor = document.getElementById('disp_conductor')?.value||'';
   const tipoMant = document.getElementById('disp_tipo_mant')?.value||'';
   const mantManual = document.getElementById('disp_mant_manual')?.value||'';
+  const clienteRaw = document.getElementById('disp_cliente')?.value||'';
+  const clienteManual = document.getElementById('disp_cliente_manual')?.value||'';
+  const cliente = clienteRaw === '__otro__' ? clienteManual : clienteRaw;
 
   if (!patente || !estado || !fecha) return alert('Completa fecha, patente y estado');
 
@@ -10531,7 +10543,7 @@ function guardarDisponibilidad() {
 
   if (!appData.disponibilidad) appData.disponibilidad = {};
   if (!appData.disponibilidad[fechaKey]) appData.disponibilidad[fechaKey] = {};
-  const registroDisp = { estado, conductor, tipoMant, mantManual };
+  const registroDisp = { estado, conductor, cliente, tipoMant, mantManual };
   appData.disponibilidad[fechaKey][patente] = registroDisp;
   uiState.disp_form = {};
   saveData();
